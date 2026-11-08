@@ -177,7 +177,7 @@ remain upstream reports about Firebat, not results from this session.
 ### Final validation for the Linux-evidence stage
 
 Both kexts, the full Metal plugin, pinned translator, patched RADV and all four
-CLI tools built successfully. Seven host C++ binaries and 19 Python test methods
+CLI tools built successfully. Seven host C++ binaries and 20 Python test methods
 passed with firmware fixtures; the actual firmware extractor also passed ASan/UBSan.
 Mesa transport tests passed 134 legacy checks plus topology cases; patches 0007..0009
 match their generators byte-for-byte. The packaged MSL-to-AIR-to-SPIR-V-to-ACO
@@ -187,3 +187,11 @@ passed; the current translated shader hashes match the HP-tested receipt.
 Existing kernel field-shadow and plugin protocol/deprecation warnings remain.
 No macOS device was activated, no target EFI was changed, and no firmware/register
 write or driver reload was performed outside normal Linux Vulkan submissions.
+
+The final review also hardened the actual `mesboot.c`: every IOKit transport and
+reply size is checked; MES completion timeouts and failed compute/graphics
+readback stop the process before queue adoption. Unknown/incomplete commands fail
+before opening IOKit. An injected-transport build of the real source tests Hello,
+register reads, staging writes, claims, short replies and scheduler timeout paths.
+These host cases do not execute GPU commands. Other experimental VM/SDMA branches
+still need runtime work; no hardware reset or HP initialization was added.

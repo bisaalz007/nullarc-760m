@@ -40,6 +40,7 @@ The kernel now rejects unready/wrong-engine submission, rolls back partial page
 mappings, tracks multiple user fences, and retains memory after a device-loss
 fault instead of freeing pages potentially referenced by DMA. Firmware tools
 propagate transfer/status errors rather than reporting success after failure.
+MES timeouts and failed compute/graphics readback now stop before queue adoption.
 
 **HP hardware bring-up, GPU execution and Metal acceleration are not verified.**
 The exact HP device remains diagnostic-only. A live SSH capture confirms its

@@ -22,11 +22,39 @@
 
 static io_connect_t conn;
 
+static void fail(const char *operation, kern_return_t kr)
+{
+   fprintf(stderr, "mesboot: %s failed (0x%x); stopped before further GPU operations\n", operation, kr);
+   exit(EXIT_FAILURE);
+}
+static kern_return_t scalar(io_connect_t c, uint32_t selector, const uint64_t *in,
+   uint32_t count, uint64_t *out, uint32_t *n)
+{
+   uint32_t expected = n ? *n : 0;
+   kern_return_t kr = IOConnectCallScalarMethod(c, selector, in, count, out, n);
+   if (kr || (n && *n != expected)) fail("scalar transport/reply", kr ? kr : kIOReturnBadArgument);
+   return kr;
+}
+static kern_return_t method(io_connect_t c, uint32_t selector, const uint64_t *in, uint32_t count,
+   const void *bytes, size_t size, uint64_t *out, uint32_t *n, void *bout, size_t *bsize)
+{
+   uint32_t expected = n ? *n : 0;
+   size_t expected_size = bsize ? *bsize : 0;
+   kern_return_t kr = IOConnectCallMethod(c, selector, in, count, bytes, size, out, n, bout, bsize);
+   if (kr || (n && *n != expected) || (bsize && *bsize != expected_size))
+      fail("structured transport/reply", kr ? kr : kIOReturnBadArgument);
+   return kr;
+}
+// Route every experiment and queue-adoption call through checked transport.
+#define IOConnectCallScalarMethod scalar
+#define IOConnectCallMethod method
+
 static int open_kext(void)
 {
    io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
    if (!svc) { fprintf(stderr, "no PhxBringup\n"); return -1; }
    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), UC_TYPE, &conn);
+   IOObjectRelease(svc);
    uint64_t hin[2] = {1, 0}, hout[4]; uint32_t hn = 4;
    if (kr == 0) kr = IOConnectCallScalarMethod(conn, SEL_HELLO, hin, 2, hout, &hn);
    if (kr) { fprintf(stderr, "open: 0x%x\n", kr); return -1; }
@@ -323,7 +351,8 @@ static int mes_submit(void *pkt, size_t size, size_t api_status_off, const char 
    grbm_select(0, 0, 0, 0);
    uint32_t f = vr(SCH_WB + 32), st = vr(SCH_WB + 64);
    printf("mes %s: fence=%u (want %llu) status=%u -> %s\n", what, f, (unsigned long long)sch_seq, st, (f == sch_seq && st) ? "OK" : "TIMEOUT");
-   return !(f == sch_seq && st);
+   if (!(f == sch_seq && st)) fail("MES completion timeout", kIOReturnTimeout);
+   return 0;
 }
 #define CMP_RING 0x2540000ull
 #define CMP_WB   0x2541000ull
@@ -358,6 +387,8 @@ static void compute_via_mes(void)
    for (int i = 0; i < 50; i++) { usleep(10000); if (rd(SEG1(0x2040)) == 0xDEADBEEF && vr(TESTBUF) == 0xFEEDF00D) break; }
    grbm_select(1, 0, 0, 0);
    printf("compute: scratch0=0x%08x (want deadbeef) testbuf=0x%08x (want feedf00d) hqd_active=%u rptr=%u\n", rd(SEG1(0x2040)), vr(TESTBUF), rd(SEG0(0x1fab)), rd(SEG0(0x1fb3)));
+   if (rd(SEG1(0x2040)) != 0xDEADBEEF || vr(TESTBUF) != 0xFEEDF00D)
+      fail("compute readback before queue adoption", kIOReturnTimeout);
    grbm_select(0, 0, 0, 0);
    if (env_on("ADOPT")) {   // hand the working compute queue to the kext: SUBMIT from RADV goes here from now on
       uint64_t in[6] = {CMP_RING, 1024, CMP_WB, 6 * 4, 8, 0x2550000};
@@ -368,7 +399,7 @@ static void compute_via_mes(void)
    if (env_on("VM8")) { vm8_test(); return; }
    if (getenv("MESBOOT_VMT") && *getenv("MESBOOT_VMT")) {
       // GPU write into SYSTEM memory through a context0 (GART) mapping, PTE SYSTEM|SNOOPED
-      uint64_t phys = 0, len = 0, val = 0;
+      uint64_t phys = 0, len = 0;
       kern_return_t kr = sm(1, 1 << 20, 0, &phys, &len);
       printf("sysmem alloc kr=0x%x phys=0x%llx len=0x%llx\n", kr, (unsigned long long)phys, (unsigned long long)len);
       if (kr) return;
@@ -667,6 +698,8 @@ static void gfx_via_mes(void)
    grbm_select(0, 0, 0, 0);
    printf("gfx: scratch1=0x%08x (want deadbeef) testbuf=0x%08x (want 6f7a6f7a) rptr=%u rptr_wb=%u grbm=0x%08x cp_stat=0x%08x\n",
           rd(SEG1(0x2041)), vr(TESTBUF + 0x40), rd(SEG0(0x1e88)), vr(GFX_WB), rd(0x2004), rd(0x21a0));
+   if (rd(SEG1(0x2041)) != 0xDEADBEEF || vr(TESTBUF + 0x40) != 0x6F7A6F7A)
+      fail("graphics readback before queue adoption", kIOReturnTimeout);
    if (env_on("ADOPT_GFX")) {   // hand the gfx queue to the kext as its second queue
       uint64_t in[6] = {GFX_RING, GFX_RDW, GFX_WB, GFX_DB * 4, w, 0x2580000 | 1};
       kern_return_t kr = IOConnectCallScalarMethod(conn, SEL_DBG_ADOPTQ, in, 6, NULL, NULL);
@@ -739,8 +772,15 @@ static void sdma_sys_test(void)
 
 int main(int argc, char **argv)
 {
-   if (open_kext()) return 1;
    if (argc < 2) { fprintf(stderr, "mesboot gart|mes|kiq|all\n"); return 2; }
+   const char *steps[] = {"all","db","dump","gart","mes","kiqdb","kiqsched","claim","gfx",
+                          "sdmasys","kiqreg","mec","sched","viakiq","kiq"};
+   bool known = false;
+   for (unsigned i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) known |= !strcmp(argv[1], steps[i]);
+   if (!known || (!strcmp(argv[1], "db") && argc != 4)) {
+      fprintf(stderr, "unknown or incomplete mesboot step\n"); return 2;
+   }
+   if (open_kext()) return 1;
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;
    if (!strcmp(argv[1], "db") && argc >= 4) { printf("db +0x%llx <- %llu kr=0x%x\n", strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0), db(strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0))); return 0; }

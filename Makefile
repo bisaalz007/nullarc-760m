@@ -55,6 +55,7 @@ test: $(TESTS) build/tools/phxfw
 	python3 tests/test_bringup_preflight.py
 	python3 tests/test_build_receipt.py
 	python3 tests/test_firmware_plan.py
+	python3 tests/test_mesboot_transport.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \
