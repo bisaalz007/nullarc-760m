@@ -385,6 +385,9 @@ Validation: native PhxBringup compiles with the same three pre-existing shadow
 warnings. Nine C++ binaries and 33 Python methods pass. The production parser
 passes ASan/UBSan, all truncations of the synthetic image, duplicate/wrong-device
 cases and 10,000 mutations. These fixtures are not an HP VBIOS capture. A build-36
-diagnostic update is being prepared for the already-authorized USB EFI, with the
-existing backup/rollback installer. A manual boot/capture is needed before this
+diagnostic update is now staged on the already-authorized USB EFI, using the
+existing backup/rollback installer. Independent verification confirms the new
+binary matches the packet and every parsed configuration value is unchanged.
+The new backup is separate from the earlier one. Expected build-36 module UUID:
+7B8E4713-0C01-39FB-948B-2CADB5FC8F26. A manual boot/capture is needed before this
 metadata can inform a safe HP memory plan. Acceleration remains unimplemented.
