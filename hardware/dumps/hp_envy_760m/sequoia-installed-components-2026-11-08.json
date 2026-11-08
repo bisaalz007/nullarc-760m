@@ -10,12 +10,12 @@
     "gpu_including_phxboot_off": 20
   },
   "backup_directory_exists": true,
-  "backup_receipt_verification": "requires root; pending",
+  "backup_receipt_verification": "passed with administrator access",
   "phxboot_off": true,
   "launch_daemon_installed": false,
-  "loaded_accelerator_uuid": "AA33BEDC-8AC7-3EE4-87BE-A45D328C46A1",
+  "loaded_accelerator_uuid": null,
   "installed_accelerator_uuid": "A672A59E-9077-35D7-840D-360640764497",
-  "new_accelerator_load_tested": false,
+  "new_accelerator_load_tested": true,
   "installed_plugin_RTLD_NOW": "passed",
   "installed_metallib_translation": [
     "compute",
@@ -27,5 +27,13 @@
     "12_CU_mock": "passed"
   },
   "GPU_submissions": 0,
-  "acceleration_verified": false
+  "acceleration_verified": false,
+  "new_accelerator_loaded": false,
+  "live_load_result": {
+    "old_module_unload": "passed",
+    "new_module_load": "KMErrorDomain 28: requires reboot",
+    "old_module_restore_attempt": "KMErrorDomain 27: approval required",
+    "GPU_initialization_requested": false,
+    "new_module_start_verified": false
+  }
 }

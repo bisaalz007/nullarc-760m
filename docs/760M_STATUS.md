@@ -312,8 +312,12 @@ now includes the Sequoia ZIP, diagnostic kext ZIP, matching checksum file and
 build-time validation receipt. Its tag is unchanged; each binary package embeds
 its matching source commit, and older Tahoe assets remain separate.
 
-A target-local administrator command is prepared for a start-only kernel load
-test, with package/backup verification, idle-service checks and exact loaded UUID
-verification. Its result is pending; no device matching or GPU initialization is
-requested by that test. PSP/TMR/GPUVM/scanout ownership, native queues, command
+A target-local administrator command completed package/backup verification and
+idle-service checks, then unloaded the old module. The new start-only load was
+refused with KMErrorDomain 28 (reboot required); restoring the old module was
+refused with code 27 (approval required). Neither accelerator UUID remained
+loaded. This is a failed live-load test, not a successful kernel link/start.
+No device matching or GPU initialization was requested. Normal Sequoia extension
+approval and a user-controlled reboot are the next test; no security bypass was
+attempted. PSP/TMR/GPUVM/scanout ownership, native queues, command
 completion and Metal/display acceleration remain unimplemented or unverified.
