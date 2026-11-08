@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
@@ -27,8 +28,9 @@ static uint32_t pci_value(const struct stat *st, const char *name) {
     return value;
 }
 int main(int argc, char **argv) {
-    if (argc != 2) { fprintf(stderr, "usage: collect /dev/dri/renderD128\n"); return 1; }
-    int fd = open(argv[1], O_RDONLY | O_CLOEXEC);
+    int details = argc == 3 && !strcmp(argv[1], "--device-info");
+    if (argc != 2 && !details) { fprintf(stderr, "usage: collect [--device-info] /dev/dri/renderD128\n"); return 1; }
+    int fd = open(argv[details ? 2 : 1], O_RDONLY | O_CLOEXEC);
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || !S_ISCHR(st.st_mode)) { perror("DRM node"); return 1; }
     uint32_t vendor = pci_value(&st, "vendor"), device = pci_value(&st, "device");
@@ -40,6 +42,30 @@ int main(int argc, char **argv) {
     q.query = AMDGPU_INFO_DEV_INFO; q.return_pointer = (uintptr_t)&d; q.return_size = sizeof(d);
     if (ioctl(fd, DRM_IOCTL_AMDGPU_INFO, &q)) { perror("AMDGPU_INFO_DEV_INFO"); return 1; }
     if (d.device_id != device || d.pci_rev != revision) { fprintf(stderr, "DRM and sysfs identity disagree\n"); return 1; }
+    if (details) {
+        /* Preserve kernel-reported values, including zeros; no capability inference.
+         * Field names and units follow the installed amdgpu_drm.h UAPI.
+         */
+        printf("{\n  \"format\": 1,\n  \"query\": \"AMDGPU_INFO_DEV_INFO\",\n  \"userspace_struct_size\": %zu", sizeof(d));
+#define FIELD32(name) printf(",\n  \"" #name "\": %" PRIu32, (uint32_t)d.name)
+#define FIELD64(name) printf(",\n  \"" #name "\": %" PRIu64, (uint64_t)d.name)
+        FIELD32(device_id); FIELD32(pci_rev); FIELD32(chip_rev); FIELD32(external_rev); FIELD32(family);
+        FIELD32(gpu_counter_freq); FIELD64(max_engine_clock); FIELD64(max_memory_clock);
+        FIELD64(ids_flags); FIELD64(virtual_address_offset); FIELD64(virtual_address_max);
+        FIELD32(virtual_address_alignment); FIELD32(pte_fragment_size); FIELD32(gart_page_size);
+        FIELD32(vram_type); FIELD32(vram_bit_width); FIELD32(num_hw_gfx_contexts);
+        FIELD32(wave_front_size); FIELD32(num_shader_visible_vgprs); FIELD32(num_tcc_blocks);
+        FIELD32(gs_vgt_table_depth); FIELD32(gs_prim_buffer_depth); FIELD32(max_gs_waves_per_vgt);
+        FIELD32(gc_double_offchip_lds_buf); FIELD32(pa_sc_tile_steering_override); FIELD64(tcc_disabled_mask);
+        FIELD64(high_va_offset); FIELD64(high_va_max);
+        FIELD32(tcp_cache_size); FIELD32(num_sqc_per_wgp); FIELD32(sqc_data_cache_size);
+        FIELD32(sqc_inst_cache_size); FIELD32(gl1c_cache_size); FIELD32(gl2c_cache_size); FIELD64(mall_size);
+#undef FIELD32
+#undef FIELD64
+        puts("\n}");
+        close(fd);
+        return ferror(stdout) ? 1 : 0;
+    }
     printf("{\n  \"format\": 1,\n  \"pci\": {\"vendor\": %u, \"device\": %u, \"revision\": %u, \"subvendor\": %u, \"subdevice\": %u},\n",
            vendor, device, revision, subvendor, subdevice);
     printf("  \"num_shader_engines\": %u,\n  \"num_shader_arrays_per_engine\": %u,\n  \"num_cu_per_sh\": %u,\n",

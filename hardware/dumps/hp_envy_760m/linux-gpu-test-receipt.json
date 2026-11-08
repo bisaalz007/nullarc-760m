@@ -1,0 +1,83 @@
+{
+  "format": 1,
+  "captured_at": "2026-11-08T17:07:52.819692+00:00",
+  "kernel": "6.14.0-37-generic",
+  "pci": {
+    "vendor": 4098,
+    "device": 6400,
+    "revision": 202,
+    "subsystem_vendor": 4156,
+    "subsystem_device": 35946
+  },
+  "backend": "stock Linux Vulkan loader/RADV, not Darwin winsys or NullArc kext",
+  "shader_sha256": {
+    "store.spv": "781789398042366bc562d4e38a93a124112e792e583485ea99e52e9c5db7172b",
+    "triangle_vertex.spv": "4922ca31063cb71dd8b822a4db4a66843cea9bf71a57289dc3f0d46e8702bcfc",
+    "solid_fragment.spv": "e96646641cccbba2cf948b2860d1c5b3c161444774ca067951ed39e787b5fea3"
+  },
+  "source_sha256": {
+    "vkprobe.c": "fa1fc8d522308aaebbf031aaef4cd84675e8b597ba3d1e24dd86ae1cc3219e09",
+    "translated_render.c": "7bb4d210a2d587c52d37b241836f20f3c836576d5c1657c96d140c3202a201d7",
+    "fill.comp": "848b5755c6295e67987b60ff766b98b3d42ca9bfe5c6ea48bdccec022c058b60"
+  },
+  "steps": [
+    {
+      "name": "validate-store",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "validate-triangle_vertex",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "validate-solid_fragment",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "compile-glsl",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "build-vkprobe",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "build-translated_render",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "compute-queue",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "graphics-queue-compute",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "translated-compute",
+      "returncode": 0,
+      "validation_error": false
+    },
+    {
+      "name": "translated-render",
+      "returncode": 0,
+      "validation_error": false
+    }
+  ],
+  "validation_layer": "VK_LAYER_KHRONOS_validation",
+  "passed": true,
+  "translation_binary_sha256": {
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver": "4d0e2f39bebf107872b51b9ced22044228cb88b8a884182e332abb72a3004a1c",
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib": "a3b5e66c3aa758c91ebb67668bd8bc2e9b7a65210657ae5ff8355ae80850cdab"
+  },
+  "translation_fixture": "tests/shaders/store.metal; authored fixture only",
+  "translator_commit": "76df0f6af5c64c2af9a22090da8b3fe14616023e"
+}

@@ -1,0 +1,857 @@
+{
+  "format": 1,
+  "captured_at": "2026-11-08T16:46:23.851005+00:00",
+  "kernel": "6.14.0-37-generic",
+  "distribution": "Linux Mint 22.3 (Zena)",
+  "pci": {
+    "vendor": 4098,
+    "device": 6400,
+    "revision": 202,
+    "subvendor": 4156,
+    "subdevice": 35946
+  },
+  "profile": {
+    "format": 1,
+    "pci": {
+      "vendor": 4098,
+      "device": 6400,
+      "revision": 202,
+      "subvendor": 4156,
+      "subdevice": 35946
+    },
+    "num_shader_engines": 1,
+    "num_shader_arrays_per_engine": 2,
+    "num_cu_per_sh": 6,
+    "num_rb_pipes": 4,
+    "enabled_rb_pipes_mask": 10,
+    "cu_active_number": 8,
+    "cu_bitmap": [
+      [
+        15,
+        15,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "ip_discovery": [
+    {
+      "die": 0,
+      "hw_id": 1,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        4
+      ],
+      "base_addr": [
+        16384,
+        90112,
+        14417920,
+        14680064,
+        14942208,
+        38009856
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 108,
+      "instance": 0,
+      "version": [
+        7,
+        7,
+        0
+      ],
+      "base_addr": [
+        0,
+        20,
+        3360,
+        66560,
+        37859328,
+        67371008
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 11,
+      "instance": 0,
+      "version": [
+        11,
+        0,
+        1
+      ],
+      "base_addr": [
+        4704,
+        40960,
+        37760000
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 12,
+      "instance": 0,
+      "version": [
+        4,
+        0,
+        2
+      ],
+      "base_addr": [
+        30720,
+        32256
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 14,
+      "instance": 0,
+      "version": [
+        6,
+        3,
+        0
+      ],
+      "base_addr": [
+        4718592,
+        37763072
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 150,
+      "instance": 0,
+      "version": [
+        11,
+        5,
+        0
+      ],
+      "base_addr": [
+        81920,
+        344064,
+        37902336,
+        37903360,
+        38042624,
+        38043648,
+        57147392,
+        57409536
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 150,
+      "instance": 1,
+      "version": [
+        11,
+        5,
+        0
+      ],
+      "base_addr": [
+        606208,
+        868352,
+        37904384,
+        37905408,
+        38044672,
+        38045696,
+        57671680,
+        57933824
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 168,
+      "instance": 0,
+      "version": [
+        0,
+        0,
+        0
+      ],
+      "base_addr": []
+    },
+    {
+      "die": 0,
+      "hw_id": 2,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        4
+      ],
+      "base_addr": [
+        16384,
+        90112,
+        14417920,
+        14680064,
+        14942208,
+        38009856
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 216,
+      "instance": 0,
+      "version": [
+        0,
+        0,
+        0
+      ],
+      "base_addr": []
+    },
+    {
+      "die": 0,
+      "hw_id": 24,
+      "instance": 0,
+      "version": [
+        7,
+        0,
+        1
+      ],
+      "base_addr": [
+        65536,
+        37773312,
+        82575360
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 255,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        4
+      ],
+      "base_addr": [
+        16384,
+        90112,
+        14417920,
+        14680064,
+        14942208,
+        38009856
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 271,
+      "instance": 0,
+      "version": [
+        3,
+        1,
+        4
+      ],
+      "base_addr": [
+        18,
+        192,
+        13504,
+        36864,
+        37764096
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 282,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        1
+      ],
+      "base_addr": [
+        12320768
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 286,
+      "instance": 0,
+      "version": [
+        4,
+        0,
+        1
+      ],
+      "base_addr": [
+        37761024
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 3,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        91648,
+        37751808
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 34,
+      "instance": 0,
+      "version": [
+        3,
+        0,
+        1
+      ],
+      "base_addr": [
+        78336,
+        106496,
+        37783552
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 35,
+      "instance": 0,
+      "version": [
+        3,
+        0,
+        1
+      ],
+      "base_addr": [
+        3072,
+        78592,
+        37784576
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 4,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        7
+      ],
+      "base_addr": [
+        92160,
+        92672,
+        4456448,
+        37752832
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 40,
+      "instance": 0,
+      "version": [
+        6,
+        0,
+        1
+      ],
+      "base_addr": [
+        4256,
+        37789696
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 41,
+      "instance": 0,
+      "version": [
+        5,
+        2,
+        1
+      ],
+      "base_addr": [
+        3872,
+        37790720
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 42,
+      "instance": 0,
+      "version": [
+        6,
+        0,
+        1
+      ],
+      "base_addr": [
+        4704,
+        40960,
+        37760000
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 44,
+      "instance": 0,
+      "version": [
+        3,
+        0,
+        1
+      ],
+      "base_addr": [
+        98304,
+        37793792
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 45,
+      "instance": 0,
+      "version": [
+        2,
+        0,
+        2
+      ],
+      "base_addr": [
+        480,
+        37794816
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 45,
+      "instance": 1,
+      "version": [
+        2,
+        0,
+        2
+      ],
+      "base_addr": [
+        608,
+        37829632
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 45,
+      "instance": 2,
+      "version": [
+        2,
+        0,
+        2
+      ],
+      "base_addr": [
+        640,
+        37838848
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 46,
+      "instance": 0,
+      "version": [
+        4,
+        0,
+        0
+      ],
+      "base_addr": [
+        28672,
+        12582912,
+        37795840,
+        130023424,
+        306184192
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 48,
+      "instance": 0,
+      "version": [
+        8,
+        1,
+        0
+      ],
+      "base_addr": [
+        704,
+        11796480,
+        37797888,
+        285212672
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 5,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        95232,
+        37753856
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 0,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        93184,
+        37754880
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 1,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        93696,
+        37755904
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 2,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        94208,
+        37756928
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 3,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        94720,
+        37757952
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 4,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        110592,
+        37935104
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 5,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        111104,
+        37936128
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 6,
+      "instance": 6,
+      "version": [
+        13,
+        0,
+        3
+      ],
+      "base_addr": [
+        111616,
+        37937152
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 70,
+      "instance": 0,
+      "version": [
+        6,
+        0,
+        0
+      ],
+      "base_addr": [
+        0,
+        20,
+        3360,
+        66560,
+        37859328,
+        67371008
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 70,
+      "instance": 1,
+      "version": [
+        6,
+        0,
+        0
+      ],
+      "base_addr": [
+        0,
+        20,
+        3360,
+        66560,
+        37859328,
+        67371008
+      ]
+    },
+    {
+      "die": 0,
+      "hw_id": 91,
+      "instance": 0,
+      "version": [
+        6,
+        0,
+        1
+      ],
+      "base_addr": [
+        70656
+      ]
+    }
+  ],
+  "device_info": {
+    "format": 1,
+    "query": "AMDGPU_INFO_DEV_INFO",
+    "userspace_struct_size": 448,
+    "device_id": 6400,
+    "pci_rev": 202,
+    "chip_rev": 12,
+    "external_rev": 13,
+    "family": 148,
+    "gpu_counter_freq": 100000,
+    "max_engine_clock": 2600000,
+    "max_memory_clock": 800000,
+    "ids_flags": 5,
+    "virtual_address_offset": 65536,
+    "virtual_address_max": 140737488355328,
+    "virtual_address_alignment": 4096,
+    "pte_fragment_size": 2097152,
+    "gart_page_size": 4096,
+    "vram_type": 12,
+    "vram_bit_width": 128,
+    "num_hw_gfx_contexts": 8,
+    "wave_front_size": 32,
+    "num_shader_visible_vgprs": 1024,
+    "num_tcc_blocks": 4,
+    "gs_vgt_table_depth": 32,
+    "gs_prim_buffer_depth": 1792,
+    "max_gs_waves_per_vgt": 32,
+    "gc_double_offchip_lds_buf": 0,
+    "pa_sc_tile_steering_override": 0,
+    "tcc_disabled_mask": 0,
+    "high_va_offset": 18446603336221196288,
+    "high_va_max": 18446744073705349120,
+    "tcp_cache_size": 32,
+    "num_sqc_per_wgp": 1,
+    "sqc_data_cache_size": 16,
+    "sqc_inst_cache_size": 32,
+    "gl1c_cache_size": 256,
+    "gl2c_cache_size": 2048,
+    "mall_size": 0
+  },
+  "memory_bytes": {
+    "vram_total": 536870912,
+    "vis_vram_total": 536870912,
+    "gtt_total": 3788591104
+  },
+  "firmware_package": "20240318.git3b128b60-0ubuntu2.22",
+  "decompressed_firmware_files": [
+    {
+      "name": "gc_11_0_1_imu.bin",
+      "size": 132352,
+      "sha256": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 184626432
+    },
+    {
+      "name": "gc_11_0_1_me.bin",
+      "size": 263424,
+      "sha256": "9ce5e30398f38c16fbdf6f91ee36fc4e57e67916d60a52c161516b44f490ad8e",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 39
+    },
+    {
+      "name": "gc_11_0_1_mec.bin",
+      "size": 268640,
+      "sha256": "d7ca25bcdb9d3baa4d7f1f875e523e4399770e680531f931aa4dcee9fb1c8dc7",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 35
+    },
+    {
+      "name": "gc_11_0_1_mes1.bin",
+      "size": 231440,
+      "sha256": "9930fb834ca7ba72d5fbc6a14357bf98f5d55b18203ae4c699ae5e225fcdd1bf",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 0
+    },
+    {
+      "name": "gc_11_0_1_mes_2.bin",
+      "size": 244016,
+      "sha256": "c762c8d1c8cf1dd7d5741e0b69431d547fff9fc880f1a69b62c38dd5aefe82a2",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 0
+    },
+    {
+      "name": "gc_11_0_1_pfp.bin",
+      "size": 263424,
+      "sha256": "da74f5648ace58b5c172340df9a7cfa56e5a400cae3666234a6b71bb6b67e762",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 47
+    },
+    {
+      "name": "gc_11_0_1_rlc.bin",
+      "size": 160592,
+      "sha256": "272b53d37af33a6877d865f7c4830dfaa5329af95c0976034b79f7752e49272c",
+      "header_version": [
+        2,
+        3
+      ],
+      "ip_version": [
+        11,
+        0
+      ],
+      "ucode_version": 127
+    },
+    {
+      "name": "psp_13_0_4_toc.bin",
+      "size": 2560,
+      "sha256": "11e3529d748e2b6b204681183360a6ead80665b8deda996dfcf35973f789fc3d",
+      "header_version": [
+        1,
+        0
+      ],
+      "ip_version": [
+        13,
+        0
+      ],
+      "ucode_version": 11
+    },
+    {
+      "name": "sdma_6_0_1.bin",
+      "size": 34560,
+      "sha256": "dcec60f8d58c67fdd3203d8775ab166ff1e10294985e69aa4597547d493db5bd",
+      "header_version": [
+        2,
+        0
+      ],
+      "ip_version": [
+        6,
+        0
+      ],
+      "ucode_version": 16
+    }
+  ],
+  "loaded_firmware_report": [
+    "VCE feature version: 0, firmware version: 0x00000000",
+    "UVD feature version: 0, firmware version: 0x00000000",
+    "MC feature version: 0, firmware version: 0x00000000",
+    "ME feature version: 35, firmware version: 0x00000027",
+    "PFP feature version: 35, firmware version: 0x0000002f",
+    "CE feature version: 0, firmware version: 0x00000000",
+    "RLC feature version: 1, firmware version: 0x0000007f",
+    "RLC SRLC feature version: 0, firmware version: 0x00000000",
+    "RLC SRLG feature version: 0, firmware version: 0x00000000",
+    "RLC SRLS feature version: 0, firmware version: 0x00000000",
+    "RLCP feature version: 1, firmware version: 0x0000000f",
+    "RLCV feature version: 0, firmware version: 0x00000000",
+    "MEC feature version: 35, firmware version: 0x00000023",
+    "IMU feature version: 0, firmware version: 0x0b012d00",
+    "SOS feature version: 0, firmware version: 0x00000000",
+    "ASD feature version: 553648327, firmware version: 0x210000c7",
+    "TA XGMI feature version: 0x00000000, firmware version: 0x00000000",
+    "TA RAS feature version: 0x00000000, firmware version: 0x00000000",
+    "TA HDCP feature version: 0x00000000, firmware version: 0x1700003c",
+    "TA DTM feature version: 0x00000000, firmware version: 0x12000016",
+    "TA RAP feature version: 0x00000000, firmware version: 0x00000000",
+    "TA SECUREDISPLAY feature version: 0x00000000, firmware version: 0x00000000",
+    "SMC feature version: 0, program: 0, firmware version: 0x004c5d00 (76.93.0)",
+    "SDMA0 feature version: 60, firmware version: 0x00000010",
+    "VCN feature version: 0, firmware version: 0x07113000",
+    "DMCU feature version: 0, firmware version: 0x00000000",
+    "DMCUB feature version: 0, firmware version: 0x08005300",
+    "TOC feature version: 0, firmware version: 0x0000000b",
+    "MES_KIQ feature version: 6, firmware version: 0x00000073",
+    "MES feature version: 1, firmware version: 0x00000052",
+    "VPE feature version: 0, firmware version: 0x00000000",
+    "VBIOS version: 113-PHXGENERIC-001"
+  ],
+  "capture_errors": [],
+  "register_access": false,
+  "driver_reloaded": false,
+  "meaning": "Linux state only; addresses, memory budget, clocks and firmware versions do not establish macOS runtime state or readiness."
+}

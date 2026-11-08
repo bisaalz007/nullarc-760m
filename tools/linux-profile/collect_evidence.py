@@ -63,6 +63,11 @@ def main():
     (a.output/'profile.json').write_bytes(result.stdout)
     (a.output/'hw-ip.txt').write_bytes(result.stderr)
     if result.returncode: errors.append({'step':'DRM INFO query','returncode':result.returncode})
+    details = subprocess.run([str(a.collector.resolve()),'--device-info',str(a.device)],capture_output=True)
+    (a.output/'device-info.json').write_bytes(details.stdout)
+    if details.returncode:
+        errors.append({'step':'DRM device details','returncode':details.returncode,
+                       'error':details.stderr.decode(errors='replace')})
     copy_sysfs(device,a.output/'sysfs',errors)
     debug = Path('/sys/kernel/debug/dri')
     found_debug = False

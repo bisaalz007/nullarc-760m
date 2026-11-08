@@ -1,0 +1,19 @@
+fill.comp
+physical devices: 2
+[0] AMD Radeon 760M Graphics (RADV PHOENIX)  vendor 0x1002 device 0x1900  api 1.4.305
+    driver: radv (Mesa 25.0.7-0ubuntu0.24.04.2)
+    heap 0: 1375 MiB flags 0x0
+    heap 1: 2750 MiB flags 0x1
+    queue family 0: flags 0x7 count 1
+    queue family 1: flags 0x6 count 4
+    queue family 2: flags 0x8 count 1
+[1] llvmpipe (LLVM 20.1.2, 256 bits)  vendor 0x10005 device 0x0000  api 1.4.305
+    driver: llvmpipe (Mesa 25.0.7-0ubuntu0.24.04.2 (LLVM 20.1.2))
+    heap 0: 7226 MiB flags 0x1
+    queue family 0: flags 0xf count 1
+selected physical device 0 (HP device ID; subsystem verified by companion capture)
+using queue family 1
+device created
+compute pipeline compiled
+dispatch submitted and fence signalled
+results: 256/256 correct (data[1]=0x9e3779b1, expected 0x9e3779b1)
