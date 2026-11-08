@@ -19,6 +19,7 @@ import tempfile
 
 # Works in the repository and at the root of an assembled package.
 HERE = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True  # importing a helper must not alter the hashed package
 sys.path.insert(0, str(HERE.parent / 'tools'))
 from package_manifest import verify, inventory, digest
 

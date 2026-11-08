@@ -107,3 +107,27 @@ checks the complete known Phoenix firmware layout and emits tab-separated payloa
 ranges; no firmware binary is shipped or loaded by this operation. `bringup5.sh`
 requires this preflight before watchdog/PSP access. Unsupported payload sets fail
 closed. Staging/PSP/TMR addresses remain reference-machine values, and HP stays gated.
+
+## Build the downloadable installer release
+
+The source-built stack now includes executable root `install.sh`/`uninstall.sh`,
+`INSTALL.md`, the diagnostic installer and read-only collector. The base stack
+contains no firmware. After committing the validated sources and assembling a
+stack whose source commit matches the checkout, create the release assets:
+
+```sh
+python3 tools/release/build_release.py --version 0.1.0-alpha \
+  --stack build/stack --firmware /path/to/measured-unmodified-firmware \
+  --mesa /path/to/patched-mesa --output build/release-NEW
+```
+
+This requires a clean driver/Mesa tree, verifies the stack inventory and source
+commits, checks the nine firmware hashes against the live HP capture, and runs
+`phxfw` before producing output. It includes the matching driver source archive,
+translator source, Mesa patchset and license notices. No installed driver or
+personal EFI is read. ZIP executable modes and CRCs are preserved/verified, and
+old dependency timestamps are clamped to the ZIP epoch. The output directory
+appears atomically and contains the installer ZIP, a standalone diagnostic-kext
+ZIP, translator source, SHA256SUMS and release notes. Publishing does not retag
+`alpha`, merge main or install anything locally. Release notes distinguish the
+binary source commit from the existing tag's automatic source archives.

@@ -151,10 +151,18 @@ def assemble(a):
         copy(REPO / 'hardware/profiles/hp-760m.json', p / 'hardware/hp-760m.json')
         for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'LICENSES'):
             copy(REPO / name, p / name)
-        for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md'):
+        for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
+                     'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
         for name in ('install_diagnostics.py',):
             copy(REPO / 'install' / name, p / name)
+        for name in ('install.sh','uninstall.sh'):
+            copy(REPO / 'install' / name, p / name)
+            (p / name).chmod(0o755)
+        guide=(REPO / 'docs/INSTALL.md').read_text().replace('](INSTALL_REFERENCE.md)','](docs/INSTALL_REFERENCE.md)')
+        guide=guide.replace('](760M_STATUS.md)','](docs/760M_STATUS.md)')
+        (p / 'INSTALL.md').write_text(guide)
+        copy(REPO / 'tools/collect_macos_evidence.py', p / 'collect_macos_evidence.py')
         copy(REPO / 'tools/package_manifest.py', p / 'package_manifest.py')
         (p / 'README.txt').write_text('NullArc 760M development stack for Tahoe\n'
             'HP policy: diagnostic-only. GPU execution and acceleration are not verified.\n'

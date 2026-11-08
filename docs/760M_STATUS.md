@@ -195,3 +195,29 @@ before opening IOKit. An injected-transport build of the real source tests Hello
 register reads, staging writes, claims, short replies and scheduler timeout paths.
 These host cases do not execute GPU commands. Other experimental VM/SDMA branches
 still need runtime work; no hardware reset or HP initialization was added.
+
+## Installer release engineering (2026-11-08)
+
+The release pipeline now assembles source-built artifacts instead of snapshotting
+installed drivers or mounting EFI. Root installer/uninstaller scripts and a
+fork-specific guide are included. The archived upstream guide is preserved as
+`docs/INSTALL_REFERENCE.md`. HP diagnostics have shell entrypoints with explicit
+EFI/OC selection, backup and removal. Exact PCI detection refuses `--windowserver`
+even if an older loaded kext lacks a diagnostic marker. Reference installation
+copies the newly required `phxfw` and checks the entire header-derived firmware plan.
+Python bytecode writes are disabled before importing package helpers, preventing
+checks from modifying the hashed package.
+
+New shell-level tests exercise diagnostic install/remove, HP WindowServer refusal,
+unreadable PCI inventory, package tampering and ZIP executable/timestamp handling.
+These use temporary EFI fixtures and injected PCI facts; they are not kext-load or
+GPU tests. The prerelease includes measured unmodified AMD firmware under its
+redistribution license, matching source archives, checksums and explicit HP limits.
+The existing `alpha` tag is retained; binary provenance is recorded separately.
+
+Release validation: both kexts, the full Metal plugin, pinned translator, patched
+RADV and four tools rebuilt successfully. Seven host binaries and 25 Python test
+methods passed. Shell-level checks preserve temporary EFI state on refusal; no
+macOS driver was installed or loaded on the build host or HP. Existing native
+compile warnings remain. The release's WindowServer path is present but still
+refuses the diagnostic HP identity.

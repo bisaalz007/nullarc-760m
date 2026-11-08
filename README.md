@@ -103,14 +103,27 @@ plugin; its source is attached to every release. The `NVMTL` prefix is NullMoth'
 
 ## Installing
 
-Download `nullarc-<version>.zip` from the [releases page](https://github.com/luuumi-dev/nullarc/releases) and follow
-**[docs/INSTALL.md](docs/INSTALL.md)**. In short: add `PhxBringup.kext` and the boot-args to OpenCore, reboot, run
-`sudo ./install.sh --windowserver` from the release folder, reboot twice.
+Download the **compiled ZIP asset** from this fork's
+[alpha release](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases/tag/alpha),
+verify `SHA256SUMS`, extract it, and follow **[docs/INSTALL.md](docs/INSTALL.md)**.
+GitHub's automatic “Source code” downloads are not binary installer packages.
 
-> [!WARNING]
-> WindowServer only loads an ad-hoc signed driver with AMFI relaxed (`amfi=0x80`, `amfi_get_out_of_my_way=0x1`).
-> That turns library validation off system-wide and FairPlay playback (Apple TV+, Netflix in Safari) stops working.
-> `uninstall.sh` and the guide's last section undo everything.
+For the HP 760M, the supported development flow is:
+
+```sh
+./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC --check
+sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC
+```
+
+Use the actual EFI/OC path for your machine. The release also contains
+`sudo ./install.sh --windowserver` for the reference acceleration flow, but the
+HP remains diagnostic-only and that command refuses acceleration before writing.
+Python 3 is required. Diagnostic installation preserves boot/security settings.
+
+The original Firebat installation/security instructions are retained in
+[the archived reference guide](docs/INSTALL_REFERENCE.md). Its relaxed AMFI/SIP
+settings and reported second-boot WindowServer acceleration apply to that
+reference workflow; they are not HP diagnostic-install requirements.
 
 ## Building
 

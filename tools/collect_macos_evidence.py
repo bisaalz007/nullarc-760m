@@ -56,11 +56,20 @@ def capture(nodes):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--output', type=Path, required=True)
+    mode=ap.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--output', type=Path)
+    mode.add_argument('--target-policy', action='store_true', help='print exact HP policy without writing files')
     a = ap.parse_args()
-    a.output.mkdir(parents=True, exist_ok=False)
     p = subprocess.run(['ioreg','-a','-r','-c','IOPCIDevice'], capture_output=True)
-    devices = capture(plistlib.loads(p.stdout)) if p.returncode == 0 else []
+    try:
+        if p.returncode: raise ValueError('ioreg failed')
+        devices = capture(plistlib.loads(p.stdout))
+    except (ValueError,TypeError,KeyError,plistlib.InvalidFileException) as e:
+        ap.exit(1,f'Cannot determine target policy: {e}\n')
+    if a.target_policy:
+        print('hp-diagnostic-only' if devices else 'other-device')
+        raise SystemExit(0)
+    a.output.mkdir(parents=True, exist_ok=False)
     report = {'format':1,'captured_at':datetime.now(timezone.utc).isoformat(),
               'os':subprocess.check_output(['sw_vers'],text=True).strip(),
               'target_found':bool(devices),'devices':devices,'register_access':False,

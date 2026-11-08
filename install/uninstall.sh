@@ -2,6 +2,15 @@
 # nullarc uninstaller: sudo ./uninstall.sh. Removes what install.sh put on the system volume and the Data volume;
 # PhxBringup.kext and the boot-args stay in OpenCore until you take them out (see INSTALL.md). Reboot afterwards.
 set -uo pipefail
+SRC=$(cd "$(dirname "$0")" && pwd)
+if [ "$#" -gt 0 ]; then
+    if [ "$#" = 5 ] && [ "$1" = --diagnostics ] && [ "$2" = --oc ] && [ "$4" = --backup ]; then
+        [ "$(id -u)" = 0 ] || { echo "run it with sudo"; exit 1; }
+        exec python3 -B "$SRC/install_diagnostics.py" --oc "$3" --remove "$5"
+    fi
+    echo 'Usage: sudo ./uninstall.sh [--diagnostics --oc EFI/OC --backup BACKUP_DIRECTORY]'
+    exit 2
+fi
 [ "$(id -u)" = 0 ] || { echo "run it with sudo"; exit 1; }
 G=/Users/Shared/gpu
 H=/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/PhxGPU
