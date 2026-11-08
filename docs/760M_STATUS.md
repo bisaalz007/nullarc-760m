@@ -50,7 +50,7 @@ loaded, or replaced during this session.
   supplied Windows report independently corroborates CPU, identity and 60 Hz panel;
   it does not provide IP/firmware/controller data.
 
-Validation completed for this continuation: 7 host C++ binaries, 13 Python test
+Validation completed for this continuation: 7 host C++ binaries, 14 Python test
 methods, existing firmware/discovery fuzz cases, ASan/UBSan execution-policy tests,
 134 Mesa marshaller checks plus topology tests, native kext/plugin/translator/RADV
 builds, package hashes and signature checks, and real MSL-to-ACO compute/graphics

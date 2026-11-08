@@ -47,6 +47,7 @@ test: $(TESTS)
 	python3 tests/test_diagnostic_install.py
 	python3 tests/test_evidence_collectors.py
 	python3 tests/test_bringup_preflight.py
+	python3 tests/test_build_receipt.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

@@ -70,17 +70,33 @@ def source_inputs():
             if f.is_file() and 'build' not in f.relative_to(REPO).parts}
 
 
-def build_receipt(a):
-    artifacts = [REPO / 'src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup',
+def required_artifacts(mesa):
+    files = [REPO / 'src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup',
         REPO / 'src/phxaccel/build/PhxAccel.kext/Contents/MacOS/PhxAccel',
         REPO / 'src/nmplugin/build/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver',
         REPO / 'build/translator/libnvmtl_translate.dylib',
-        a.mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib']
-    artifacts += list((REPO / 'build/tools').iterdir())
-    record = {'source_inputs':source_inputs(), 'artifacts':{str(p):digest(p) for p in artifacts if p.is_file()},
+        REPO / 'build/translator/nvmtl-translator-source.tar.gz',
+        REPO / 'build/translator/SOURCE_COMMIT',
+        mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib']
+    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile')]
+    return files
+
+
+def build_receipt(a):
+    record = {'source_inputs':source_inputs(), 'artifacts':{str(p):digest(p) for p in required_artifacts(a.mesa)},
               'sdk':output(['xcrun','--sdk','macosx','--show-sdk-version']),
               'target':'x86_64 macOS Tahoe 26', 'runtime_validated':False}
     (REPO / 'build/stack-build.json').write_text(json.dumps(record, indent=2)+'\n')
+
+
+def verify_build_receipt(mesa):
+    receipt = json.loads((REPO / 'build/stack-build.json').read_text())
+    if receipt['source_inputs'] != source_inputs(): raise ValueError('compiled source inputs are stale; rebuild first')
+    if any(str(path) not in receipt['artifacts'] for path in required_artifacts(mesa)):
+        raise ValueError('selected build inputs differ from the recorded build; rebuild with these inputs')
+    for path, sha in receipt['artifacts'].items():
+        if digest(Path(path)) != sha: raise ValueError(f'compiled artifact differs: {path}')
+    return receipt
 
 
 def assemble(a):
@@ -90,10 +106,7 @@ def assemble(a):
     if 'native queues are not ready' not in (a.mesa / 'src/amd/common/darwin/ac_darwin_drm.c').read_text():
         raise ValueError('Mesa readiness patch 0008 is required')
     receipt_path = REPO / 'build/stack-build.json'
-    receipt = json.loads(receipt_path.read_text())
-    if receipt['source_inputs'] != source_inputs(): raise ValueError('compiled source inputs are stale; rebuild first')
-    for path, sha in receipt['artifacts'].items():
-        if digest(Path(path)) != sha: raise ValueError(f'compiled artifact differs: {path}')
+    verify_build_receipt(a.mesa)
     dest = a.output.resolve()
     if dest.exists():
         raise ValueError(f'output already exists: {dest}; choose a new output directory')
