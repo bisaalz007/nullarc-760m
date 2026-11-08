@@ -3,16 +3,80 @@
  * ./phxprofile prints captured metadata only. No registers are written.
  */
 #include <IOKit/IOKitLib.h>
+#include <CoreFoundation/CFNumber.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "../../src/amd/phx_topology.h"
-int main(void) {
+#include "../../src/amd/phx_vbios_abi.h"
+
+static int dump_vbios(io_connect_t conn, const char *path, uint64_t bytes) {
+    int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
+    if (fd<0) { perror("create VBIOS snapshot (new file required)"); return 1; }
+    for (uint64_t offset=0;offset<bytes;) {
+        uint64_t count=bytes-offset;
+        if (count>PHX_VBIOS_READ_MAX) count=PHX_VBIOS_READ_MAX;
+        uint64_t input[2]={offset,count}; uint8_t buffer[PHX_VBIOS_READ_MAX]; size_t size=(size_t)count;
+        kern_return_t kr=IOConnectCallMethod(conn,PHX_SEL_VBIOS_READ,input,2,NULL,0,NULL,NULL,buffer,&size);
+        if (kr || size!=count) {
+            fprintf(stderr,"cached VBIOS read failed (0x%x); root is required; no firmware was executed\n",kr);
+            close(fd);unlink(path);return 1;
+        }
+        size_t written=0;
+        while (written<size) {
+            ssize_t n=write(fd,buffer+written,size-written);
+            if (n<0 && errno==EINTR) continue;
+            if (n<=0) { perror("write VBIOS snapshot");close(fd);unlink(path);return 1; }
+            written+=(size_t)n;
+        }
+        offset+=count;
+    }
+    // A sudo caller can retrieve its own private capture over the existing SSH key.
+    const char *uid=getenv("SUDO_UID"), *gid=getenv("SUDO_GID");
+    if (geteuid()==0 && uid && gid) {
+        char *ue=NULL,*ge=NULL;
+        unsigned long long u=strtoull(uid,&ue,10),g=strtoull(gid,&ge,10);
+        if (*uid && *gid && !*ue && !*ge && u>0 && u<=UINT32_MAX && g<=UINT32_MAX &&
+            fchown(fd,(uid_t)u,(gid_t)g)) {
+            perror("assign snapshot to invoking user");close(fd);unlink(path);return 1;
+        }
+    }
+    if (fsync(fd)) { perror("sync snapshot");close(fd);unlink(path);return 1; }
+    if (close(fd)) { perror("close snapshot");unlink(path);return 1; }
+    printf("Saved %llu cached VBIOS bytes to %s; no firmware execution or GPU submission\n",
+           (unsigned long long)bytes,path);
+    return 0;
+}
+
+int main(int argc,char **argv) {
+    int dump=argc==3 && !strcmp(argv[1],"--dump-vbios");
+    if (argc!=1 && !dump) { fprintf(stderr,"phxprofile [--dump-vbios NEW_FILE (sudo, build 37+)]\n");return 2; }
     io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
     if (!svc) { fprintf(stderr, "PhxBringup is not loaded\n"); return 1; }
     io_connect_t conn = IO_OBJECT_NULL;
     kern_return_t kr = IOServiceOpen(svc, mach_task_self(), 0x4e34384e, &conn);
+    int64_t image_bytes=0;
+    if (dump && !kr) {
+        CFTypeRef value=IORegistryEntryCreateCFProperty(svc,CFSTR("phx-vbios-image-bytes"),kCFAllocatorDefault,0);
+        if (!value || CFGetTypeID(value)!=CFNumberGetTypeID() ||
+            !CFNumberGetValue((CFNumberRef)value,kCFNumberSInt64Type,&image_bytes) || image_bytes<=0 || image_bytes>UINT32_MAX)
+            kr=kIOReturnNotReady;
+        if (value) CFRelease(value);
+    }
     IOObjectRelease(svc);
     uint64_t in[2] = {1, 0}, out[4]; uint32_t count = 4;
     if (!kr) kr = IOConnectCallScalarMethod(conn, 0, in, 2, out, &count);
+    if (!kr && count!=4) kr=kIOReturnBadArgument;
+    if (dump) {
+        int result=1;
+        if (kr) fprintf(stderr,"VBIOS snapshot unavailable (0x%x); cached VFCT image and build 37+ required\n",kr);
+        else result=dump_vbios(conn,argv[2],(uint64_t)image_bytes);
+        if (conn) IOServiceClose(conn);
+        return result;
+    }
     struct phx_topology p = {0}; size_t size = sizeof(p);
     if (!kr && count != 4) kr = kIOReturnBadArgument;
     if (!kr) kr = IOConnectCallStructMethod(conn, PHX_SEL_TOPOLOGY, NULL, 0, &p, &size);

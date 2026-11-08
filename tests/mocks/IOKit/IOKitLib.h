@@ -8,17 +8,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <CoreFoundation/CFNumber.h>
 #include "../../../src/amd/phx_memory_layout.h"
 typedef uint32_t io_connect_t;
 typedef uint32_t io_service_t;
 typedef uint32_t kern_return_t;
 #define kIOMainPortDefault 0
+#define IO_OBJECT_NULL 0
+#define kIOReturnNotReady 0xe00002d8u
 #define kIOReturnBadArgument 0xe00002c2u
 #define kIOReturnTimeout 0xe00002d6u
 static inline uint32_t mach_task_self(void) { return 1; }
 static inline void *IOServiceMatching(const char *name) { (void)name; return (void*)1; }
 static inline io_service_t IOServiceGetMatchingService(uint32_t port,void *match) { (void)port;(void)match;return 1; }
 static inline kern_return_t IOObjectRelease(io_service_t svc) { (void)svc;return 0; }
+static inline kern_return_t IOServiceClose(io_connect_t c) { (void)c;return 0; }
+static inline CFTypeRef IORegistryEntryCreateCFProperty(io_service_t svc,const char *key,void *allocator,uint32_t options) {
+    (void)svc;(void)key;(void)allocator;(void)options;return (CFTypeRef)1;
+}
+static inline kern_return_t IOConnectCallStructMethod(io_connect_t c,uint32_t selector,
+    const void *in,size_t size,void *out,size_t *n) {
+    (void)c;(void)selector;(void)in;(void)size;(void)out;(void)n;return kIOReturnNotReady;
+}
 static inline kern_return_t IOServiceOpen(io_service_t svc,uint32_t task,uint32_t type,io_connect_t *c) {
     (void)svc;(void)task;(void)type;*c=1;return 0;
 }

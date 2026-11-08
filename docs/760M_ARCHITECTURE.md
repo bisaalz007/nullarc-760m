@@ -159,3 +159,13 @@ VFCT checksum, truncation, duplicate images, version rejection and 10,000 mutate
 inputs are covered by the same parser used in the kext. Missing VFCT has no
 speculative VRAM fallback. IOACPIFamily is an explicit dependency. This only
 collects evidence needed for a later ownership/initialization implementation.
+
+Build 37 preserves the selected cached ACPI image independently of the decoder's
+supported formats, and reports common ROM/master header revisions when validated.
+Private selector 32 reads bounded (1..4096-byte) chunks after Hello and requires
+administrator privilege even on diagnostic/lost devices. It reads immutable
+kernel-owned OSData, not a caller-selected address or ROM BAR; the cache is
+released at service free. No unknown layout is accepted to establish readiness.
+The capture CLI creates a new mode-0600 file, refuses overwrite, checks reply
+lengths, removes failed captures and returns ownership to a valid sudo caller.
+The binary stays private; only selected decoded facts belong in public evidence.

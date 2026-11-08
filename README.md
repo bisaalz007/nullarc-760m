@@ -71,14 +71,18 @@ Development build 35 adds read-only memory snapshot selector 31 and `mesboot lay
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects
 initialization when the remaining Firebat default-page plan does not match. Queue,
 VRAM and doorbell accesses now reject overflow and queue-buffer overlap. These
-changes build and pass host tests; build 35 has not been tested on the HP or added
-to the existing 0.1.1 release. Decoded memory does not establish ownership.
+changes build and pass host tests; the memory query now works on HP build 36.
+The changes are not in the existing 0.1.1 release. Decoded memory does not establish ownership.
 
 Build 36 additionally reads the matching cached ACPI VFCT/ATOM image and exports
 supported firmware reservation metadata. The decoder checks checksums, PCI BDF,
 table bounds and exact known formats; missing/unknown data stays explicit. It
 does not execute VBIOS functions or enable HP hardware writes. Native compilation
-and parser tests pass; HP boot/capture of this build is pending.
+and parser tests pass. HP build 36 booted but reported an unsupported ATOM format;
+it did not establish reservations. Build 37 records the actual header versions
+and adds a root-only cached VBIOS snapshot (`phxprofile --dump-vbios NEW_FILE`)
+for inspecting that format. Its runtime capture is pending. HP firmware/queue
+initialization and acceleration remain unfinished.
 
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).

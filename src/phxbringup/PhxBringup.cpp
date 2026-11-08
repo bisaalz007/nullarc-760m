@@ -21,7 +21,7 @@
 #include "../amd/phx_hp_760m.h"
 #include "../amd/phx_vbios.h"
 
-#define PHX_KEXT_BUILD 36u
+#define PHX_KEXT_BUILD 37u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -70,6 +70,7 @@ class PhxBringup : public IOService {
 public:
     bool start(IOService *provider) override;
     void stop(IOService *provider) override;
+    void free() override;
     IOReturn newUserClient(task_t owningTask, void *securityID, UInt32 type, IOUserClient **handler) override;
 
     bool claimSession();
@@ -95,6 +96,7 @@ public:
     bool diagnosticOnly() const { return topology != nullptr; }
     const phx_topology *capturedTopology() const { return topology; }
     bool memoryLayout(phx_memory_layout &out) const;
+    IOReturn readVbios(uint64_t offset, uint32_t bytes, void *out) const;
     bool gpuReady() const { return !isLost() && (gq[0].ready || gq[1].ready); }
     bool engineReady(uint32_t ip) const {
         return !isLost() && phxEngineAvailable(ip, gq[1].ready, gq[0].ready);
@@ -128,6 +130,7 @@ private:
     // UMA carve-out ("VRAM"): GPU MC address range and the system physical address behind it.
     uint64_t fbMcBase{0}, fbSize{0}, fbPhys{0};
     uint32_t fbBaseRaw{0}, fbTopRaw{0}, fbOffsetRaw{0};
+    OSData *vbiosImage{nullptr}; // Immutable cached ACPI image; retained until service free.
     // BAR0 framebuffer aperture: the CPU window into the first fbAperLen bytes of VRAM. It is an MMIO
     // region above system RAM (phys 0x8_2040_0000 here, 256 MiB), so CPU writes through it reach the
     // GPU's local memory and never the macOS heap. This is how the PSP ring is initialised.
@@ -231,6 +234,7 @@ private:
     IOReturn doQueryInfo(IOExternalMethodArguments *a);
     IOReturn doTopology(IOExternalMethodArguments *a);
     IOReturn doMemoryLayout(IOExternalMethodArguments *a);
+    IOReturn doVbiosRead(IOExternalMethodArguments *a);
     IOReturn doReadRegs(IOExternalMethodArguments *a);
     IOReturn doBoCreate(IOExternalMethodArguments *a);
     IOReturn doBoFree(IOExternalMethodArguments *a);
@@ -435,10 +439,19 @@ void PhxBringup::readFirmwareLayout() {
         }
     }
     if (!table) { setProperty("phx-vbios-status","no-vfct"); return; }
-    PhxVbiosInfo p{};
-    const auto result=phxDecodeVfct(static_cast<const uint8_t *>(table->getBytesNoCopy()),table->getLength(),
+    PhxVbiosView view{};
+    auto result=phxFindVfctImage(static_cast<const uint8_t *>(table->getBytesNoCopy()),table->getLength(),
         pci->getBusNumber(),pci->getDeviceNumber(),pci->getFunctionNumber(),
-        pci->configRead16(0),pci->configRead16(2),p);
+        pci->configRead16(0),pci->configRead16(2),view);
+    PhxVbiosInfo p{};
+    if (result==PhxVbiosResult::Decoded) {
+        vbiosImage=OSData::withBytes(view.bytes,static_cast<unsigned>(view.size));
+        setProperty("phx-vbios-image-bytes",static_cast<uint32_t>(view.size),32);
+        setProperty("phx-vbios-snapshot-available",vbiosImage!=nullptr);
+        result=phxDecodeAtom(view.bytes,view.size,p);
+    }
+    if (p.romHeaderKnown) setProperty("phx-vbios-rom-table",(p.romFormat<<16)|p.romContent,32);
+    if (p.masterHeaderKnown) setProperty("phx-vbios-master-table",(p.masterFormat<<16)|p.masterContent,32);
     if (result!=PhxVbiosResult::Decoded) {
         setProperty("phx-vbios-status",result==PhxVbiosResult::MissingImage ? "no-matching-vfct-image" :
             result==PhxVbiosResult::Unsupported ? "unsupported-atom-format" : "invalid-vfct-or-atom");
@@ -457,6 +470,19 @@ void PhxBringup::readFirmwareLayout() {
     }
     if (p.extraDecoded) setProperty("phx-vbios-extra-fw-bytes",p.extraFirmwareBytes,64);
     if (p.protectedDecoded) setProperty("phx-vbios-protected-fw-bytes",p.protectedFirmwareBytes,64);
+}
+
+void PhxBringup::free() {
+    OSSafeReleaseNULL(vbiosImage);
+    IOService::free();
+}
+
+IOReturn PhxBringup::readVbios(uint64_t offset, uint32_t bytes, void *out) const {
+    if (!vbiosImage) return kIOReturnNotReady;
+    if (!out || bytes>PHX_VBIOS_READ_MAX || !phxBufferSpan(offset,bytes,vbiosImage->getLength()))
+        return kIOReturnBadArgument;
+    bcopy(static_cast<const uint8_t *>(vbiosImage->getBytesNoCopy())+offset,out,bytes);
+    return kIOReturnSuccess;
 }
 
 bool PhxBringup::memoryLayout(phx_memory_layout &out) const {
@@ -1402,6 +1428,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_QUERYINFO: r = doQueryInfo(a); break;
         case PHX_SEL_TOPOLOGY: r = doTopology(a); break;
         case PHX_SEL_MEMORY_LAYOUT: r = doMemoryLayout(a); break;
+        case PHX_SEL_VBIOS_READ: r = doVbiosRead(a); break;
         case PHXN_SEL_READREGS:  r = doReadRegs(a); break;
         case PHXN_SEL_BOCREATE:  r = doBoCreate(a); break;
         case PHXN_SEL_BOFREE:    r = doBoFree(a); break;
@@ -1460,6 +1487,13 @@ IOReturn IOAccelPhxNativeClient::doMemoryLayout(IOExternalMethodArguments *a) {
     if (!owner->memoryLayout(p)) return kIOReturnNotReady;
     bcopy(&p, a->structureOutput, sizeof(p));
     return kIOReturnSuccess;
+}
+
+IOReturn IOAccelPhxNativeClient::doVbiosRead(IOExternalMethodArguments *a) {
+    if (!privileged) return kIOReturnNotPrivileged;
+    if (a->scalarInputCount!=2 || a->scalarInput[1]>PHX_VBIOS_READ_MAX ||
+        !shape(a,2,0,0,static_cast<uint32_t>(a->scalarInput[1]))) return kIOReturnBadArgument;
+    return owner->readVbios(a->scalarInput[0],static_cast<uint32_t>(a->scalarInput[1]),a->structureOutput);
 }
 
 IOReturn IOAccelPhxNativeClient::doQueryInfo(IOExternalMethodArguments *a) {

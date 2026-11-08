@@ -10,10 +10,11 @@
 
 enum class PhxVbiosResult { Decoded, MissingImage, Invalid, Unsupported };
 struct PhxVbiosInfo {
+    uint32_t romFormat, romContent, masterFormat, masterContent;
     uint32_t imageBytes, firmwareRevision, firmwareFormat, firmwareContent;
     uint32_t usageFormat, usageContent, firmwareStartRawKiB, driverStartRawKiB;
     uint64_t firmwareUsageBytes, driverUsageBytes, extraFirmwareBytes, protectedFirmwareBytes;
-    bool usageDecoded, extraDecoded, protectedDecoded;
+    bool usageDecoded, extraDecoded, protectedDecoded, romHeaderKnown, masterHeaderKnown;
 };
 static inline uint16_t phxVbios16(const uint8_t *p) {
     return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
@@ -36,15 +37,17 @@ static inline PhxVbiosResult phxDecodeAtom(const uint8_t *rom, size_t size, PhxV
     const uint8_t *h=rom+header;
     if (!((h[4]=='A'&&h[5]=='T'&&h[6]=='O'&&h[7]=='M') ||
           (h[4]=='M'&&h[5]=='O'&&h[6]=='T'&&h[7]=='A'))) return PhxVbiosResult::Invalid;
-    if (h[2]!=2 || h[3]!=2) return PhxVbiosResult::Unsupported;
+    PhxVbiosInfo p{};
+    p.imageBytes=(uint32_t)size; p.romHeaderKnown=true; p.romFormat=h[2]; p.romContent=h[3];
+    if (h[2]!=2 || h[3]!=2) { out=p; return PhxVbiosResult::Unsupported; }
     const size_t master=phxVbios16(h+32);
     if (!phxVbiosTable(rom,size,master,28)) return PhxVbiosResult::Invalid;
-    if (rom[master+2]!=2 || rom[master+3]!=1) return PhxVbiosResult::Unsupported;
+    p.masterHeaderKnown=true; p.masterFormat=rom[master+2]; p.masterContent=rom[master+3];
+    if (p.masterFormat!=2 || p.masterContent!=1) { out=p; return PhxVbiosResult::Unsupported; }
     // Master data-table indexes: firmwareinfo=4, vram_usagebyfirmware=11.
     const size_t fw=phxVbios16(rom+master+4+4*2), usage=phxVbios16(rom+master+4+11*2);
     if (!phxVbiosTable(rom,size,fw,8)) return PhxVbiosResult::Invalid;
-    PhxVbiosInfo p{};
-    p.imageBytes=(uint32_t)size; p.firmwareFormat=rom[fw+2]; p.firmwareContent=rom[fw+3];
+    p.firmwareFormat=rom[fw+2]; p.firmwareContent=rom[fw+3];
     p.firmwareRevision=phxVbios32(rom+fw+4);
     if (p.firmwareFormat==3 && (p.firmwareContent==4 || p.firmwareContent==5)) {
         const size_t minimum=p.firmwareContent==4 ? 108 : 172;
@@ -76,9 +79,10 @@ static inline PhxVbiosResult phxDecodeAtom(const uint8_t *rom, size_t size, PhxV
     out=p;
     return PhxVbiosResult::Decoded;
 }
-static inline PhxVbiosResult phxDecodeVfct(const uint8_t *table, size_t size,
+struct PhxVbiosView { const uint8_t *bytes; size_t size; };
+static inline PhxVbiosResult phxFindVfctImage(const uint8_t *table, size_t size,
     uint32_t bus, uint32_t device, uint32_t function, uint16_t vendor, uint16_t gpu,
-    PhxVbiosInfo &out) {
+    PhxVbiosView &out) {
     if (!table || size<76 || table[0]!='V'||table[1]!='F'||table[2]!='C'||table[3]!='T')
         return PhxVbiosResult::Invalid;
     const size_t length=phxVbios32(table+4);
@@ -102,6 +106,15 @@ static inline PhxVbiosResult phxDecodeVfct(const uint8_t *table, size_t size,
         }
         offset+=bytes;
     }
-    return selected ? phxDecodeAtom(table+selected,selectedSize,out) : PhxVbiosResult::MissingImage;
+    if (!selected) return PhxVbiosResult::MissingImage;
+    out={table+selected,selectedSize};
+    return PhxVbiosResult::Decoded;
+}
+static inline PhxVbiosResult phxDecodeVfct(const uint8_t *table, size_t size,
+    uint32_t bus, uint32_t device, uint32_t function, uint16_t vendor, uint16_t gpu,
+    PhxVbiosInfo &out) {
+    PhxVbiosView view{};
+    const auto result=phxFindVfctImage(table,size,bus,device,function,vendor,gpu,view);
+    return result==PhxVbiosResult::Decoded ? phxDecodeAtom(view.bytes,view.size,out) : result;
 }
 #endif

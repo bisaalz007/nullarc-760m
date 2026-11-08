@@ -15,11 +15,12 @@
 #include <stdint.h>
 #include "../amd/phx_topology.h"
 #include "../amd/phx_memory_layout.h"
+#include "../amd/phx_vbios_abi.h"
 static_assert(sizeof(phx_topology) == 128, "topology wire size");
 static_assert(sizeof(phx_memory_layout) == 80, "memory snapshot wire size");
 
 static inline bool phxDiagnosticSelector(uint32_t selector) {
-    return phx_topology_diagnostic_selector(selector) || selector == PHX_SEL_MEMORY_LAYOUT;
+    return phx_topology_diagnostic_selector(selector) || selector == PHX_SEL_MEMORY_LAYOUT || selector == PHX_SEL_VBIOS_READ;
 }
 
 #define PHXN_UC_TYPE      0x4E34384Eu   /* 'N48N' */

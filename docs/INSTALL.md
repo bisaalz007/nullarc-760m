@@ -136,3 +136,18 @@ sudo python3 -B install_components.py --restore /Users/Shared/nullarc-component-
 
 Rollback refuses to overwrite later edits. Keep the Sequoia and Tahoe kernel
 build profiles separate; their private accelerator interfaces differ.
+
+## Developer firmware snapshot (build 37+)
+
+With the diagnostic kext loaded, capture the selected cached VFCT image using
+the matching development tool:
+
+```sh
+sudo ./phxprofile --dump-vbios /Users/Shared/hp-vbios.rom
+```
+
+Use a new filename. The root-only read copies cached firmware bytes; it does not
+execute VBIOS or initialize the GPU. The capture stays mode 0600 and is assigned
+to the invoking sudo user where available. Keep the raw image private and inspect
+it before sharing decoded facts. Older kexts refuse this operation. Capturing the
+image does not enable acceleration or validate memory ownership.

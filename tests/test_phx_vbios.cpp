@@ -41,6 +41,12 @@ int main() {
     b=good;w16(b,104+0x140,100);checksum(b);assert(decode(b,p)==PhxVbiosResult::Invalid);
     b=good;w32(b,80,1);checksum(b);assert(decode(b,p)==PhxVbiosResult::MissingImage);
     b=good;b[104+0x82]=9;checksum(b);assert(decode(b,p)==PhxVbiosResult::Unsupported);
+    assert(p.romHeaderKnown && p.romFormat==9 && !p.masterHeaderKnown);
+    b=good;b[104+0xc3]=9;checksum(b);assert(decode(b,p)==PhxVbiosResult::Unsupported);
+    assert(p.romHeaderKnown && p.masterHeaderKnown && p.masterContent==9 && !p.usageDecoded);
+    PhxVbiosView view{};
+    assert(phxFindVfctImage(b.data(),b.size(),1,0,0,0x1002,0x1900,view)==PhxVbiosResult::Decoded);
+    assert(view.size==512 && view.bytes==b.data()+104); // Unsupported formats remain privately capturable.
     b=good;b[9]++;assert(decode(b,p)==PhxVbiosResult::Invalid);
     b=good;w32(b,52,UINT32_MAX);checksum(b);assert(decode(b,p)==PhxVbiosResult::Invalid);
     b=good;w32(b,100,UINT32_MAX);checksum(b);assert(decode(b,p)==PhxVbiosResult::Invalid);

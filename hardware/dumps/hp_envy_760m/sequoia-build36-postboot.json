@@ -1,0 +1,92 @@
+{
+  "format": 1,
+  "captured_at": "2026-11-08T20:09:42.962524+00:00",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.8.2\nBuildVersion:\t\t24H232",
+  "target_found": true,
+  "devices": [
+    {
+      "properties": {
+        "vendor-id": {
+          "hex": "02100000",
+          "bytes": 4
+        },
+        "device-id": {
+          "hex": "00190000",
+          "bytes": 4
+        },
+        "revision-id": {
+          "hex": "ca000000",
+          "bytes": 4
+        },
+        "subsystem-vendor-id": {
+          "hex": "3c100000",
+          "bytes": 4
+        },
+        "subsystem-id": {
+          "hex": "6a8c0000",
+          "bytes": 4
+        },
+        "class-code": {
+          "hex": "00000300",
+          "bytes": 4
+        },
+        "model": {
+          "hex": "414d4420526164656f6e203736304d00",
+          "bytes": 16
+        },
+        "assigned-addresses": {
+          "hex": "100003c202000000000000b00000000000000010180003c202000000000080c0000000000000200020000381000000000010000000000000000100002400038200000000000010800000000000000800",
+          "bytes": 80
+        },
+        "reg": {
+          "hex": "00000300000000000000000000000000000000001000034200000000000000000000000000000010180003420000000000000000000000000000200020000301000000000000000000000000000100002400030200000000000000000000000000000800",
+          "bytes": 100
+        },
+        "IODeviceMemory": [
+          [
+            {
+              "address": 11542724608,
+              "length": 268435456
+            }
+          ],
+          [
+            {
+              "address": 11819548672,
+              "length": 2097152
+            }
+          ],
+          "IOSubMemoryDescriptor is not serializable",
+          [
+            {
+              "address": 2148532224,
+              "length": 524288
+            }
+          ]
+        ]
+      },
+      "services": [
+        "IOPCIDevice",
+        "PhxBringup",
+        "AMDSupport",
+        "IONDRVFramebuffer",
+        "AppleMCCSControlModule",
+        "AppleMCCSParameterHandler",
+        "AppleUpstreamUserClientDriver",
+        "AGPM",
+        "IODisplayConnect",
+        "AppleDisplay",
+        "IOFramebufferUserClient",
+        "IOFramebufferSharedUserClient"
+      ],
+      "edid": []
+    }
+  ],
+  "register_access": false,
+  "driver_loaded_by_collector": false,
+  "remaining": [
+    "macOS memory-controller/GOP ownership and reservations",
+    "macOS PSP/firmware/MES initialization",
+    "native macOS GPU fence and readback",
+    "Metal device and WindowServer rendering"
+  ]
+}

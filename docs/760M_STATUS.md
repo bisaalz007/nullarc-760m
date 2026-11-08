@@ -391,3 +391,28 @@ binary matches the packet and every parsed configuration value is unchanged.
 The new backup is separate from the earlier one. Expected build-36 module UUID:
 7B8E4713-0C01-39FB-948B-2CADB5FC8F26. A manual boot/capture is needed before this
 metadata can inform a safe HP memory plan. Acceleration remains unimplemented.
+
+## Build 36 boot result and protected firmware capture
+
+The HP booted build 36, UUID 7B8E4713-0C01-39FB-948B-2CADB5FC8F26. Selector 31
+returned the expected decoded 512 MiB layout, but firmware parsing returned
+`unsupported-atom-format`. No firmware reservations were established. Evidence:
+`hardware/dumps/hp_envy_760m/sequoia-build36-postboot.json`. The reader failed to
+expose which header version was unsupported; treating the reboot as completed
+hardware bring-up would be incorrect.
+
+Build 37 corrects that diagnostic gap. The selected VFCT image is cached before
+format-specific decoding, actual validated common-header revisions are reported,
+and new root-only selector 32 supports private snapshot capture. `phxprofile
+--dump-vbios NEW_FILE` creates a private new file with strict reply checks and
+failure cleanup. This allows user-space inspection/parser development against
+actual bytes without a kernel reboot for each parser iteration. Unknown ROM and
+master formats still do not inherit existing layouts.
+
+Native PhxBringup and the Sequoia capture CLI compile. Nine C++ binaries and 34
+Python methods pass; parser ASan/UBSan and 10,000-mutation cases pass. Mock capture
+transport tests verify cleanup, no-overwrite and exact lengths, not kernel
+authorization. On actual HP build 36 the new CLI's existing topology query still
+passes, and snapshot capture refuses before creating a file. Build-37 root
+authorization/snapshot operation remains a runtime test. No HP PSP/MES command,
+GPU memory initialization or GPU submission was enabled or executed.
