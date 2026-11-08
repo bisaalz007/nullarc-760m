@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <unistd.h>
 #include "mes_v11_api_def.h"
+#include "../../src/amd/phx_memory_layout.h"
 
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
@@ -21,6 +22,8 @@
 #define SEL_DBG_ADOPTQ 112
 
 static io_connect_t conn;
+static struct phx_memory_layout memory_layout;
+static uint64_t vram_mc, fb_pa;
 
 static void fail(const char *operation, kern_return_t kr)
 {
@@ -98,11 +101,30 @@ static uint32_t vr(uint64_t off)
 }
 
 
-#define VRAM_MC 0x8000000000ull          // MC address of VRAM offset 0
+#define VRAM_MC vram_mc                 // decoded by the running kernel
 #define GART_VA 0x7FFF00000000ull            // VA = GART_VA + vram offset (first 128 MiB)
 #define GART_PT 0x2400000ull             // flat PTE table (VRAM offset)
 #define GART_N 32768
-#define FB_PA 0x6A0000000ull             // GCMC_VM_FB_OFFSET << 24
+#define FB_PA fb_pa                     // decoded by the running kernel
+
+static void memory_snapshot(void)
+{
+   size_t size = sizeof(memory_layout);
+   IOConnectCallMethod(conn, PHX_SEL_MEMORY_LAYOUT, NULL, 0, NULL, 0, NULL, NULL, &memory_layout, &size);
+   if (!phx_memory_translate(&memory_layout, 0, 1, &vram_mc, &fb_pa))
+      fail("invalid memory snapshot", kIOReturnBadArgument);
+}
+
+static void require_reference_memory(void)
+{
+   if (memory_layout.flags & (PHX_MEMORY_DIAGNOSTIC_ONLY | PHX_MEMORY_DEVICE_LOST))
+      fail("diagnostic-only or lost GPU; no initialization plan", kIOReturnBadArgument);
+   /* The remaining default-page and aperture register sequence is Firebat-only.
+    * A decoded HP address must never silently make that sequence applicable. */
+   if (vram_mc != 0x8000000000ull || fb_pa != 0x6a0000000ull ||
+       memory_layout.vram_bytes != (6ull << 30) || memory_layout.cpu_aperture_bytes < (128ull << 20))
+      fail("reference memory/default-page plan does not match runtime layout", kIOReturnBadArgument);
+}
 
 #define SEG0(o) (0x1260u + (o))
 #define SEG1(o) (0xA000u + (o))
@@ -772,8 +794,8 @@ static void sdma_sys_test(void)
 
 int main(int argc, char **argv)
 {
-   if (argc < 2) { fprintf(stderr, "mesboot gart|mes|kiq|all\n"); return 2; }
-   const char *steps[] = {"all","db","dump","gart","mes","kiqdb","kiqsched","claim","gfx",
+   if (argc < 2) { fprintf(stderr, "mesboot layout (read-only; PhxBringup build 35+) | gart|mes|kiq|all\n"); return 2; }
+   const char *steps[] = {"layout","all","db","dump","gart","mes","kiqdb","kiqsched","claim","gfx",
                           "sdmasys","kiqreg","mec","sched","viakiq","kiq"};
    bool known = false;
    for (unsigned i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) known |= !strcmp(argv[1], steps[i]);
@@ -781,6 +803,17 @@ int main(int argc, char **argv)
       fprintf(stderr, "unknown or incomplete mesboot step\n"); return 2;
    }
    if (open_kext()) return 1;
+   memory_snapshot();
+   if (!strcmp(argv[1], "layout")) {
+      printf("decoded only: MC=0x%llx physical=0x%llx size=0x%llx BAR0=0x%llx/0x%llx flags=0x%x\n",
+         (unsigned long long)vram_mc, (unsigned long long)fb_pa,
+         (unsigned long long)memory_layout.vram_bytes,
+         (unsigned long long)memory_layout.cpu_aperture_base,
+         (unsigned long long)memory_layout.cpu_aperture_bytes, memory_layout.flags);
+      puts("Memory ownership, CPU-window placement and GPU readiness are not established by this snapshot.");
+      return 0;
+   }
+   require_reference_memory();
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;
    if (!strcmp(argv[1], "db") && argc >= 4) { printf("db +0x%llx <- %llu kr=0x%x\n", strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0), db(strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0))); return 0; }

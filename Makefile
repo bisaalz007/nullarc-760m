@@ -11,7 +11,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_r3n_abi \
         $(TEST_BIN_DIR)/test_phx_topology \
         $(TEST_BIN_DIR)/test_phx_execution \
-        $(TEST_BIN_DIR)/test_phx_firmware_file
+        $(TEST_BIN_DIR)/test_phx_firmware_file \
+        $(TEST_BIN_DIR)/test_phx_memory
 
 .PHONY: all test clean kext fixtures
 
@@ -32,10 +33,13 @@ $(TEST_BIN_DIR)/test_rdna3_ucode: src/amd/rdna3_ucode_extract.cpp tests/test_rdn
 $(TEST_BIN_DIR)/test_r3n_abi: src/uapi/r3n_user_client.cpp src/winsys/radv_r3n_winsys.cpp tests/test_r3n_abi.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@
 
-$(TEST_BIN_DIR)/test_phx_topology: tests/test_phx_topology.cpp src/amd/phx_topology.h src/amd/phx_hp_760m.h src/phxbringup/PhxNativeABI.h | $(TEST_BIN_DIR)
+$(TEST_BIN_DIR)/test_phx_topology: tests/test_phx_topology.cpp src/amd/phx_topology.h src/amd/phx_hp_760m.h src/amd/phx_memory_layout.h src/phxbringup/PhxNativeABI.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
-$(TEST_BIN_DIR)/test_phx_execution: tests/test_phx_execution.cpp src/phxbringup/PhxExecutionPolicy.h | $(TEST_BIN_DIR)
+$(TEST_BIN_DIR)/test_phx_execution: tests/test_phx_execution.cpp src/phxbringup/PhxExecutionPolicy.h src/amd/phx_memory_layout.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_memory: tests/test_phx_memory.cpp src/amd/phx_memory_layout.h src/phxbringup/PhxNativeABI.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 $(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)

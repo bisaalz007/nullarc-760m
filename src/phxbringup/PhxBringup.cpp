@@ -19,7 +19,7 @@
 #include "PhxExecutionPolicy.h"
 #include "../amd/phx_hp_760m.h"
 
-#define PHX_KEXT_BUILD 34u
+#define PHX_KEXT_BUILD 35u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -92,6 +92,7 @@ public:
     IOReturn claimAccel();
     bool diagnosticOnly() const { return topology != nullptr; }
     const phx_topology *capturedTopology() const { return topology; }
+    bool memoryLayout(phx_memory_layout &out) const;
     bool gpuReady() const { return !isLost() && (gq[0].ready || gq[1].ready); }
     bool engineReady(uint32_t ip) const {
         return !isLost() && phxEngineAvailable(ip, gq[1].ready, gq[0].ready);
@@ -123,6 +124,7 @@ private:
     IOLock *smuLock{nullptr};
     // UMA carve-out ("VRAM"): GPU MC address range and the system physical address behind it.
     uint64_t fbMcBase{0}, fbSize{0}, fbPhys{0};
+    uint32_t fbBaseRaw{0}, fbTopRaw{0}, fbOffsetRaw{0};
     // BAR0 framebuffer aperture: the CPU window into the first fbAperLen bytes of VRAM. It is an MMIO
     // region above system RAM (phys 0x8_2040_0000 here, 256 MiB), so CPU writes through it reach the
     // GPU's local memory and never the macOS heap. This is how the PSP ring is initialised.
@@ -225,6 +227,7 @@ private:
     IOReturn doHello(IOExternalMethodArguments *a);
     IOReturn doQueryInfo(IOExternalMethodArguments *a);
     IOReturn doTopology(IOExternalMethodArguments *a);
+    IOReturn doMemoryLayout(IOExternalMethodArguments *a);
     IOReturn doReadRegs(IOExternalMethodArguments *a);
     IOReturn doBoCreate(IOExternalMethodArguments *a);
     IOReturn doBoFree(IOExternalMethodArguments *a);
@@ -394,10 +397,10 @@ void PhxBringup::wreg(uint32_t reg, uint32_t value) const {
 
 // FB location (MC, 16 MiB units, FB_BASE bits 23:0) and the system physical address of the carve-out (FB_OFFSET << 24).
 void PhxBringup::readFbLayout() {
-    uint32_t base = rreg(PHX_MMMC_VM_FB_LOCATION_BASE);
-    uint32_t top = rreg(PHX_MMMC_VM_FB_LOCATION_TOP);
-    uint32_t offset = rreg(PHX_MMMC_VM_FB_OFFSET);
-    if (!phxDecodeMemoryLayout(base, top, offset, fbMcBase, fbSize, fbPhys)) {
+    fbBaseRaw = rreg(PHX_MMMC_VM_FB_LOCATION_BASE);
+    fbTopRaw = rreg(PHX_MMMC_VM_FB_LOCATION_TOP);
+    fbOffsetRaw = rreg(PHX_MMMC_VM_FB_OFFSET);
+    if (!phxDecodeMemoryLayout(fbBaseRaw, fbTopRaw, fbOffsetRaw, fbMcBase, fbSize, fbPhys)) {
         setProperty("phx-memory-status", "unreadable-or-uninitialized");
         IOLog("PhxBringup: stage memory-layout unavailable: uninitialized or invalid MMHUB registers\n");
         return;
@@ -417,6 +420,19 @@ void PhxBringup::readFbLayout() {
     }
     if (fbSize)
         pci->setProperty("VRAM,totalMB", fbSize >> 20, 32);
+}
+
+bool PhxBringup::memoryLayout(phx_memory_layout &out) const {
+    phx_memory_layout p{};
+    p.version = PHX_MEMORY_LAYOUT_VERSION;
+    p.flags = PHX_MEMORY_DECODED | (diagnosticOnly() ? PHX_MEMORY_DIAGNOSTIC_ONLY : 0) |
+              (isLost() ? PHX_MEMORY_DEVICE_LOST : 0);
+    p.raw_base = fbBaseRaw; p.raw_top = fbTopRaw; p.raw_offset = fbOffsetRaw;
+    p.mc_base = fbMcBase; p.physical_base = fbPhys; p.vram_bytes = fbSize;
+    p.cpu_aperture_base = fbAperPhys; p.cpu_aperture_bytes = fbAperLen;
+    if (!phx_memory_layout_valid(&p)) return false;
+    out = p;
+    return true;
 }
 
 void PhxBringup::clearRing() {
@@ -440,7 +456,7 @@ void PhxBringup::hdpFlush() const {
 IOReturn PhxBringup::vramRead(uint32_t byteOff, uint32_t count, uint32_t *out) {
     if (!fbAper)
         return kIOReturnNotReady;
-    if ((byteOff & 3) || (static_cast<uint64_t>(byteOff) + static_cast<uint64_t>(count) * 4) > fbAperLen)
+    if ((byteOff & 3) || !phxVramSpan(byteOff, static_cast<uint64_t>(count) * 4, fbSize, fbAperLen))
         return kIOReturnBadArgument;
     volatile uint32_t *v = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + byteOff);
     for (uint32_t i = 0; i < count; i++)
@@ -488,7 +504,7 @@ IOReturn PhxBringup::sysMem(uint64_t op, uint64_t a, uint64_t b, uint64_t *out0,
         sysBuf = nullptr;
         return kIOReturnSuccess;
     }
-    if ((a & 3) || a + 4 > sysBuf->getLength())
+    if ((a & 3) || !phxBufferSpan(a, 4, sysBuf->getLength()))
         return kIOReturnBadArgument;
     volatile uint32_t *p = reinterpret_cast<volatile uint32_t *>(static_cast<uint8_t *>(sysBuf->getBytesNoCopy()) + a);
     if (op == 2) {
@@ -707,9 +723,7 @@ IOReturn PhxBringup::adoptQueue(const uint64_t in[6]) {
     // in[5] = fence offset | queue index (0 compute, 1 gfx): the fence is 8-byte aligned, so bit 0 is free
     const uint64_t ringOff = in[0], ringDw = in[1], wbOff = in[2], dbByte = in[3], wptr = in[4], fenceOff = in[5] & ~1ull;
     const uint32_t qi = static_cast<uint32_t>(in[5] & 1);
-    if (ringDw < 256 || ringDw > 65536 || (ringDw & (ringDw - 1)) || (ringOff & 0xFF) ||
-        ringOff + ringDw * 4 > fbAperLen || (wbOff & 7) || wbOff + 32 > fbAperLen || (fenceOff & 7) ||
-        fenceOff + 8 > fbAperLen || (dbByte & 7) || dbByte + 8 > doorbellMap->getLength())
+    if (!phxQueueLayoutValid(ringOff, ringDw, wbOff, fenceOff, dbByte, fbSize, fbAperLen, doorbellMap->getLength()))
         return kIOReturnBadArgument;
     IOLockLock(gpuLock);
     GpuQueue &q = gq[qi];
@@ -895,7 +909,7 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
 IOReturn PhxBringup::doorbellWrite(uint64_t byteOff, uint64_t value) {
     if (!doorbellMap)
         return kIOReturnNotReady;
-    if ((byteOff & 7) || byteOff + 8 > doorbellMap->getLength())
+    if ((byteOff & 7) || !phxBufferSpan(byteOff, 8, doorbellMap->getLength()))
         return kIOReturnBadArgument;
     *reinterpret_cast<volatile uint64_t *>(doorbellMap->getVirtualAddress() + byteOff) = value;
     return kIOReturnSuccess;
@@ -904,7 +918,7 @@ IOReturn PhxBringup::doorbellWrite(uint64_t byteOff, uint64_t value) {
 IOReturn PhxBringup::vramWrite(uint32_t byteOff, uint32_t value) {
     if (!fbAper)
         return kIOReturnNotReady;
-    if ((byteOff & 3) || static_cast<uint64_t>(byteOff) + 4 > fbAperLen)
+    if ((byteOff & 3) || !phxVramSpan(byteOff, 4, fbSize, fbAperLen))
         return kIOReturnBadArgument;
     *reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + byteOff) = value;
     __asm__ __volatile__("sfence" ::: "memory");
@@ -933,8 +947,10 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
     if (op == 1) {
         if (ringMc) {
             r = kIOReturnExclusiveAccess;   // a ring is already live; destroy it first
-        } else if ((carveOffset & 0xFFF) || carveOffset + PHX_PSP_FENCE_REL + 0x1000 > PHX_VRAM_TMR_OFF ||
-                   PHX_VRAM_FWBUF_OFF + PHX_VRAM_FWBUF_SIZE > fbAperLen) {
+        } else if ((carveOffset & 0xFFF) ||
+                   !phxBufferSpan(carveOffset, PHX_PSP_FENCE_REL + 0x1000, PHX_VRAM_TMR_OFF) ||
+                   !phxVramSpan(carveOffset, PHX_PSP_FENCE_REL + 0x1000, fbSize, fbAperLen) ||
+                   !phxVramSpan(PHX_VRAM_FWBUF_OFF, PHX_VRAM_FWBUF_SIZE, fbSize, fbAperLen)) {
             r = kIOReturnBadArgument;        // ring+cmd+fence must sit below the TMR; fw_buf must fit the aperture
         } else {
             volatile uint32_t *ring = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + carveOffset);
@@ -1078,7 +1094,9 @@ IOReturn PhxBringup::pspSubmit(uint32_t cmdId, uint64_t out[4]) {
 IOReturn PhxBringup::fwStage(uint32_t dstOffset, const void *bytes, uint32_t len) {
     if (!fbAper || !fwBufSize)
         return kIOReturnNotReady;
-    if ((dstOffset & 3) || static_cast<uint64_t>(dstOffset) + len > fwBufSize)
+    const uint64_t written = (static_cast<uint64_t>(len) + 3) & ~3ull;
+    if ((dstOffset & 3) || !phxBufferSpan(dstOffset, written, fwBufSize) ||
+        !phxVramSpan(fwBufOff, fwBufSize, fbSize, fbAperLen))
         return kIOReturnBadArgument;
     IOLockLock(smuLock);
     volatile uint8_t *dst = reinterpret_cast<volatile uint8_t *>(fbAper->getVirtualAddress() + fwBufOff + dstOffset);
@@ -1332,8 +1350,8 @@ static bool shape(const IOExternalMethodArguments *a, uint32_t sin, uint32_t sou
 IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMethodArguments *a,
                                                 IOExternalMethodDispatch *, OSObject *, void *) {
     // Enforced before WAITSEQ's separate locking and before debug handlers.
-    if (owner->isLost() && !phx_topology_diagnostic_selector(selector)) return kIOReturnAborted;
-    if (owner->diagnosticOnly() && !phx_topology_diagnostic_selector(selector)) return kIOReturnNotReady;
+    if (owner->isLost() && !phxDiagnosticSelector(selector)) return kIOReturnAborted;
+    if (owner->diagnosticOnly() && !phxDiagnosticSelector(selector)) return kIOReturnNotReady;
     if (selector == PHXN_SEL_WAITSEQ)
         return doWaitSeq(a);
 
@@ -1346,6 +1364,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_HELLO:     r = doHello(a); break;
         case PHXN_SEL_QUERYINFO: r = doQueryInfo(a); break;
         case PHX_SEL_TOPOLOGY: r = doTopology(a); break;
+        case PHX_SEL_MEMORY_LAYOUT: r = doMemoryLayout(a); break;
         case PHXN_SEL_READREGS:  r = doReadRegs(a); break;
         case PHXN_SEL_BOCREATE:  r = doBoCreate(a); break;
         case PHXN_SEL_BOFREE:    r = doBoFree(a); break;
@@ -1395,6 +1414,14 @@ IOReturn IOAccelPhxNativeClient::doTopology(IOExternalMethodArguments *a) {
     const phx_topology *p = owner->capturedTopology();
     if (!p) return kIOReturnUnsupported; // Preserve legacy 780M fallback.
     bcopy(p, a->structureOutput, sizeof(*p));
+    return kIOReturnSuccess;
+}
+
+IOReturn IOAccelPhxNativeClient::doMemoryLayout(IOExternalMethodArguments *a) {
+    if (!shape(a, 0, 0, 0, sizeof(phx_memory_layout))) return kIOReturnBadArgument;
+    phx_memory_layout p{};
+    if (!owner->memoryLayout(p)) return kIOReturnNotReady;
+    bcopy(&p, a->structureOutput, sizeof(p));
     return kIOReturnSuccess;
 }
 

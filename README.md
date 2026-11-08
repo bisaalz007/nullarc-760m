@@ -66,6 +66,13 @@ plugin translation/RADV compiler tests also pass; these remain CPU-only tests.
 The rebuilt accelerator's kernel load and HP acceleration are separate validation
 stages. See the Sequoia-labelled development asset in this fork's Releases.
 
+Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
+The tool gets MC/physical addresses from the kernel, validates the reply and rejects
+initialization when the remaining Firebat default-page plan does not match. Queue,
+VRAM and doorbell accesses now reject overflow and queue-buffer overlap. These
+changes build and pass host tests; build 35 has not been tested on the HP or added
+to the existing 0.1.1 release. Decoded memory does not establish ownership.
+
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.

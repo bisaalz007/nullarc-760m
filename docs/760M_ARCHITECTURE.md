@@ -117,3 +117,25 @@ extractor does not start MES. `mesboot.c`, fixed PSP/TMR addresses and HP memory
 reservation discovery still need integration before diagnostic restrictions can go.
 Stock Linux hardware tests establish shader translator behavior independently of
 these unfinished macOS paths; see [Linux validation](LINUX_VALIDATION.md).
+
+## Runtime memory contract (build 35)
+
+`src/amd/phx_memory_layout.h` defines selector 31 and an 80-byte snapshot. It
+exports the raw attach-time MMHUB registers, decoded MC/physical/size fields and
+the mapped BAR0 extent. The shared decoder/validator checks internal consistency,
+reserved/version/flag fields and address overflow. The kernel requires the exact
+method shape and a successful Hello; diagnostic/lost devices can still report
+their snapshot. No readiness, reservation or CPU-window-offset assertion is made.
+
+`mesboot layout` reads this snapshot without a mutating selector. Other mesboot
+steps require a valid reply and reject diagnostic/lost hardware before register,
+VRAM or doorbell operations. Address calculations use the query, but remaining
+Firebat default-page/register sequences require the original matching memory
+layout. A different physical base cannot silently reuse those sequences. New
+mesboot requires build 35+; older kernels fail before hardware operations.
+
+The production queue adoption policy checks both VRAM and CPU aperture bounds,
+32-bit offset storage, doorbell span and ring/writeback/fence overlap. The same
+overflow-safe bounds protect VRAM reads/writes, PSP ring/staging and system-memory
+debug accesses. This does not prove ownership of any of those regions. HP PSP/TMR,
+GOP scanout reservations and actual queue initialization remain separate work.

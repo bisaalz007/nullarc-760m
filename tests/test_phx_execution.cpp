@@ -11,6 +11,15 @@ int main() {
     assert(!phxCanonicalSpan(0x10000, 0));
     assert(!phxBufferSpan(~0ull - 7, 32, 4096));
     assert(phxBufferSpan(4096, 4096, 8192));
+    assert(!phxVramSpan(4096,4096,4096,16384)); // A large BAR is not additional VRAM.
+    assert(!phxVramSpan(4096,4096,16384,4096));
+    assert(phxVramSpan(4096,4096,8192,8192));
+    assert(phxQueueLayoutValid(0x1000,1024,0x2000,0x2020,24,0x10000,0x10000,0x1000));
+    assert(!phxQueueLayoutValid(0x1000,1024,0x1ff8,0x2020,24,0x10000,0x10000,0x1000));
+    assert(!phxQueueLayoutValid(0x1000,1024,0x2000,0x2018,24,0x10000,0x10000,0x1000));
+    assert(!phxQueueLayoutValid(~0ull-255,1024,0x2000,0x2020,24,0x10000,0x10000,0x1000));
+    assert(!phxQueueLayoutValid(1ull<<32,1024,0x2000,0x2020,24,1ull<<34,1ull<<34,0x1000));
+    assert(!phxQueueLayoutValid(0x1000,1024,0x2000,0x2020,~0ull-7,0x10000,0x10000,0x1000));
     assert(!phxEngineAvailable(0, false, true));
     assert(!phxEngineAvailable(1, true, false));
     assert(phxEngineAvailable(1, true, true));

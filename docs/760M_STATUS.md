@@ -321,3 +321,32 @@ No device matching or GPU initialization was requested. Normal Sequoia extension
 approval and a user-controlled reboot are the next test; no security bypass was
 attempted. PSP/TMR/GPUVM/scanout ownership, native queues, command
 completion and Metal/display acceleration remain unimplemented or unverified.
+
+## Runtime memory integration continuation
+
+The user reports both kexts loaded after the load/reboot discussion. Exact loaded
+accelerator UUID and new postboot state remain independently unverified because
+SSH is unreachable. Work proceeds without treating that report as GPU readiness.
+
+Build 35 adds the shared `phx_memory_layout.h` wire contract/decoder and kernel
+selector 31. `PhxBringup.cpp` exports the attach-time raw/decoded memory snapshot;
+`PhxExecutionPolicy.h` shares its decoder and adds production queue/aperture span
+checks. `mesboot.c` reads and validates this contract, supports a read-only `layout`
+step, derives address bases from it and stops mismatched/diagnostic/lost plans
+before mutations. Remaining Firebat register/default-page constants are explicitly
+restricted to the reference memory geometry. No HP initialization was enabled.
+
+Queue adoption now rejects integer wrap, uint32 offset truncation and overlap of
+ring, writeback and fence spans. VRAM accesses are bounded by both decoded VRAM
+and BAR extent; PSP staging includes rounded final-dword bounds. Doorbell and
+system-debug offsets use overflow-safe subtraction checks.
+
+Validation: eight C++ host binaries and 32 Python methods passed, including
+malformed/short memory replies, HP/reference layouts, diagnostic/lost/mismatched
+pre-mutation refusal and queue overflow/overlap cases. ASan/UBSan memory and
+execution-policy cases passed. PhxBringup and Sequoia PhxAccel native builds and
+Sequoia mesboot compilation passed; three existing PhxBringup shadow warnings
+remain. Neither build 35 nor native GPU execution was runtime tested. Existing
+0.1.1 release assets remain unchanged; their matching source is the older commit.
+Next required hardware evidence remains macOS memory/scanout/firmware reservation
+ownership before PSP/TMR/GPUVM/MES initialization can be implemented safely.
