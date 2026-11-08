@@ -2,7 +2,8 @@
 
 Download the ZIP asset from this fork's
 [Releases](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases), verify its
-SHA-256 using the attached `SHA256SUMS`, and extract it. Open Terminal in the
+SHA-256 using `SHA256SUMS-sequoia` for the Sequoia asset (`SHA256SUMS` for the
+older Tahoe asset), and extract it. Open Terminal in the
 extracted `nullarc-...` directory containing `install.sh`.
 
 This guide uses the upstream installation stages as a reference, with commands
@@ -15,12 +16,12 @@ do not establish HP compatibility.
 | Target | Available operation |
 |---|---|
 | HP Envy x360 16-ad0013dx, Radeon 760M | Diagnostic PhxBringup kext in an explicitly selected OpenCore directory |
-| HP with Sequoia 15 | Sequoia-target package loads/translates shaders; diagnostic kext load and acceleration still require testing |
+| HP with Sequoia 15 | Diagnostic kext boot and installed plugin translation verified; backed-up `--components` replacement available; acceleration unverified |
 | HP with Tahoe | Same diagnostic gate; GPU acceleration is not enabled |
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
 Linux tests executed translated compute and graphics shaders on the HP. The
-macOS kernel, native queues, Metal device and WindowServer remain unverified.
+diagnostic macOS kext boots, but native queues, Metal device and WindowServer remain unverified.
 Running `sudo ./install.sh --windowserver` on the HP returns an error **before
 installing acceleration or changing boot settings**. There is no bypass option.
 

@@ -60,8 +60,11 @@ translator, RADV and transitive dependencies are checked for actual Mach-O minim
 versions. On the HP running Sequoia 15.8.2, the port passed immediate plugin loading,
 three-stage Metal/AIR translation and real ACO pipeline compilation with explicit
 8/12-CU mocks. No native GPU command was submitted. Build headers still require
-SDK 26; the resulting binaries target macOS 15. Diagnostic kext loading and HP
-acceleration remain separate hardware-validation stages.
+SDK 26; the resulting binaries target macOS 15. PhxBringup build 34 now boots on
+the HP in diagnostic-only mode. Installed component hashes and actual installed
+plugin translation/RADV compiler tests also pass; these remain CPU-only tests.
+The rebuilt accelerator's kernel load and HP acceleration are separate validation
+stages. See the Sequoia-labelled development asset in this fork's Releases.
 
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).

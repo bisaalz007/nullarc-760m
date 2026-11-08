@@ -292,3 +292,28 @@ including deployment-command dependency rejection, target-specific receipt check
 and component-copy failure rollback. Native source builds and the actual HP
 user-space compiler/load tests above passed. This does not validate the new
 accelerator's runtime load or the native GPU command path.
+
+## Installed Sequoia components (2026-11-08)
+
+The user ran the protected `--components` installation on the HP. Independent
+SSH hashing verifies the installed PhxAccel (2 files), NVMTLDriver bundle (9),
+RADV directory (3) and disabled bring-up directory (20) against the published
+0.1.1-sequoia-alpha package. The backup directory exists; its root-only receipt
+requires administrator access to verify. `phxboot-off` exists and no boot daemon
+is installed. The old accelerator UUID AA33BEDC-8AC7-3EE4-87BE-A45D328C46A1 remains
+loaded, while the rebuilt binary on disk is A672A59E-9077-35D7-840D-360640764497.
+File installation does not establish a successful new-module load.
+
+The actual installed plugin passes RTLD_NOW and compute/vertex/fragment AIR
+translation. Installed RADV/ACO passes compute and graphics pipeline compilation
+under explicit 8/12-CU mocks with zero submissions. This verifies installed
+user-space dependencies, not native GPU execution. The existing `alpha` prerelease
+now includes the Sequoia ZIP, diagnostic kext ZIP, matching checksum file and
+build-time validation receipt. Its tag is unchanged; each binary package embeds
+its matching source commit, and older Tahoe assets remain separate.
+
+A target-local administrator command is prepared for a start-only kernel load
+test, with package/backup verification, idle-service checks and exact loaded UUID
+verification. Its result is pending; no device matching or GPU initialization is
+requested by that test. PSP/TMR/GPUVM/scanout ownership, native queues, command
+completion and Metal/display acceleration remain unimplemented or unverified.

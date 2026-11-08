@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "source_commit": "7a95270b84a518a95aeb62bc69c56f56beb9db13",
+  "os": "macOS Sequoia 15.8.2",
+  "installation": "components-installed-no-activation",
+  "installed_file_inventory_matches_package": {
+    "PhxAccel.kext": 2,
+    "NVMTLDriver.bundle": 9,
+    "nvmtl": 3,
+    "gpu_including_phxboot_off": 20
+  },
+  "backup_directory_exists": true,
+  "backup_receipt_verification": "requires root; pending",
+  "phxboot_off": true,
+  "launch_daemon_installed": false,
+  "loaded_accelerator_uuid": "AA33BEDC-8AC7-3EE4-87BE-A45D328C46A1",
+  "installed_accelerator_uuid": "A672A59E-9077-35D7-840D-360640764497",
+  "new_accelerator_load_tested": false,
+  "installed_plugin_RTLD_NOW": "passed",
+  "installed_metallib_translation": [
+    "compute",
+    "vertex",
+    "fragment"
+  ],
+  "installed_RADV_ACO_pipeline_compilation": {
+    "8_CU_mock": "passed",
+    "12_CU_mock": "passed"
+  },
+  "GPU_submissions": 0,
+  "acceleration_verified": false
+}
