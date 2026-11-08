@@ -416,3 +416,10 @@ authorization. On actual HP build 36 the new CLI's existing topology query still
 passes, and snapshot capture refuses before creating a file. Build-37 root
 authorization/snapshot operation remains a runtime test. No HP PSP/MES command,
 GPU memory initialization or GPU submission was enabled or executed.
+
+Build 37 is now staged on the confirmed USB EFI with a separate rollback backup.
+Independent comparison verified the staged binary and unchanged parsed config.
+Expected module UUID: 389AD4FD-0B13-3162-AD0E-DFC7443A9CC2. The matching tool and
+source packet are on the HP under the existing Shared test directory. Manual
+reboot followed by the root-only private VBIOS capture is pending. Build 36 was
+the last independently verified running kernel. Staging is not GPU initialization.
