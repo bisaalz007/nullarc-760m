@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.8.2\nBuildVersion:\t\t24H232",
+  "plugin_sha256": "1930ee21b5943520d6ca234195561f61b26ae5430c0721c3b9cc71aeb31147d0",
+  "translator_sha256": "aff384eae94f4e2968b93caf7867385e380f23ddaf1efa7f3efcf9feb0cb68ee",
+  "GPU_submissions": 0,
+  "acceleration_verified": false,
+  "tests": [
+    {
+      "name": "installed-metallib-translation",
+      "returncode": 0,
+      "stdout": "[PASS] metallib triangle_vertex -> vertex SPIR-V (676 bytes)\n[PASS] metallib solid_fragment -> fragment SPIR-V (348 bytes)\n[PASS] compiled MSL metallib -> plugin AIR reader -> SPIR-V (540 bytes); no GPU execution\n",
+      "stderr": ""
+    },
+    {
+      "name": "8-CU-mock-ACO-pipelines",
+      "returncode": 0,
+      "stdout": "[PASS] AMD Radeon 760M Graphics (RADV PHOENIX): 8 CUs, SE=1 SA=2 CU/SA=4 (mock, no execution)\n[PASS] gfx1103 ACO compute pipeline compiled; no commands submitted\n[PASS] translated vertex/fragment gfx1103 graphics pipeline compiled; no draw submitted\n",
+      "stderr": "radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: native kext: ABI 1.11, build 603, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 168 MiB visible + 15360 MiB hi, GTT cap 512 MiB\nradv-darwin: mock client closed: 0 submits, 0 seqs\nradv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: mock client closed: 0 submits, 0 seqs\nradv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: mock client closed: 0 submits, 0 seqs\n"
+    },
+    {
+      "name": "12-CU-mock-ACO-pipelines",
+      "returncode": 0,
+      "stdout": "[PASS] AMD Radeon 780M Graphics (RADV PHOENIX): 12 CUs, SE=1 SA=2 CU/SA=6 (mock, no execution)\n[PASS] gfx1103 ACO compute pipeline compiled; no commands submitted\n[PASS] translated vertex/fragment gfx1103 graphics pipeline compiled; no draw submitted\n",
+      "stderr": "radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: native kext: ABI 1.11, build 603, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 168 MiB visible + 15360 MiB hi, GTT cap 512 MiB\nradv-darwin: mock client closed: 0 submits, 0 seqs\nradv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: mock client closed: 0 submits, 0 seqs\nradv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)\nradv-darwin: mock client closed: 0 submits, 0 seqs\n"
+    }
+  ],
+  "plugin_RTLD_NOW": "passed",
+  "shaders": {
+    "store.spv": "781789398042366bc562d4e38a93a124112e792e583485ea99e52e9c5db7172b",
+    "triangle_vertex.spv": "4922ca31063cb71dd8b822a4db4a66843cea9bf71a57289dc3f0d46e8702bcfc",
+    "solid_fragment.spv": "e96646641cccbba2cf948b2860d1c5b3c161444774ca067951ed39e787b5fea3"
+  },
+  "passed": true,
+  "independent_SPIRV_validation": "passed all three HP-produced shaders, Vulkan 1.2 target",
+  "loaded_module_uuids": {
+    "org.drip.PhxBringup": "FCD65B84-7D25-3245-9186-18D99B2D8048",
+    "com.luuumi.PhxAccel": "A672A59E-9077-35D7-840D-360640764497"
+  },
+  "phx_build": 34,
+  "phx_stage": "profile-diagnostic-only",
+  "phx_memory_status": "decoded-not-initialized"
+}

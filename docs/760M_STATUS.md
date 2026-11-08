@@ -350,3 +350,19 @@ remain. Neither build 35 nor native GPU execution was runtime tested. Existing
 0.1.1 release assets remain unchanged; their matching source is the older commit.
 Next required hardware evidence remains macOS memory/scanout/firmware reservation
 ownership before PSP/TMR/GPUVM/MES initialization can be implemented safely.
+
+## Postboot installed-translator verification
+
+SSH access resumed. On the HP running Sequoia 15.8.2, the installed plugin,
+translator and LLVM/Zstd dependencies exactly match the 0.1.1 Sequoia package.
+Fresh compute, vertex and fragment metallib translation passed with empty test
+caches and cache reuse disabled. All three HP-produced SPIR-V files passed
+independent Vulkan 1.2 validation. Installed RADV/ACO compute/graphics compilation
+passed under explicit 8/12-CU mocks with zero GPU submissions.
+
+The loaded accelerator UUID is now independently verified as
+A672A59E-9077-35D7-840D-360640764497, matching the rebuilt Sequoia binary. This
+confirms module loading, not GPU execution or IOAccelerator service operation.
+PhxBringup remains build 34, profile-diagnostic-only and decoded-not-initialized;
+development build 35 was not installed. Evidence:
+`hardware/dumps/hp_envy_760m/sequoia-translator-postboot-2026-11-08.json`.

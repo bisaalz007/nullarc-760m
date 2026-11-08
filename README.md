@@ -63,8 +63,9 @@ three-stage Metal/AIR translation and real ACO pipeline compilation with explici
 SDK 26; the resulting binaries target macOS 15. PhxBringup build 34 now boots on
 the HP in diagnostic-only mode. Installed component hashes and actual installed
 plugin translation/RADV compiler tests also pass; these remain CPU-only tests.
-The rebuilt accelerator's kernel load and HP acceleration are separate validation
-stages. See the Sequoia-labelled development asset in this fork's Releases.
+The rebuilt Sequoia accelerator's loaded UUID is now verified. Fresh installed
+translation tests and independent SPIR-V validation pass; GPU acceleration remains
+unverified. See the Sequoia-labelled development asset in this fork's Releases.
 
 Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects
