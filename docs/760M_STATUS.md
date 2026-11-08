@@ -221,3 +221,23 @@ methods passed. Shell-level checks preserve temporary EFI state on refusal; no
 macOS driver was installed or loaded on the build host or HP. Existing native
 compile warnings remain. The release's WindowServer path is present but still
 refuses the diagnostic HP identity.
+
+## WindowServer continuation: runtime access required
+
+The installer command is present, but HP firmware/MES/VM/display bring-up is not
+implemented and verified sufficiently to enable it. Both known SSH endpoints
+(Linux `192.168.1.68`, macOS `192.168.1.148`) timed out during this continuation;
+no current HP OS or driver state was inferred. Last verified installed macOS was
+Sequoia 15.8.2; the acceleration/plugin binaries target Tahoe 26.
+
+`tools/collect_macos_evidence.py` now preserves the existing PhxBringup memory
+status, MC base, size, physical offset, BAR aperture and HDP properties. Previously
+these were dropped from the report despite being exported by the kernel. A new
+fixture test verifies exact property transport, omission of unavailable values
+and preservation of diagnostic-only state. Eight targeted collector/installer
+tests passed. No native source changed, so a native rebuild was not required.
+This is a diagnostic collection fix, not completion of the WindowServer path.
+No new raw register values, reservations, firmware interface or readiness claims
+were added; no target EFI or released binary asset was changed. The next step
+requires the HP back in macOS with SSH, then actual memory/scanout ownership and
+staged firmware/queue/fence validation.

@@ -38,5 +38,19 @@ class EvidenceCollectorTests(unittest.TestCase):
             self.assertFalse((out/'ip_discovery/die/0/GC/0/outside').exists())
             self.assertTrue(errors) # absent attributes are explicit, never fabricated
 
+    def test_existing_kernel_memory_properties_are_preserved_without_readiness_claim(self):
+        # Deliberately synthetic values: checks property transport, not HP layout.
+        facts={'phx-stage':'profile-diagnostic-only','phx-memory-status':'decoded-not-initialized',
+               'phx-fb-mc-base':0x10000000,'phx-fb-size':0x02000000,'phx-fb-phys':0x20000000,
+               'phx-fb-aper-phys':0x30000000,'phx-fb-aper-len':0x01000000,'phx-hdp-flush-dword':0x100}
+        pci={k:v.to_bytes(4,'little') for k,v in mac.EXPECTED.items()}
+        pci['IORegistryEntryChildren']=[dict(facts,IOObjectClass='PhxBringup',PrivateData='not recorded')]
+        result=mac.capture([pci])[0]
+        for k,v in facts.items():self.assertEqual(result['bringup'][k],v)
+        self.assertNotIn('not recorded',str(result))
+        self.assertNotIn('runtime_ready',result)
+        del pci['IORegistryEntryChildren'][0]['phx-fb-phys']
+        self.assertNotIn('phx-fb-phys',mac.capture([pci])[0]['bringup'])
+
 
 if __name__=='__main__':unittest.main()

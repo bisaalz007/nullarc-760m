@@ -16,7 +16,9 @@ import subprocess
 EXPECTED = {'vendor-id':0x1002, 'device-id':0x1900, 'revision-id':0xca,
             'subsystem-vendor-id':0x103c, 'subsystem-id':0x8c6a}
 FIELDS = tuple(EXPECTED) + ('class-code', 'model', 'assigned-addresses', 'reg', 'IODeviceMemory',
-    'phx-build', 'phx-stage', 'phx-profile', 'phx-failure', 'phx-bringup-blocker')
+    'phx-build', 'phx-stage', 'phx-profile', 'phx-failure', 'phx-bringup-blocker',
+    'phx-memory-status', 'phx-fb-mc-base', 'phx-fb-size', 'phx-fb-phys',
+    'phx-fb-aper-phys', 'phx-fb-aper-len', 'phx-hdp-flush-dword')
 
 
 def safe(value):
@@ -74,7 +76,10 @@ if __name__ == '__main__':
               'os':subprocess.check_output(['sw_vers'],text=True).strip(),
               'target_found':bool(devices),'devices':devices,'register_access':False,
               'driver_loaded_by_collector':False,
-              'remaining':['IP discovery','firmware versions/hashes and load layout','memory-controller/GOP reservations','verified GPU command execution']}
+              'remaining':['macOS memory-controller/GOP ownership and reservations',
+                           'macOS PSP/firmware/MES initialization',
+                           'native macOS GPU fence and readback',
+                           'Metal device and WindowServer rendering']}
     (a.output/'macos-evidence.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps({'output':str(a.output),'target_found':bool(devices),'read_only':True}))
     raise SystemExit(0 if devices else 1)
