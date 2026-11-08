@@ -3,16 +3,21 @@
 # LOAD_IP_FW, RLC autoload, then the SMU messages that switch GFX on (EnableGfxImu with 1). Firmware from ~/gpu/fw at
 # the offsets and sizes of linux-firmware's gc_11_0_1/psp_13_0_4 files. Run as root (phxboot) or as a user with sudo.
 # A reboot is armed for 3 minutes in case the PSP hangs and cancelled at the end.
-set -u
-if ioreg -rc PhxBringup -l | grep -q '"phx-stage" = "profile-diagnostic-only"'; then
-    echo "HP profile captured; IP discovery, firmware and memory layout validation required. Bring-up stopped." >&2
+set -eo pipefail
+REGISTRY=$(ioreg -rc PhxBringup -l)
+if ! grep -q '"phx-build"' <<<"$REGISTRY"; then
+    echo "PhxBringup is not loaded; bring-up stopped before watchdog or hardware access." >&2
+    exit 1
+fi
+if grep -qE '"phx-stage" = "(profile-diagnostic-only|device-lost)"' <<<"$REGISTRY"; then
+    echo "Diagnostic-only or lost GPU: bring-up refused; collect evidence or reboot." >&2
     exit 1
 fi
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO=sudo
 P(){ $SUDO ~/gpu/phxctl/phxctl "$@"; }
 echo "== watchdog: reboot in 3 min unless cancelled =="
 $SUDO bash -c 'nohup shutdown -r +3 >/dev/null 2>&1 &'
-P psp destroy >/dev/null 2>&1
+P psp destroy >/dev/null 2>&1 || true
 P psp create 0x1100000 >/dev/null
 P stage ~/gpu/fw/psp_13_0_4_toc.bin 256 2304 0x0 >/dev/null
 P raw 0x20 0x04000000 0x80 0x900 0 0 0 >/dev/null
@@ -45,4 +50,5 @@ P smu 0x2 0 | tail -1
 P smu 0x16 1 | tail -1
 sleep 2
 P regs 0xee7e 0x21a0 0x2004 0x263e
-$SUDO killall shutdown 2>/dev/null; echo "watchdog cancelled rc=$?"
+$SUDO killall shutdown 2>/dev/null || true
+echo "firmware/power stage complete; watchdog cancellation requested"
