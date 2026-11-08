@@ -232,6 +232,25 @@ uint32_t extract_cp_rs64(const uint8_t *bin, uint64_t size,
     return n;
 }
 
+// Linux v6.14 mes_v11_0.c uses the explicit code/data offsets, not a fixed
+// code size or a concatenation assumption. Both payloads are mandatory.
+uint32_t extract_mes(const uint8_t *bin, uint64_t size, bool kiq, UcodePayload out[]) {
+    if (size < sizeof(mes_firmware_header_v1_0)) return 0;
+    auto *h = reinterpret_cast<const mes_firmware_header_v1_0 *>(bin);
+    if (h->header.header_version_major != 1 || h->header.header_version_minor != 0 ||
+        h->header.size_bytes != size || h->header.header_size_bytes < sizeof(*h) ||
+        h->header.header_size_bytes > size) return 0;
+    const uint64_t code = h->mes_ucode_offset_bytes, data = h->mes_ucode_data_offset_bytes;
+    if (code < h->header.header_size_bytes || data < h->header.header_size_bytes ||
+        !within(code, h->mes_ucode_size_bytes, size) ||
+        !within(data, h->mes_ucode_data_size_bytes, size) ||
+        (code < data + h->mes_ucode_data_size_bytes && data < code + h->mes_ucode_size_bytes)) return 0;
+    push(out, 0, static_cast<uint32_t>(kiq ? PSPGfxFwType::CP_MES_KIQ : PSPGfxFwType::CP_MES),
+         code, h->mes_ucode_size_bytes, size);
+    return push(out, 1, static_cast<uint32_t>(kiq ? PSPGfxFwType::MES_KIQ_STACK : PSPGfxFwType::MES_STACK),
+                data, h->mes_ucode_data_size_bytes, size);
+}
+
 // DMCUB extractor (DCN display micro-controller).
 uint32_t extract_dmcub(const uint8_t *bin, uint64_t size, UcodePayload out[]) {
     if (size < sizeof(common_firmware_header)) return 0;
@@ -291,6 +310,10 @@ uint32_t rdna3_ucode_extract(uint64_t hostFwType,
         return extract_rlc(bin, size_bytes, out);
     case kHostFwFile_IMU:
         return extract_imu(bin, size_bytes, out);
+    case kHostFwFile_MES:
+        return extract_mes(bin, size_bytes, false, out);
+    case kHostFwFile_MES_KIQ:
+        return extract_mes(bin, size_bytes, true, out);
     case kHostFwFile_CP_PFP:
         return extract_cp_rs64(bin, size_bytes, RS64Family::PFP, out);
     case kHostFwFile_CP_ME:

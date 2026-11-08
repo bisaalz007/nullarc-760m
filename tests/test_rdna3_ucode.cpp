@@ -52,6 +52,56 @@ static void test_null_and_zero_inputs() {
     std::cout << "[PASS] test_null_and_zero_inputs" << std::endl;
 }
 
+static void test_mes_ranges() {
+    std::vector<uint8_t> bin(2048, 0);
+    auto *h = reinterpret_cast<mes_firmware_header_v1_0 *>(bin.data());
+    h->header.size_bytes = static_cast<uint32_t>(bin.size());
+    h->header.header_size_bytes = sizeof(*h);
+    h->header.header_version_major = 1;
+    h->mes_ucode_offset_bytes = 256; h->mes_ucode_size_bytes = 512;
+    // Deliberate gap: data must use its own offset, not code-end.
+    h->mes_ucode_data_offset_bytes = 1024; h->mes_ucode_data_size_bytes = 512;
+    UcodePayload out[kMaxUcodePayloadsPerFile];
+    assert(rdna3_ucode_extract(kHostFwFile_MES, bin.data(), bin.size(), out) == 2);
+    assert(out[0].fw_type == 33 && out[1].fw_type == 34 && out[1].offset_bytes == 1024);
+    assert(rdna3_ucode_extract(kHostFwFile_MES_KIQ, bin.data(), bin.size(), out) == 2);
+    assert(out[0].fw_type == 81 && out[1].fw_type == 82);
+    const auto valid = *h;
+    for (unsigned fault = 0; fault < 8; ++fault) {
+        *h = valid;
+        switch (fault) {
+        case 0: h->mes_ucode_size_bytes = 0; break;
+        case 1: h->mes_ucode_data_size_bytes = UINT32_MAX; break;
+        case 2: h->mes_ucode_data_offset_bytes = 512; break; // overlap
+        case 3: h->mes_ucode_offset_bytes = 0; break;
+        case 4: h->header.header_version_minor = 1; break;
+        case 5: --h->header.size_bytes; break;
+        case 6: h->header.header_size_bytes = 1; break;
+        case 7: h->mes_ucode_offset_bytes = UINT32_MAX; break;
+        }
+        assert(rdna3_ucode_extract(kHostFwFile_MES, bin.data(), bin.size(), out) == 0);
+        for (const auto &p : out) assert(!p.size_bytes); // no partially usable plan
+    }
+    *h = valid;
+    for (size_t size = 0; size < bin.size(); ++size)
+        assert(rdna3_ucode_extract(kHostFwFile_MES, bin.data(), size, out) == 0);
+    std::cout << "[PASS] MES scheduler/KIQ explicit offsets and atomic failure" << std::endl;
+}
+
+static void test_phoenix_mes() {
+    for (const auto *name : {"gc_11_0_1_mes_2.bin", "gc_11_0_1_mes1.bin"}) {
+        auto bin = read_fixture(name);
+        assert(!bin.empty());
+        const bool kiq = std::strstr(name, "mes1") != nullptr;
+        UcodePayload out[kMaxUcodePayloadsPerFile];
+        assert(rdna3_ucode_extract(kiq ? kHostFwFile_MES_KIQ : kHostFwFile_MES, bin.data(), bin.size(), out) == 2);
+        auto *h = reinterpret_cast<const mes_firmware_header_v1_0 *>(bin.data());
+        assert(out[0].offset_bytes == h->mes_ucode_offset_bytes && out[0].size_bytes == h->mes_ucode_size_bytes);
+        assert(out[1].offset_bytes == h->mes_ucode_data_offset_bytes && out[1].size_bytes == h->mes_ucode_data_size_bytes);
+    }
+    std::cout << "[PASS] Phoenix MES scheduler/KIQ fixture headers" << std::endl;
+}
+
 static void test_phoenix_rlc() {
     auto bin = read_fixture("gc_11_0_1_rlc.bin");
     assert(!bin.empty());
@@ -205,9 +255,9 @@ static void test_fuzzer() {
         uint64_t fw_types[] = {
             kHostFwFile_SDMA, kHostFwFile_RLC, kHostFwFile_IMU,
             kHostFwFile_CP_PFP, kHostFwFile_CP_ME, kHostFwFile_CP_MEC,
-            kHostFwFile_DMCUB
+            kHostFwFile_DMCUB, kHostFwFile_MES, kHostFwFile_MES_KIQ
         };
-        uint64_t hostFw = fw_types[rnd() % 7];
+        uint64_t hostFw = fw_types[rnd() % (sizeof(fw_types) / sizeof(fw_types[0]))];
 
         uint32_t count = rdna3_ucode_extract(hostFw, corrupted.data(), corrupted.size(), out);
         assert(count <= kMaxUcodePayloadsPerFile);
@@ -223,6 +273,7 @@ static void test_fuzzer() {
 int main() {
     std::cout << "=== Running RDNA3 / GFX1103 Firmware Extractor Tests ===" << std::endl;
     test_null_and_zero_inputs();
+    test_mes_ranges();
     test_cp_rs64_synthetic();
     if (!fixtures_present()) {
         if (std::getenv("REQUIRE_FIXTURES")) {
@@ -238,6 +289,7 @@ int main() {
     test_phoenix_cp();
     test_phoenix_sdma();
     test_phoenix_imu();
+    test_phoenix_mes();
     test_phoenix_dmcub();
     test_adversarial_truncation();
     test_fuzzer();

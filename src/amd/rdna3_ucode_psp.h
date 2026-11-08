@@ -89,6 +89,22 @@ struct gfx_firmware_header_v2_0 {
 static_assert(sizeof(gfx_firmware_header_v2_0) == 60, "gfx_firmware_header_v2_0 must be 60 bytes");
 
 // ---- RLC firmware headers (GFX11 / RDNA 3) -------------------------------
+// MES v1.0 ABI: Linux v6.14 amdgpu_ucode.h; offsets are from file start.
+struct mes_firmware_header_v1_0 {
+    common_firmware_header header;
+    uint32_t mes_ucode_version;
+    uint32_t mes_ucode_size_bytes;
+    uint32_t mes_ucode_offset_bytes;
+    uint32_t mes_ucode_data_version;
+    uint32_t mes_ucode_data_size_bytes;
+    uint32_t mes_ucode_data_offset_bytes;
+    uint32_t mes_uc_start_addr_lo;
+    uint32_t mes_uc_start_addr_hi;
+    uint32_t mes_data_start_addr_lo;
+    uint32_t mes_data_start_addr_hi;
+} __attribute__((packed));
+static_assert(sizeof(mes_firmware_header_v1_0) == 72, "MES v1.0 ABI");
+
 struct rlc_firmware_header_v2_0 {
     common_firmware_header header;
     uint32_t ucode_feature_version;

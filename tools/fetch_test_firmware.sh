@@ -20,6 +20,9 @@ FILES=(
   gc_11_0_1_me.bin
   gc_11_0_1_mec.bin
   gc_11_0_1_imu.bin
+  gc_11_0_1_mes_2.bin
+  gc_11_0_1_mes1.bin
+  psp_13_0_4_toc.bin
   sdma_6_0_1.bin
   dcn_3_1_4_dmcub.bin
 )
