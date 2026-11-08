@@ -28,20 +28,31 @@
 This fork adds the supplied HP Envy x360 16-ad0013dx capture (`1002:1900`, revision
 `ca`, subsystem `103c:8c6a`): 8 active CUs with physical masks `[0x0f, 0x0f]`, six
 physical CU slots per shader array, and enabled RB mask `0x0a`. Captured topology
-is validated and transported to RADV through a versioned kernel query. The patched
-RADV builds and compiles a gfx1103 compute pipeline in the HP mock; the default
-12-CU 780M mock is also checked.
+is validated and transported to RADV through a versioned kernel query.
+
+The source build pipeline now assembles PhxBringup, PhxAccel, this fork's Metal
+plugin, the pinned LGPL translator and patched RADV. Authored Metal compute,
+vertex and fragment shaders pass through the real metallib/AIR reader and
+translator, validate as SPIR-V, and compile into gfx1103 pipelines with both 8-CU
+HP and 12-CU legacy mocks. No GPU command execution is implied by those tests.
+
+The kernel now rejects unready/wrong-engine submission, rolls back partial page
+mappings, tracks multiple user fences, and retains memory after a device-loss
+fault instead of freeing pages potentially referenced by DMA. Firmware tools
+propagate transfer/status errors rather than reporting success after failure.
 
 **HP hardware bring-up, GPU execution and Metal acceleration are not verified.**
-This branch keeps that exact HP device in diagnostic-only mode: no reference-machine
-firmware/register writes, queue submission or display takeover. The capture lacks
-IP discovery, memory reservations and firmware validation needed to adapt those
-operations. Existing Firebat runtime claims below are retained as upstream reports.
+The exact HP device remains diagnostic-only. A live SSH capture confirms its
+identity on Sequoia 15.8.2, its firmware framebuffer and 1920×1200 panel. Historical
+Linux/Windows evidence corroborates the panel's 60 Hz mode. IP discovery, firmware
+and memory-controller evidence are still required before enabling initialization.
+Existing Firebat runtime claims below are retained as upstream reports.
 
-See [development status and test commands](docs/760M_STATUS.md) and
-[actual source dependency map](docs/760M_ARCHITECTURE.md). Validate the supplied
-profile with `python3 tools/phx_profile.py --check`. Apply Mesa Phoenix patch 0007
-after 0001..0006, or use `tools/mesa_phoenix_topology.py` as its alternative.
+See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
+and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
+Validate the supplied profile with `python3 tools/phx_profile.py --check`.
+Mesa uses Phoenix patches 0001..0008; generator scripts are alternatives to applying
+the corresponding patches, not additional steps.
 
 ## Status
 
@@ -103,7 +114,8 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK      # PhxBringup.kext
 sh src/phxaccel/build.sh /path/to/MacKernelSDK        # PhxAccel.kext
 ```
 
-The plugin builds from `src/nmplugin/NVMTLDevice.m`, which includes the rest of `src/nmplugin`. RADV: Mesa
+The plugin builds with `bash src/nmplugin/build.sh /path/to/Vulkan-Headers` from
+`src/nmplugin/NVMTLDevice.m`, which includes the rest of `src/nmplugin`. RADV: Mesa
 `f5cb8ee0` + Cobalt64's Darwin patches + [`mesa-patches-phoenix`](mesa-patches-phoenix/README.txt).
 
 Unit tests (firmware parsing, IP discovery) run on Linux or macOS and in CI:

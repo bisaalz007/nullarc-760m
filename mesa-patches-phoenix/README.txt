@@ -1,7 +1,7 @@
 Phoenix (Radeon 780M, gfx1103) patches on top of Cobalt64's RADV Darwin port.
 
 Base: Mesa f5cb8ee032adabef599ae892ec4e42d796b84da9 + reference/Cobalt64/mesa-patches/0001..0009.
-Apply these after them (git am, 0001..0007).  0001..0003 are what tools/mesa_phoenix_canned.py,
+Apply these after them (git am, 0001..0008).  0001..0003 are what tools/mesa_phoenix_canned.py,
 tools/mesa_phoenix_identity.py and tools/mesa_phoenix_service.py produce (0003: open the PhxBringup service).
 0004 answers AMDGPU_INFO_TIMESTAMP from SMUIO GOLDEN_TSC (needs PhxBringup build 31): Metal GPUStartTime/GPUEndTime.
 0005 opens PhxBringup through NMXAccel when sandboxed (needs the PhxAccel proxy): Metal in WebKit's GPU process.
@@ -38,3 +38,14 @@ Mock Vulkan properties plus gfx1103 ACO pipeline compilation (macOS, x86_64):
   python3 tools/test_mesa_vulkan_profile.py /path/to/mesa --glslang /path/to/glslangValidator
 The latter explicitly checks 8-CU HP and the unchanged 12-CU legacy default, with
 zero command submissions. It is not hardware execution or Metal testing.
+
+0008 requires the native kernel's positive readiness flags before a Vulkan device
+     is exposed. PhxBringup build 34 reports these only with both queue types ready;
+     it no longer retires submissions in software when queues are absent.
+Alternative to 0008, after 0007:
+  python3 /path/to/nullarc-760m/tools/mesa_phoenix_readiness.py /path/to/mesa
+Roundtrip test from the ref after 0006:
+  python3 tests/test_mesa_patch.py /path/to/mesa <ref-after-0006>
+Packaged real Metal/AIR/SPIR-V + ACO compute/graphics compiler integration:
+  python3 tools/test_metal_stack.py --package build/stack --mesa /path/to/mesa --spirv-val /path/to/spirv-val
+This compiles authored MSL and runs no GPU command execution.

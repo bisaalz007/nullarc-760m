@@ -70,3 +70,33 @@ GFX11 CU mapping; no hardware register/fuse encoding was inferred from these mas
 [Linux AMDGPU UAPI](https://github.com/torvalds/linux/blob/master/include/uapi/drm/amdgpu_drm.h),
 [Linux GFX11 implementation](https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c),
 Mesa source at the build's pinned commit. Runtime proof remains required.
+
+## Continuation implementation
+
+`PhxExecutionPolicy.h` now supplies canonical/BO range checks, transactional page
+mapping, engine-selection policy and pending-fence storage to the actual kext.
+PhxBringup build 34 removes immediate software retirement, checks TLB completion,
+unmaps BO PTEs before release and quarantines wired resources after device loss.
+It advertises native readiness to RADV only with graphics and compute queues ready;
+Mesa patch 0008 enforces that handshake for native transport. HP diagnostic gates
+remain in force independently of those shared execution improvements.
+
+The source Metal build is now `src/nmplugin/build.sh`; translator source is built
+by `tools/build_translator.sh`. `tools/test_metal_stack.py` exercises the actual
+plugin's lazy metallib indexing followed by `nvmtl_compile_library_entry`, not a
+separate translator stand-in. It tests three authored shader stages and the
+packaged RADV library with mock transport. `hasUnifiedMemory` now reflects the
+queried Vulkan integrated-device type, preserving discrete-device behavior.
+
+`tools/build_stack.py` assembles these components with LLVM/Zstd runtime inputs,
+corresponding source/notices and relocatable native dependencies. Package manifests
+and compiled-input receipts prevent accidental stale/missing-file assembly.
+`install/install_diagnostics.py` provides explicit OpenCore staging and rollback;
+it does not activate acceleration. Reference bring-up scripts now propagate errors,
+validate firmware file ranges, and refuse missing/diagnostic/lost services before
+arming watchdogs. Their Firebat memory/firmware constants are still not an HP recipe.
+
+Live Sequoia capture and historical HP evidence are in `hardware/dumps/hp_envy_760m`.
+The current CPU aperture addresses differ from the earlier Linux snapshot; neither
+snapshot is compiled into initialization. Linux IP and memory-controller evidence
+remain prerequisites to replacing the remaining board-specific bootstrap constants.

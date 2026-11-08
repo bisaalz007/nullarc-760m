@@ -9,7 +9,9 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_rdna3_ip_dcn \
         $(TEST_BIN_DIR)/test_rdna3_ucode \
         $(TEST_BIN_DIR)/test_r3n_abi \
-        $(TEST_BIN_DIR)/test_phx_topology
+        $(TEST_BIN_DIR)/test_phx_topology \
+        $(TEST_BIN_DIR)/test_phx_execution \
+        $(TEST_BIN_DIR)/test_phx_firmware_file
 
 .PHONY: all test clean kext fixtures
 
@@ -33,9 +35,18 @@ $(TEST_BIN_DIR)/test_r3n_abi: src/uapi/r3n_user_client.cpp src/winsys/radv_r3n_w
 $(TEST_BIN_DIR)/test_phx_topology: tests/test_phx_topology.cpp src/amd/phx_topology.h src/amd/phx_hp_760m.h src/phxbringup/PhxNativeABI.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
+$(TEST_BIN_DIR)/test_phx_execution: tests/test_phx_execution.cpp src/phxbringup/PhxExecutionPolicy.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
 test: $(TESTS)
 	python3 tools/phx_profile.py --check
 	python3 tests/test_phx_profile.py
+	python3 tests/test_diagnostic_install.py
+	python3 tests/test_evidence_collectors.py
+	python3 tests/test_bringup_preflight.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

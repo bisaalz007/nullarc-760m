@@ -42,6 +42,12 @@ if grep -q "status: enabled" <<<"$(csrutil status)"; then fail "System Integrity
 else say "  ✓ System Integrity Protection relaxed"; fi
 # read the registry once: grep -q on a pipe would stop ioreg early, and pipefail counts that as a failure
 IOR=$(ioreg -l -w0)
+if grep -q '"phx-stage" = "profile-diagnostic-only"' <<<"$IOR"; then
+    say "HP is diagnostic-only: acceleration installation and WindowServer arming are unavailable."
+    say "Use install_diagnostics.py for the OpenCore diagnostic kext; collect target evidence first."
+    exit 1
+fi
+
 build=$(grep -m1 '"phx-build"' <<<"$IOR" | grep -oE '[0-9]+$' || true)
 if [ -n "$build" ]; then say "  ✓ PhxBringup.kext is loaded (build $build)"
 else fail "PhxBringup.kext is not loaded: add EFI/OC/Kexts/PhxBringup.kext to OpenCore and reboot first"; fi

@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Build and assemble a relocatable Tahoe development stack from explicit inputs.
+
+The kernel enforces HP diagnostic-only operation. This tool never installs or
+loads a kext, edits OpenCore, arms WindowServer, or changes system security.
+External LLVM/Zstd runtime binaries remain separately supplied dependencies.
+"""
+import argparse
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+from package_manifest import write, verify, digest
+
+REPO = Path(__file__).resolve().parents[1]
+
+
+def run(args, **kwargs):
+    subprocess.run([str(x) for x in args], check=True, **kwargs)
+
+
+def output(args):
+    return subprocess.check_output([str(x) for x in args], text=True).strip()
+
+
+def copy(src, dst):
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if src.is_dir():
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns('_CodeSignature', '*.new'))
+    else:
+        shutil.copy2(src, dst)
+
+
+def dependencies(path):
+    return [line.strip().split(' (compatibility version')[0]
+            for line in output(['otool', '-L', path]).splitlines()[1:]]
+
+
+def relocate(path, pending, dest, origins):
+    """Copy actual transitive dylibs; change paths only in this package's copies."""
+    run(['lipo', path, '-verify_arch', 'x86_64'])
+    if path.suffix == '.dylib':
+        run(['install_name_tool', '-id', '@loader_path/' + path.name, path])
+    for dep in dependencies(path):
+        if dep.startswith(('/System/Library/', '/usr/lib/')) or dep.rsplit('/', 1)[-1] == path.name:
+            continue
+        if dep.startswith('@loader_path/'):
+            local = path.parent / dep[len('@loader_path/'):]
+            if not local.is_file():
+                raise ValueError(f'missing sibling dependency {local}')
+            continue
+        if dep.startswith('@'):
+            raise ValueError(f'unresolved dependency {dep} in {path}')
+        source = Path(dep).resolve(strict=True)
+        target = dest / source.name
+        if target.exists() and origins.get(target) != digest(source):
+            raise ValueError(f'conflicting dylib basename {source.name}')
+        if not target.exists():
+            copy(source, target)
+            origins[target] = digest(source)
+            pending.append(target)
+        run(['install_name_tool', '-change', dep, '@loader_path/' + target.name, path])
+    run(['codesign', '--force', '--sign', '-', path])
+
+
+def source_inputs():
+    return {str(f.relative_to(REPO)):digest(f) for f in (REPO / 'src').rglob('*')
+            if f.is_file() and 'build' not in f.relative_to(REPO).parts}
+
+
+def build_receipt(a):
+    artifacts = [REPO / 'src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup',
+        REPO / 'src/phxaccel/build/PhxAccel.kext/Contents/MacOS/PhxAccel',
+        REPO / 'src/nmplugin/build/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver',
+        REPO / 'build/translator/libnvmtl_translate.dylib',
+        a.mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib']
+    artifacts += list((REPO / 'build/tools').iterdir())
+    record = {'source_inputs':source_inputs(), 'artifacts':{str(p):digest(p) for p in artifacts if p.is_file()},
+              'sdk':output(['xcrun','--sdk','macosx','--show-sdk-version']),
+              'target':'x86_64 macOS Tahoe 26', 'runtime_validated':False}
+    (REPO / 'build/stack-build.json').write_text(json.dumps(record, indent=2)+'\n')
+
+
+def assemble(a):
+    for name in ('phx_topology.h', 'phx_hp_760m.h'):
+        if (a.mesa / 'src/amd/common/darwin' / name).read_bytes() != (REPO / 'src/amd' / name).read_bytes():
+            raise ValueError('Mesa topology headers differ; apply the documented patches')
+    if 'native queues are not ready' not in (a.mesa / 'src/amd/common/darwin/ac_darwin_drm.c').read_text():
+        raise ValueError('Mesa readiness patch 0008 is required')
+    receipt_path = REPO / 'build/stack-build.json'
+    receipt = json.loads(receipt_path.read_text())
+    if receipt['source_inputs'] != source_inputs(): raise ValueError('compiled source inputs are stale; rebuild first')
+    for path, sha in receipt['artifacts'].items():
+        if digest(Path(path)) != sha: raise ValueError(f'compiled artifact differs: {path}')
+    dest = a.output.resolve()
+    if dest.exists():
+        raise ValueError(f'output already exists: {dest}; choose a new output directory')
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.nullarc-stage-', dir=dest.parent) as temp:
+        p = Path(temp) / 'package'; p.mkdir()
+        copy(REPO / 'src/phxbringup/build/PhxBringup.kext', p / 'EFI/OC/Kexts/PhxBringup.kext')
+        copy(REPO / 'src/phxaccel/build/PhxAccel.kext', p / 'Library/Extensions/PhxAccel.kext')
+        bundle = p / 'PhxGPU/NVMTLDriver.bundle'
+        copy(REPO / 'src/nmplugin/build/NVMTLDriver.bundle', bundle)
+        native = bundle / 'Contents/MacOS'
+        translator = REPO / 'build/translator'
+        copy(translator / 'libnvmtl_translate.dylib', native / 'libnvmtl_translate.dylib')
+        copy(translator / 'nvmtl-translator-source.tar.gz', p / 'sources/nvmtl-translator-source.tar.gz')
+        copy(a.air_runtime / 'Contents/MacOS/air-runtime', native / 'air-runtime')
+        copy(a.air_runtime / 'Contents/Resources/air-runtime', bundle / 'Contents/Resources/air-runtime')
+        copy(a.dependency_notices, p / 'sources/native-dependencies')
+        radv = p / 'PhxGPU/nvmtl/libvulkan_radeon.dylib'
+        copy(a.mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib', radv)
+        # The plugin opens the ICD directly. The JSON is also usable by a
+        # separately installed Vulkan loader; no loader binary is required here.
+        (radv.parent / 'radeon_icd.json').write_text(json.dumps({'file_format_version':'1.0.0',
+            'ICD':{'library_path':'libvulkan_radeon.dylib','api_version':'1.3.0'}}, indent=2)+'\n')
+        pending = [radv, native / 'NVMTLDriver', native / 'libnvmtl_translate.dylib']
+        pending += list((native / 'air-runtime').glob('*.dylib'))
+        origins = {x:digest(x) for x in pending}
+        while pending:
+            binary = pending.pop(0)
+            relocate(binary, pending, binary.parent, origins)
+        run(['codesign', '--force', '--sign', '-', bundle])
+        run(['codesign', '--verify', '--deep', '--strict', bundle])
+        for name in ('phxctl', 'mesboot', 'phxprofile'):
+            copy(REPO / 'build/tools' / name, p / 'gpu/phxctl' / name)
+        for name in ('phxboot.sh', 'full.sh', 'bringup5.sh', 'kinst.sh', 'local.phxboot.plist'):
+            copy(REPO / 'tools/phxctl' / name, p / 'gpu' / name)
+        # No firmware or automatic activation: these remain blocked on HP.
+        copy(REPO / 'hardware/profiles/hp-760m.json', p / 'hardware/hp-760m.json')
+        for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'LICENSES'):
+            copy(REPO / name, p / name)
+        for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md'):
+            copy(REPO / 'docs' / name, p / 'docs' / name)
+        for name in ('install_diagnostics.py',):
+            copy(REPO / 'install' / name, p / name)
+        copy(REPO / 'tools/package_manifest.py', p / 'package_manifest.py')
+        (p / 'README.txt').write_text('NullArc 760M development stack for Tahoe\n'
+            'HP policy: diagnostic-only. GPU execution and acceleration are not verified.\n'
+            'No firmware or automatic activation is included. See docs/BUILD_STACK.md.\n')
+        src = {str(f.relative_to(REPO)):digest(f) for folder in ('src', 'tools', 'install')
+               for f in (REPO / folder).rglob('*') if f.is_file() and 'build' not in f.relative_to(REPO).parts and '__pycache__' not in f.parts}
+        copy(receipt_path, p / 'stack-build.json')
+        metadata = {'source_commit':output(['git', '-C', REPO, 'rev-parse', 'HEAD']),
+                    'source_inputs':src, 'mesa_commit':output(['git', '-C', a.mesa, 'rev-parse', 'HEAD']),
+                    'translator_commit':(translator / 'SOURCE_COMMIT').read_text().strip(),
+                    'validation':'compiled and offline-tested; no HP execution evidence'}
+        write(p, metadata); verify(p)
+        p.rename(dest)
+    print(f'Assembled {dest}; HP diagnostic-only')
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--sdk', type=Path)
+    ap.add_argument('--vulkan-headers', type=Path)
+    ap.add_argument('--translator-source', type=Path)
+    ap.add_argument('--mesa', type=Path, required=True)
+    ap.add_argument('--air-runtime', type=Path, required=True, help='compatible bundle containing LLVM, Zstd and their license files')
+    ap.add_argument('--dependency-notices', type=Path, required=True, help='licenses and corresponding source for non-system dylib dependencies')
+    ap.add_argument('--output', type=Path, default=REPO / 'build/stack')
+    ap.add_argument('--assemble-only', action='store_true', help='use components already built in this checkout')
+    a = ap.parse_args()
+    a.mesa = a.mesa.resolve()
+    if not a.assemble_only:
+        if not all((a.sdk, a.vulkan_headers, a.translator_source)):
+            ap.error('--sdk, --vulkan-headers and --translator-source are required for building')
+        run(['python3', REPO / 'tools/phx_profile.py', '--check'])
+        run(['make', 'test'], cwd=REPO)
+        for component in ('phxbringup', 'phxaccel'):
+            run(['sh', REPO / 'src' / component / 'build.sh', a.sdk])
+        run(['bash', REPO / 'src/nmplugin/build.sh', a.vulkan_headers])
+        run(['bash', REPO / 'tools/build_translator.sh', a.translator_source])
+        run(['ninja', '-C', a.mesa / 'build'])
+        tools = REPO / 'build/tools'; tools.mkdir(parents=True, exist_ok=True)
+        for name in ('phxctl', 'mesboot', 'phxprofile'):
+            run(['clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', REPO / 'tools/phxctl' / (name+'.c'),
+                 '-framework', 'IOKit', '-framework', 'CoreFoundation', '-o', tools / name])
+        build_receipt(a)
+    assemble(a)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, OSError, subprocess.CalledProcessError) as e:
+        raise SystemExit(str(e))

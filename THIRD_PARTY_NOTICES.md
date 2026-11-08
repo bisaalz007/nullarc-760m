@@ -19,7 +19,9 @@ GNU Lesser General Public License v3.0 or later — [`LICENSES/LGPL-3.0-or-later
 which incorporates [`LICENSES/GPL-3.0.txt`](LICENSES/GPL-3.0.txt).
 
 Based on metal2vulkan, Copyright (C) Anees Iqbal (https://github.com/steelbrain/metal2vulkan), with modifications by
-NullMoth Systems under the same license. The library is shipped unmodified, as built by NullMoth 2.4.1. Its
+NullMoth Systems under the same license. Upstream releases shipped the NullMoth 2.4.1 binary. This fork's development pipeline
+builds unmodified translator source at `76df0f6af5c64c2af9a22090da8b3fe14616023e` with
+`tools/build_translator.sh` and includes the corresponding source archive. Its
 corresponding source (the `translator/` directory of NullMoth's driver, https://github.com/nullmoth/nvidia-macos-driver)
 is attached to every nullarc release as `nvmtl-translator-source.tar.gz`. You may replace the library with your own
 build: the plugin loads it with `dlopen` and calls its exported C functions only.
@@ -66,3 +68,13 @@ redistribution in binary form only; no reverse engineering, decompilation or dis
   [`hardware/REQUIRED_KEXTS.md`](hardware/REQUIRED_KEXTS.md).
 - **Firmware images of the reference laptop.** The VBIOS and the ACPI VFCT table that holds it were removed from
   the tree: they are AMD/OEM copyright with no redistribution grant.
+
+## Extra native runtime dependencies in development packages
+
+The package assembler copies actual non-system dylib dependencies discovered in
+its build inputs and relocates their load paths within staging. On the tested
+build host these are libelf 0.8.13_6 (LGPL-2.0-or-later) and zlib 1.3.2 (zlib
+license). Their notices, the libelf source archive and MacPorts recipe/patches
+are supplied under `sources/native-dependencies`. These dylibs remain separately
+replaceable. Other build hosts must supply the corresponding notices/source for
+their dependency set. System Apple frameworks are linked, not redistributed.

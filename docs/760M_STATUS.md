@@ -1,14 +1,71 @@
 # Radeon 760M development status
 
 Updated 2026-11-08. Fork: `yt42c2mvn2-cmd/nullarc-760m`.
-Branch: `codex/radeon-760m-integration`. Baseline: `85e4142`.
+Branch: `codex/radeon-760m-driver-completion`. Continuation baseline: merged `main` at `f08b898` (PR #1).
 
 **HP acceleration is not functional or hardware-tested. This branch intentionally
 allows only diagnostics on the captured HP PCI identity. Do not install an upstream
 780M release expecting these source changes.** No system drivers were installed,
 loaded, or replaced during this session.
 
-## Stages and changed components
+## Continuation after PR #1
+
+- **Kernel execution/memory:** `PhxExecutionPolicy.h` is used directly by the
+  production kext and failure-injection tests. Mapping failures clear the installed
+  prefix; canonical-span/BO-range overflow is rejected; unmap/free waits for client
+  retirement and removes PTEs. Graphics/compute batches require their actual engine;
+  mixed-engine batches are refused. The old immediate-retirement fallback was removed.
+- **Fences and faults:** sixteen user-fence slots prevent overwriting earlier pending
+  completions. TLB/ring/VMID timeouts enter an atomic device-lost state. New GPU
+  work is refused and affected wired BO/page-table memory is deliberately retained
+  until reboot. This is a bounded diagnostic failure policy, **not verified GPU
+  reset/recovery**. The actual hardware fault/timeout path still needs runtime tests.
+- **Bring-up tools:** `phxctl` returns failures for transport/reply-shape errors,
+  failed SMU/PSP operations and short firmware reads. File ranges are checked before
+  staging; unsigned overflow is refused. Scripts stop before watchdog/hardware access
+  when the service is missing, diagnostic-only or lost, and stop on command failures.
+  No HP firmware sequence was enabled or executed.
+- **Metal/translation:** source build scripts now compile the full plugin and pinned
+  NullMoth v2.4.1 translator (`76df0f6...`) and preserve corresponding LGPL source.
+  The Metal `hasUnifiedMemory` property follows Vulkan's integrated-device type.
+  Authored MSL compute/vertex/fragment shaders traverse the real metallib reader,
+  LLVM AIR decoder and translator, pass independent `spirv-val`, and compile into
+  compute and graphics pipelines with the HP/legacy mocks. No Metal device is
+  constructed and no GPU dispatch/draw is issued by this test.
+- **RADV:** Phoenix patch 0008 refuses native initialization without positive queue
+  readiness. Explicit mocks remain separate. Patches 0007/0008 and their generators
+  are checked for byte-identical output from the documented baseline.
+- **Build/package/install:** `build_stack.py` builds components from explicit inputs,
+  checks build receipts, relocates native dylib dependencies in staging, signs the
+  bundle and writes a complete hashed package inventory. It never copies an installed
+  driver executable or automatically installs it. LLVM/Zstd runtime binaries remain
+  separately supplied dependencies with their notices. The transactional diagnostic
+  installer has dry-run, backup, failure rollback, removal and later-edit protection.
+  Installation/removal tests operate on temporary EFI fixtures; no HP EFI was modified.
+- **Hardware evidence:** live SSH capture on the HP confirmed PCI `1002:1900` rev `ca`,
+  subsystem `103c:8c6a`, Sequoia 15.8.2, IONDRVFramebuffer and 1920×1200 output. System
+  Information reports the firmware framebuffer's 8 MB, **not functional acceleration**.
+  BAR sizes are 256 MiB/2 MiB/512 KiB; addresses differ from historical Linux, reinforcing
+  the need for runtime address discovery. Saved reports omit system serials. The
+  supplied Windows report independently corroborates CPU, identity and 60 Hz panel;
+  it does not provide IP/firmware/controller data.
+
+Validation completed for this continuation: 7 host C++ binaries, 13 Python test
+methods, existing firmware/discovery fuzz cases, ASan/UBSan execution-policy tests,
+134 Mesa marshaller checks plus topology tests, native kext/plugin/translator/RADV
+builds, package hashes and signature checks, and real MSL-to-ACO compute/graphics
+compilation under both mocks. Three existing kext field-shadow warnings and the
+plugin's upstream protocol/deprecation warnings remain. KXLD/AuxKC compatibility,
+HP execution, hardware rendering, display takeover, suspend/resume and reset remain
+unverified. The HP currently runs Sequoia; Tahoe driver runtime testing is outstanding.
+
+The Linux collector can now capture topology, full available IP sysfs attributes,
+firmware-version/debugfs reports, memory inventory, relevant kernel messages and
+candidate firmware hashes without reloading drivers or accessing registers. Its
+sysfs/file handling is fixture-tested; actual Linux capture/compilation awaits the
+HP live session.
+
+## PR #1 baseline stages and changed components
 
 | Stage | Result | Files/components changed | Validation |
 |---|---|---|---|
@@ -53,19 +110,19 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK
 sh src/phxaccel/build.sh /path/to/MacKernelSDK
 ```
 
-Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0007 to Mesa
-`f5cb8ee032adabef599ae892ec4e42d796b84da9`. The generator is an alternative to
-0007, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
+Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0008 to Mesa
+`f5cb8ee032adabef599ae892ec4e42d796b84da9`. Each generator is an alternative to its corresponding patch, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
 
 ```sh
 sh tools/test_mesa_topology.sh /path/to/mesa
 python3 tools/test_mesa_vulkan_profile.py /path/to/mesa --glslang /path/to/glslangValidator
 ```
 
-Both tests are mocks. They verify topology transport/compiler integration, not GPU
+The Mesa-only tests are mocks. They verify topology transport/compiler integration, not GPU
 execution, Metal, textures, scanout, interrupts or scheduler behavior on HP.
-The AIR translator is an external prebuilt library: its source is not in this fork;
-no AIR translation or full Metal bundle build was performed.
+PR #1 used an external prebuilt AIR translator and did not build the full Metal
+bundle. The continuation above adds the pinned source build and real translation
+checks; source archives accompany development packages.
 
 ## Next required hardware evidence
 
