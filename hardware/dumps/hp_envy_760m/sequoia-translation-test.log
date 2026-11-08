@@ -1,0 +1,23 @@
+[PASS] metallib triangle_vertex -> vertex SPIR-V (676 bytes)
+[PASS] metallib solid_fragment -> fragment SPIR-V (348 bytes)
+[PASS] compiled MSL metallib -> plugin AIR reader -> SPIR-V (540 bytes); no GPU execution
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+radv-darwin: native kext: ABI 1.11, build 603, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 168 MiB visible + 15360 MiB hi, GTT cap 512 MiB
+radv-darwin: mock client closed: 0 submits, 0 seqs
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+radv-darwin: mock client closed: 0 submits, 0 seqs
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+radv-darwin: mock client closed: 0 submits, 0 seqs
+[PASS] AMD Radeon 760M Graphics (RADV PHOENIX): 8 CUs, SE=1 SA=2 CU/SA=4 (mock, no execution)
+[PASS] gfx1103 ACO compute pipeline compiled; no commands submitted
+[PASS] translated vertex/fragment gfx1103 graphics pipeline compiled; no draw submitted
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+radv-darwin: native kext: ABI 1.11, build 603, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 168 MiB visible + 15360 MiB hi, GTT cap 512 MiB
+radv-darwin: mock client closed: 0 submits, 0 seqs
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+radv-darwin: mock client closed: 0 submits, 0 seqs
+radv-darwin: RADV_DARWIN_MOCK=1: in-process mock kext (no GPU)
+[PASS] AMD Radeon 780M Graphics (RADV PHOENIX): 12 CUs, SE=1 SA=2 CU/SA=6 (mock, no execution)
+[PASS] gfx1103 ACO compute pipeline compiled; no commands submitted
+[PASS] translated vertex/fragment gfx1103 graphics pipeline compiled; no draw submitted
+radv-darwin: mock client closed: 0 submits, 0 seqs

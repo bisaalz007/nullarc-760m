@@ -16,28 +16,37 @@ H=/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/PhxGPU
 L=/Library/GPUBundles
 TS=$(date +%Y%m%d-%H%M%S)
 
-WS=0; CHECK=0; DIAG=0; OC=""
+WS=0; CHECK=0; DIAG=0; COMPONENTS=0; OC=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --windowserver) WS=1 ;;
         --check) CHECK=1 ;;
         --diagnostics) DIAG=1 ;;
+        --components) COMPONENTS=1 ;;
         --oc) [ "$#" -ge 2 ] || { echo "--oc needs an EFI/OC directory" >&2; exit 2; }; OC=$2; shift ;;
         -h|--help)
             echo 'Usage: ./install.sh --check [--windowserver]'
             echo '       sudo ./install.sh --windowserver  (reference acceleration path; HP refused)'
             echo '       sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC [--check]'
+            echo '       sudo ./install.sh --components  (HP files only; no automatic activation)'
             exit 0 ;;
         *) echo "unknown option $1 (see --help)"; exit 2 ;;
     esac
     shift
 done
+if [ "$COMPONENTS" = 1 ] && { [ "$DIAG" = 1 ] || [ "$WS" = 1 ] || [ -n "$OC" ]; }; then
+    echo '--components cannot be combined with --diagnostics, --oc or --windowserver' >&2; exit 2
+fi
 if [ "$DIAG" = 1 ] && { [ "$WS" = 1 ] || [ -z "$OC" ]; }; then
     echo "--diagnostics requires --oc and cannot be combined with --windowserver" >&2; exit 2
 fi
 if [ "$DIAG" = 0 ] && [ -n "$OC" ]; then echo "--oc requires --diagnostics" >&2; exit 2; fi
 command -v python3 >/dev/null || { echo "Python 3 is required; see INSTALL.md" >&2; exit 1; }
 python3 -B "$SRC/package_manifest.py" "$SRC"
+if [ "$COMPONENTS" = 1 ]; then
+    MODE=--install; [ "$CHECK" = 0 ] || MODE=--check
+    exec python3 -B "$SRC/install_components.py" --package "$SRC" "$MODE"
+fi
 if [ "$DIAG" = 1 ]; then
     MODE=--check
     if [ "$CHECK" = 0 ]; then
@@ -60,7 +69,11 @@ FAILED=0
 say "== checks"
 [ "$(id -u)" = 0 ] || { say "  ✗ run it with sudo"; exit 1; }
 ver=$(sw_vers -productVersion)
-case "$ver" in 26.*) say "  ✓ macOS $ver" ;; *) fail "macOS $ver: nullarc is built for macOS Tahoe 26" ;; esac
+MIN_MACOS=$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1])).get("minimum_macos","26.0"))' "$SRC/package-manifest.json")
+case "$MIN_MACOS:$ver" in
+    15.0:15.*|26.0:26.*) say "  ✓ macOS $ver (package deployment target $MIN_MACOS)" ;;
+    *) fail "macOS $ver does not match this package's deployment target $MIN_MACOS" ;;
+esac
 args=$(nvram boot-args 2>/dev/null | cut -f2- || true)
 for a in amfi=0x80 amfi_get_out_of_my_way=0x1 phxdebug=1; do
     case " $args " in *" $a "*) say "  ✓ boot-arg $a" ;; *) fail "boot-arg $a is missing (OpenCore NVRAM -> boot-args)" ;; esac

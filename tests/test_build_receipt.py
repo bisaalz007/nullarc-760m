@@ -17,10 +17,14 @@ class BuildReceiptTests(unittest.TestCase):
             tool=root/'tools/phxctl/phxfw.cpp';tool.parent.mkdir(parents=True);tool.write_text('tool fixture')
             for path in build_stack.required_artifacts(mesa):
                 path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'compiled-artifact fixture')
-            receipt={'source_inputs':build_stack.source_inputs(),
+            receipt={'source_inputs':build_stack.source_inputs(),'minimum_macos':'26.0',
                 'artifacts':{str(p):digest(p) for p in build_stack.required_artifacts(mesa)}}
             (root/'build/stack-build.json').write_text(json.dumps(receipt))
             build_stack.verify_build_receipt(mesa)
+            with self.assertRaisesRegex(ValueError,'deployment target'):
+                build_stack.verify_build_receipt(mesa,'15.0')
+            with self.assertRaisesRegex(ValueError,'selected build inputs'):
+                build_stack.verify_build_receipt(mesa,mesa_build=root/'another-build')
             with self.assertRaisesRegex(ValueError,'selected build inputs'):
                 build_stack.verify_build_receipt(root/'another-mesa')
             source.write_text('modified source')

@@ -14,14 +14,15 @@ def main():
     ap.add_argument('--package', type=Path, required=True)
     ap.add_argument('--mesa', type=Path, required=True)
     ap.add_argument('--spirv-val', required=True)
+    ap.add_argument('--min-macos',choices=('15.0','26.0'),default='26.0')
     a = ap.parse_args()
     a.package = a.package.resolve(); a.mesa = a.mesa.resolve()
     out = REPO / 'build/metal-stack-test'; out.mkdir(parents=True, exist_ok=True)
     (out / 'cache/aircache').mkdir(parents=True, exist_ok=True)
     def run(args, **kw): subprocess.run([str(x) for x in args], check=True, timeout=90, **kw)
-    run(['xcrun','metal','-c',REPO / 'tests/shaders/store.metal','-o',out/'store.air'])
+    run(['xcrun','metal','-mmacosx-version-min='+a.min_macos,'-c',REPO / 'tests/shaders/store.metal','-o',out/'store.air'])
     run(['xcrun','metallib',out/'store.air','-o',out/'store.metallib'])
-    run(['clang','-arch','x86_64','-mmacosx-version-min=26.0','-fobjc-arc','-framework','Foundation',
+    run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-fobjc-arc','-framework','Foundation',
          '-framework','Metal',REPO/'tests/test_metallib_translation.m','-o',out/'metallib-test'])
     env = dict(os.environ, NVMTL_AIRCACHE=str(out/'cache/aircache'), NVMTL_LOG_PATH=str(out/'plugin.log'),
                NVMTL_SPVCACHE_OFF='1', NVMTL_NO_LIBMEMO='1', NVMTL_NO_LAZYAIR='1')
@@ -29,7 +30,7 @@ def main():
          out/'store.metallib',out/'store.spv'], env=env)
     for name in ('store.spv','triangle_vertex.spv','solid_fragment.spv'):
         run([a.spirv_val,'--target-env','vulkan1.2',out/name])
-    run(['clang','-arch','x86_64','-std=c11','-Wall','-Wextra','-Werror','-I'+str(a.mesa/'include'),
+    run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-std=c11','-Wall','-Wextra','-Werror','-I'+str(a.mesa/'include'),
          REPO/'tests/test_mesa_vulkan_profile.c','-o',out/'radv-test'])
     for profile, count in [('hp-760m',8),('',12)]:
         env = dict(os.environ, RADV_DARWIN_MOCK='1', RADV_DARWIN_MOCK_PROFILE=profile,

@@ -55,6 +55,14 @@ Firmware preflight derives payload ranges from headers instead of fixed sizes.
 macOS memory reservations and staged PSP/MES/queue initialization remain required.
 Existing Firebat runtime claims below are retained as upstream reports.
 
+A Sequoia deployment profile is now implemented with `--min-macos 15.0`. The plugin,
+translator, RADV and transitive dependencies are checked for actual Mach-O minimum
+versions. On the HP running Sequoia 15.8.2, the port passed immediate plugin loading,
+three-stage Metal/AIR translation and real ACO pipeline compilation with explicit
+8/12-CU mocks. No native GPU command was submitted. Build headers still require
+SDK 26; the resulting binaries target macOS 15. Diagnostic kext loading and HP
+acceleration remain separate hardware-validation stages.
+
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.
@@ -105,7 +113,7 @@ plugin; its source is attached to every release. The `NVMTL` prefix is NullMoth'
 
 Download the **compiled ZIP asset** from this fork's
 [alpha release](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases/tag/alpha),
-verify `SHA256SUMS`, extract it, and follow **[docs/INSTALL.md](docs/INSTALL.md)**.
+choose the Sequoia-labelled ZIP for macOS 15, verify `SHA256SUMS`, extract it, and follow **[docs/INSTALL.md](docs/INSTALL.md)**.
 GitHub's automatic “Source code” downloads are not binary installer packages.
 
 For the HP 760M, the supported development flow is:

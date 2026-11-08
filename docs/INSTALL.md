@@ -15,7 +15,7 @@ do not establish HP compatibility.
 | Target | Available operation |
 |---|---|
 | HP Envy x360 16-ad0013dx, Radeon 760M | Diagnostic PhxBringup kext in an explicitly selected OpenCore directory |
-| HP with Sequoia | Diagnostic package checks; actual kext load still requires target testing |
+| HP with Sequoia 15 | Sequoia-target package loads/translates shaders; diagnostic kext load and acceleration still require testing |
 | HP with Tahoe | Same diagnostic gate; GPU acceleration is not enabled |
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
@@ -23,6 +23,10 @@ Linux tests executed translated compute and graphics shaders on the HP. The
 macOS kernel, native queues, Metal device and WindowServer remain unverified.
 Running `sudo ./install.sh --windowserver` on the HP returns an error **before
 installing acceleration or changing boot settings**. There is no bypass option.
+
+Choose the Sequoia-labelled ZIP for macOS 15. Its native deployment target is 15.0;
+the older Tahoe-only ZIP remains a different build. CPU loading/translation is
+verified on Sequoia 15.8.2, not full Metal-device or WindowServer operation.
 
 You need Python 3, a working OpenCore configuration and a backup of your EFI.
 Keep a separate way to boot if a diagnostic kext cannot load. These commands
@@ -65,10 +69,11 @@ sudo ./install.sh --check --windowserver
 sudo ./install.sh --windowserver
 ```
 
-The checks require Tahoe, a loaded non-diagnostic PhxBringup, the reference
+The checks require an OS matching the package deployment target, a loaded
+non-diagnostic PhxBringup, the reference
 boot/security prerequisites, every package component and a valid header-derived
-firmware plan. On a diagnostic HP, both commands refuse acceleration. Sequoia
-cannot run the Tahoe accelerator/plugin binaries.
+firmware plan. On a diagnostic HP, both commands refuse acceleration. Use the Sequoia-target binaries on Sequoia; changing the installer check or
+lowering a binary header alone is insufficient. Hardware readiness is still required.
 
 For the reference path, installation copies boot tools and AMD firmware to
 `/Users/Shared/gpu`, PhxAccel into `/Library/Extensions`, and the Metal/RADV
@@ -106,3 +111,27 @@ Do not use that mode to remove an HP diagnostic-only installation.
 For updates, extract a new release and repeat the appropriate check/install mode.
 Do not combine assets from different releases. Current engineering progress and
 remaining hardware tests are in [760M_STATUS.md](760M_STATUS.md).
+
+## Sequoia component replacement test
+
+Once the diagnostic service is loaded, the Sequoia package can replace the other
+files for a controlled test. This requires administrator access:
+
+```sh
+./install.sh --components --check
+sudo ./install.sh --components
+```
+
+It backs up existing PhxAccel, Metal/RADV and GPU files, copies the replacements,
+and keeps `phxboot-off`. No LaunchDaemon is installed, kernel cache rebuilt, module
+loaded, reboot performed or WindowServer armed. An already loaded accelerator
+continues to use its old code; replacing the file does not prove the new kext loaded.
+Successful user-space loading/compiler tests also do not prove GPU acceleration.
+Use the printed backup for rollback (substitute its actual path):
+
+```sh
+sudo python3 -B install_components.py --restore /Users/Shared/nullarc-component-backups/backup-EXAMPLE
+```
+
+Rollback refuses to overwrite later edits. Keep the Sequoia and Tahoe kernel
+build profiles separate; their private accelerator interfaces differ.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Build and assemble a relocatable Tahoe development stack from explicit inputs.
+"""Build and assemble a relocatable macOS development stack from explicit inputs.
 
 The kernel enforces HP diagnostic-only operation. This tool never installs or
 loads a kext, edits OpenCore, arms WindowServer, or changes system security.
@@ -8,11 +8,13 @@ External LLVM/Zstd runtime binaries remain separately supplied dependencies.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 from package_manifest import write, verify, digest
+from macos_target import verify_tree
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -73,29 +75,31 @@ def source_inputs():
     return {str(f.relative_to(REPO)):digest(f) for f in native}
 
 
-def required_artifacts(mesa):
+def required_artifacts(mesa, mesa_build=None):
     files = [REPO / 'src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup',
         REPO / 'src/phxaccel/build/PhxAccel.kext/Contents/MacOS/PhxAccel',
         REPO / 'src/nmplugin/build/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver',
         REPO / 'build/translator/libnvmtl_translate.dylib',
         REPO / 'build/translator/nvmtl-translator-source.tar.gz',
         REPO / 'build/translator/SOURCE_COMMIT',
-        mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib']
+        (mesa_build or mesa / 'build') / 'src/amd/vulkan/libvulkan_radeon.dylib']
     files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw')]
     return files
 
 
 def build_receipt(a):
-    record = {'source_inputs':source_inputs(), 'artifacts':{str(p):digest(p) for p in required_artifacts(a.mesa)},
+    record = {'source_inputs':source_inputs(), 'artifacts':{str(p):digest(p) for p in required_artifacts(a.mesa, a.mesa_build)},
               'sdk':output(['xcrun','--sdk','macosx','--show-sdk-version']),
-              'target':'x86_64 macOS Tahoe 26', 'runtime_validated':False}
+              'target':'x86_64 macOS '+a.min_macos, 'minimum_macos':a.min_macos, 'runtime_validated':False}
     (REPO / 'build/stack-build.json').write_text(json.dumps(record, indent=2)+'\n')
 
 
-def verify_build_receipt(mesa):
+def verify_build_receipt(mesa, min_macos=None, mesa_build=None):
     receipt = json.loads((REPO / 'build/stack-build.json').read_text())
+    if min_macos is not None and receipt.get('minimum_macos') != min_macos:
+        raise ValueError('build deployment target differs; rebuild for this macOS target')
     if receipt['source_inputs'] != source_inputs(): raise ValueError('compiled source inputs are stale; rebuild first')
-    if any(str(path) not in receipt['artifacts'] for path in required_artifacts(mesa)):
+    if any(str(path) not in receipt['artifacts'] for path in required_artifacts(mesa, mesa_build)):
         raise ValueError('selected build inputs differ from the recorded build; rebuild with these inputs')
     for path, sha in receipt['artifacts'].items():
         if digest(Path(path)) != sha: raise ValueError(f'compiled artifact differs: {path}')
@@ -111,7 +115,7 @@ def assemble(a):
     if 'phx_hp_760m_apply_device_info(di)' not in (a.mesa / 'src/amd/common/darwin/ac_darwin_drm.c').read_text():
         raise ValueError('Mesa measured device properties patch 0009 is required')
     receipt_path = REPO / 'build/stack-build.json'
-    verify_build_receipt(a.mesa)
+    verify_build_receipt(a.mesa, a.min_macos, a.mesa_build)
     dest = a.output.resolve()
     if dest.exists():
         raise ValueError(f'output already exists: {dest}; choose a new output directory')
@@ -130,7 +134,7 @@ def assemble(a):
         copy(a.air_runtime / 'Contents/Resources/air-runtime', bundle / 'Contents/Resources/air-runtime')
         copy(a.dependency_notices, p / 'sources/native-dependencies')
         radv = p / 'PhxGPU/nvmtl/libvulkan_radeon.dylib'
-        copy(a.mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib', radv)
+        copy(a.mesa_build / 'src/amd/vulkan/libvulkan_radeon.dylib', radv)
         # The plugin opens the ICD directly. The JSON is also usable by a
         # separately installed Vulkan loader; no loader binary is required here.
         (radv.parent / 'radeon_icd.json').write_text(json.dumps({'file_format_version':'1.0.0',
@@ -154,7 +158,7 @@ def assemble(a):
         for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
                      'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
-        for name in ('install_diagnostics.py',):
+        for name in ('install_diagnostics.py','install_components.py'):
             copy(REPO / 'install' / name, p / name)
         for name in ('install.sh','uninstall.sh'):
             copy(REPO / 'install' / name, p / name)
@@ -164,16 +168,18 @@ def assemble(a):
         (p / 'INSTALL.md').write_text(guide)
         copy(REPO / 'tools/collect_macos_evidence.py', p / 'collect_macos_evidence.py')
         copy(REPO / 'tools/package_manifest.py', p / 'package_manifest.py')
-        (p / 'README.txt').write_text('NullArc 760M development stack for Tahoe\n'
+        (p / 'README.txt').write_text('NullArc 760M development stack, macOS '+a.min_macos+'+\n'
             'HP policy: diagnostic-only. GPU execution and acceleration are not verified.\n'
             'No firmware or automatic activation is included. See docs/BUILD_STACK.md.\n')
         src = {str(f.relative_to(REPO)):digest(f) for folder in ('src', 'tools', 'install')
                for f in (REPO / folder).rglob('*') if f.is_file() and 'build' not in f.relative_to(REPO).parts and '__pycache__' not in f.parts}
         copy(receipt_path, p / 'stack-build.json')
+        native_targets=verify_tree(p,a.min_macos)
         metadata = {'source_commit':output(['git', '-C', REPO, 'rev-parse', 'HEAD']),
                     'source_inputs':src, 'mesa_commit':output(['git', '-C', a.mesa, 'rev-parse', 'HEAD']),
                     'translator_commit':(translator / 'SOURCE_COMMIT').read_text().strip(),
-                    'validation':'compiled and offline-tested; no HP execution evidence'}
+                    'minimum_macos':a.min_macos, 'native_targets':native_targets,
+                    'validation':'compiled and offline-tested; native HP acceleration unverified'}
         write(p, metadata); verify(p)
         p.rename(dest)
     print(f'Assembled {dest}; HP diagnostic-only')
@@ -185,12 +191,16 @@ def main():
     ap.add_argument('--vulkan-headers', type=Path)
     ap.add_argument('--translator-source', type=Path)
     ap.add_argument('--mesa', type=Path, required=True)
+    ap.add_argument('--mesa-build', type=Path, help='configured Mesa build directory; defaults to MESA/build')
+    ap.add_argument('--min-macos', choices=('15.0','26.0'), default='26.0')
     ap.add_argument('--air-runtime', type=Path, required=True, help='compatible bundle containing LLVM, Zstd and their license files')
     ap.add_argument('--dependency-notices', type=Path, required=True, help='licenses and corresponding source for non-system dylib dependencies')
     ap.add_argument('--output', type=Path, default=REPO / 'build/stack')
     ap.add_argument('--assemble-only', action='store_true', help='use components already built in this checkout')
     a = ap.parse_args()
     a.mesa = a.mesa.resolve()
+    a.mesa_build=(a.mesa_build or a.mesa/'build').resolve()
+    build_env=dict(os.environ,NULLARC_MIN_MACOS=a.min_macos)
     if not a.assemble_only:
         if not all((a.sdk, a.vulkan_headers, a.translator_source)):
             ap.error('--sdk, --vulkan-headers and --translator-source are required for building')
@@ -198,15 +208,15 @@ def main():
         run(['python3', REPO / 'tools/phx_device_profile.py'])
         run(['make', 'test'], cwd=REPO)
         for component in ('phxbringup', 'phxaccel'):
-            run(['sh', REPO / 'src' / component / 'build.sh', a.sdk])
-        run(['bash', REPO / 'src/nmplugin/build.sh', a.vulkan_headers])
-        run(['bash', REPO / 'tools/build_translator.sh', a.translator_source])
-        run(['ninja', '-C', a.mesa / 'build'])
+            run(['sh', REPO / 'src' / component / 'build.sh', a.sdk],env=build_env)
+        run(['bash', REPO / 'src/nmplugin/build.sh', a.vulkan_headers],env=build_env)
+        run(['bash', REPO / 'tools/build_translator.sh', a.translator_source],env=build_env)
+        run(['ninja', '-C', a.mesa_build])
         tools = REPO / 'build/tools'; tools.mkdir(parents=True, exist_ok=True)
         for name in ('phxctl', 'mesboot', 'phxprofile'):
-            run(['clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', REPO / 'tools/phxctl' / (name+'.c'),
+            run(['clang', '-arch', 'x86_64', '-mmacosx-version-min='+a.min_macos, '-O2', REPO / 'tools/phxctl' / (name+'.c'),
                  '-framework', 'IOKit', '-framework', 'CoreFoundation', '-o', tools / name])
-        run(['clang++', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-std=c++17', '-O2',
+        run(['clang++', '-arch', 'x86_64', '-mmacosx-version-min='+a.min_macos, '-std=c++17', '-O2',
              REPO / 'tools/phxctl/phxfw.cpp', REPO / 'src/amd/rdna3_ucode_extract.cpp', '-o', tools / 'phxfw'])
         build_receipt(a)
     assemble(a)

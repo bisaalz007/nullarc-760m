@@ -1,0 +1,150 @@
+{
+  "format": 1,
+  "os": "macOS Sequoia 15.8.2",
+  "build": "24H232",
+  "architecture": "x86_64",
+  "sdk_used_to_build": "26.4",
+  "deployment_minimum": "15.0",
+  "plugin_RTLD_NOW": "passed on actual HP",
+  "metallib_translation": [
+    "compute",
+    "vertex",
+    "fragment"
+  ],
+  "RADV_ACO_pipeline_compilation": {
+    "8_CU_mock": "passed",
+    "12_CU_mock": "passed"
+  },
+  "GPU_submissions": 0,
+  "Metal_device_created": false,
+  "kext_loaded_before_reboot": false,
+  "native_acceleration_verified": false,
+  "diagnostic_EFI_install": {
+    "authorized": true,
+    "backup_created": true,
+    "only_PhXBringup_entry_and_kext_changed": true,
+    "boot_and_security_settings_preserved": true,
+    "reboot_performed_by_agent": false
+  },
+  "native_deployment_commands": {
+    "EFI/OC/Kexts/PhxBringup.kext/Contents/MacOS/PhxBringup": {
+      "kind": 11,
+      "minimum_macos": null
+    },
+    "Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel": {
+      "kind": 11,
+      "minimum_macos": null
+    },
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver": {
+      "kind": 8,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/air-runtime/libLLVM.dylib": {
+      "kind": 6,
+      "minimum_macos": [
+        14,
+        0,
+        0
+      ]
+    },
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/air-runtime/libzstd.1.dylib": {
+      "kind": 6,
+      "minimum_macos": [
+        14,
+        0,
+        0
+      ]
+    },
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib": {
+      "kind": 6,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "PhxGPU/nvmtl/libelf.0.8.13.dylib": {
+      "kind": 6,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "PhxGPU/nvmtl/libvulkan_radeon.dylib": {
+      "kind": 6,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "gpu/phxctl/mesboot": {
+      "kind": 2,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "gpu/phxctl/phxctl": {
+      "kind": 2,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "gpu/phxctl/phxfw": {
+      "kind": 2,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    },
+    "gpu/phxctl/phxprofile": {
+      "kind": 2,
+      "minimum_macos": [
+        15,
+        0,
+        0
+      ]
+    }
+  },
+  "diagnostic_kext_loaded_after_reboot": true,
+  "phx_build": 34,
+  "phx_stage": "profile-diagnostic-only",
+  "phx_memory_status": "decoded-not-initialized",
+  "phx_memory_properties": {
+    "mc_base": 549755813888,
+    "physical_base": 10200547328,
+    "size": 536870912,
+    "cpu_aperture_base": 11542724608,
+    "cpu_aperture_size": 268435456,
+    "hdp_flush_dword": 3607
+  },
+  "preexisting_PhXAccel_loaded": true,
+  "active_NMXAccel": false,
+  "active_PhXAMDFB": false,
+  "user_space_candidate_sha256": {
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver": "1930ee21b5943520d6ca234195561f61b26ae5430c0721c3b9cc71aeb31147d0",
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/air-runtime/libLLVM.dylib": "2a6d807ce8f3a3ab772e8f861ff40cff63363b90ee1d80ca7e289147b39405aa",
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/air-runtime/libzstd.1.dylib": "afd5adc5ce9592369b1067f8bcf1ba8b7ea5b75e752e4edadd4a0f254fcdb6d0",
+    "PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib": "aff384eae94f4e2968b93caf7867385e380f23ddaf1efa7f3efcf9feb0cb68ee",
+    "PhxGPU/nvmtl/libelf.0.8.13.dylib": "a1b7a9fe4b3406866661d2c2f64c361128b9963c082c404085dec8ac8a63987a",
+    "PhxGPU/nvmtl/libvulkan_radeon.dylib": "5f2da564207b5c22753b82ef7a60d95432cbfa753b79062961c6afae0372a276",
+    "gpu/phxctl/mesboot": "831ba65c8c00479e6a4ea475bc69200445fde5c0be217dbbd16a190324eacb5e",
+    "gpu/phxctl/phxctl": "f1c0d799bdb4bda58013c4365174ab48b53bfa675a438636a9f9682b28011c07",
+    "gpu/phxctl/phxfw": "5a627e026b0b842009b6965c74b0e2ad2653ff0113552c1ad91c916a32598284",
+    "gpu/phxctl/phxprofile": "f4bdcea420ac9c69901f817f1613161f725440dd51c11c2010d925b0776ec832"
+  },
+  "accelerator_build_profile": "Sequoia base headers; NM_TAHOE forwarding disabled",
+  "new_accelerator_runtime_load_tested": false,
+  "preexisting_accelerator_binary_sha256": "de12809fcd5be526ced50eeae11a01a1a5caaafbedcdf94ac36ba23900e71ea7",
+  "new_accelerator_binary_sha256": "faffd2548226b93aa220100f3c94d51431a9aa83c041789d3d9b1aa716cae6b9"
+}

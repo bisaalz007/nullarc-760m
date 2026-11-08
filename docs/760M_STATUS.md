@@ -5,8 +5,9 @@ Branch: `codex/radeon-760m-driver-completion`. Continuation baseline: merged `ma
 
 **HP macOS acceleration is not functional or hardware-tested. This branch intentionally
 allows only diagnostics on the captured HP PCI identity. Do not install an upstream
-780M release expecting these source changes.** No macOS drivers were installed,
-loaded, or replaced during this session.
+780M release expecting these source changes.** A diagnostic kext is now staged in the user-confirmed USB EFI with a backup;
+its diagnostic load is now verified on Sequoia. Older acceleration files were
+already present on the HP; replacement tests are being prepared.
 
 ## Continuation after PR #1
 
@@ -241,3 +242,53 @@ No new raw register values, reservations, firmware interface or readiness claims
 were added; no target EFI or released binary asset was changed. The next step
 requires the HP back in macOS with SSH, then actual memory/scanout ownership and
 staged firmware/queue/fence validation.
+
+## Sequoia compatibility continuation
+
+The user requires Sequoia because another required kext does not support Tahoe.
+Live SSH reconfirmed HP Sequoia 15.8.2 (24H232), x86_64. The old package actually
+contained macOS-26 deployment commands in the plugin, translator, RADV, four tools,
+libelf and zlib. `--min-macos 15.0` now rebuilds/selects compatible artifacts, writes
+the plugin minimum OS and records the selected Mesa build/OS in the receipt.
+`macos_target.py` inspects all packaged x86_64 Mach-O deployment commands, including
+copied dependencies; it caught a cached macOS-26 translator and refused assembly.
+Rust target caches are now separated by deployment target; a clean 15.0 build passed.
+A pinned-source libelf builder provides macOS-15 libelf and pkg-config metadata for
+SDK system zlib, so no macOS-26 MacPorts zlib binary is copied into the port.
+
+The plugin built with unguarded newer-API availability treated as an error. On
+the actual HP/Sequoia, RTLD_NOW loading, compute/vertex/fragment metallib translation
+and RADV/ACO compute+graphics pipeline compilation with explicit 8/12-CU mocks
+passed. Zero GPU submissions, no Metal device construction, and no native GPU
+acceleration proof. Evidence is in `hardware/dumps/hp_envy_760m/sequoia-runtime-2026-11-08.json`
+and `sequoia-translation-test.log`. The translated compute shader is byte-identical
+to the earlier Linux hardware-tested fixture; this is not macOS GPU execution.
+
+With explicit user approval, the current diagnostic PhxBringup was installed into
+the confirmed USB EFI. The installer made a restorable backup; an independent
+comparison verified all unrelated config/security values and kext bytes. No reboot
+was performed by the agent. PhxBringup was absent before reboot. Native bring-up,
+scanout ownership, firmware/MES and macOS readback remain blocked pending that test.
+
+The user rebooted with the confirmed USB EFI. Live SSH/IORegistry now verifies
+PhxBringup build 34 active on Sequoia, selector/profile diagnostic state and decoded
+memory: MC base 0x8000000000, physical base 0x260000000, 512 MiB total and 256 MiB
+CPU aperture. This is a loaded diagnostic service, not initialized GPU queues.
+The physical base differs from Firebat's 0x6a0000000 and cannot be substituted by
+assuming the 780M layout. Firmware/TMR/scanout reservation validation is still needed.
+
+PhxAccel and older Metal bundles were already installed on the HP; the module is
+loaded but NMXAccel/PhxAMDFB services are absent. The new Sequoia accelerator build
+selects the existing Sequoia base-class headers without NM_TAHOE forwarding code;
+the default Tahoe build retains it. Its native load is not yet tested.
+A transactional `--components` installer provides a separately backed-up file
+replacement test. It keeps phxboot-off, refuses an existing boot daemon, does not
+rebuild the kernel cache or load a module, and never arms WindowServer. A password
+is required locally for protected paths; the SSH session has no noninteractive
+sudo access. Copy/restore and failure-injection tests cover this mode.
+
+Final Sequoia host checks passed: seven C++ binaries and 32 Python methods,
+including deployment-command dependency rejection, target-specific receipt checks
+and component-copy failure rollback. Native source builds and the actual HP
+user-space compiler/load tests above passed. This does not validate the new
+accelerator's runtime load or the native GPU command path.

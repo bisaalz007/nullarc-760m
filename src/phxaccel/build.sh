@@ -4,12 +4,18 @@
 set -eu
 MKSDK=${1:?usage: build.sh <MacKernelSDK>}
 HERE=$(cd "$(dirname "$0")" && pwd)
+MIN_MACOS=${NULLARC_MIN_MACOS:-26.0}
+case "$MIN_MACOS" in
+  15.0) ABI_FLAGS="" ;;
+  26.0) ABI_FLAGS="-DNM_TAHOE" ;;
+  *) echo 'Supported deployment targets: 15.0 or 26.0' >&2; exit 1 ;;
+esac
 OUT="$HERE/build/PhxAccel.kext"
 rm -rf "$HERE/build"
 mkdir -p "$OUT/Contents/MacOS"
 clang++ -arch x86_64 -mmacosx-version-min=11.0 -fapple-kext -mkernel -nostdinc -I"$MKSDK/Headers" -I"$HERE" \
   -I"$HERE/accel" -I"$HERE/accel/iofam" -I"$HERE/accel/re" \
-  -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT -DNMX_ACCEL -DNM_TAHOE -DPHX_FB \
+  -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT -DNMX_ACCEL $ABI_FLAGS -DPHX_FB \
   -std=c++17 -fno-rtti -fno-exceptions -fno-builtin -fno-common -O2 \
   -Wall -Wno-unused-parameter -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable \
   -c "$HERE/accel/nvrm-accel.cpp" -o "$HERE/build/accel.o"

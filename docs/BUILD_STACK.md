@@ -131,3 +131,31 @@ appears atomically and contains the installer ZIP, a standalone diagnostic-kext
 ZIP, translator source, SHA256SUMS and release notes. Publishing does not retag
 `alpha`, merge main or install anything locally. Release notes distinguish the
 binary source commit from the existing tag's automatic source archives.
+
+## Sequoia deployment profile
+
+Build headers still require SDK 26 because the source implements newer protocol
+surfaces. `--min-macos 15.0` selects the Sequoia deployment target, compiles with
+availability checking, sets the plugin Info.plist, and isolates the translator's
+Rust cache by target OS. The default remains 26.0. Never edit deployment load
+commands to make an incompatible binary appear older.
+
+Rebuild libelf from the pinned source archive and the supplied MacPorts patch:
+
+```sh
+python3 tools/build_macos_libelf.py --archive /path/to/libelf-0.8.13.tar.gz \
+  --elf-patch /path/to/elf_repl.diff --output /path/to/NEW-libelf-build --min-macos 15.0
+```
+
+Use that prefix's `lib/pkgconfig` first in `PKG_CONFIG_PATH` when configuring a
+separate Mesa `build-sequoia`. Keep the Vulkan options above and set `c_args`,
+`cpp_args`, `objc_args`, `c_link_args`, `cpp_link_args`, and `objc_link_args` each to
+`-mmacosx-version-min=15.0`. The helper supplies a system-zlib `.pc` derived from
+the SDK header; no Apple library is copied. Then use the normal stack command with
+`--min-macos 15.0 --mesa-build /path/to/mesa/build-sequoia`.
+
+The assembler checks every packaged native dependency's actual Mach-O minimum
+version. It rejects a newer transitive dependency or a mismatched build receipt.
+Run the compiler test with `--min-macos 15.0` as well. The source-built package
+passed loader, AIR translation and mock ACO pipeline tests on the HP's actual
+Sequoia 15.8.2; native kernel/Metal-device/GPU rendering remain separate tests.
