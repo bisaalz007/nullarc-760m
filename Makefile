@@ -41,13 +41,20 @@ $(TEST_BIN_DIR)/test_phx_execution: tests/test_phx_execution.cpp src/phxbringup/
 $(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
-test: $(TESTS)
+build/tools/phxfw: tools/phxctl/phxfw.cpp src/amd/rdna3_ucode_extract.cpp src/amd/rdna3_ucode_extract.h src/amd/rdna3_ucode_psp.h
+	mkdir -p build/tools
+	$(CXX) $(CXXFLAGS) $(INCLUDES) tools/phxctl/phxfw.cpp src/amd/rdna3_ucode_extract.cpp -o $@
+
+test: $(TESTS) build/tools/phxfw
 	python3 tools/phx_profile.py --check
+	python3 tools/phx_device_profile.py
 	python3 tests/test_phx_profile.py
+	python3 tests/test_phx_device_profile.py
 	python3 tests/test_diagnostic_install.py
 	python3 tests/test_evidence_collectors.py
 	python3 tests/test_bringup_preflight.py
 	python3 tests/test_build_receipt.py
+	python3 tests/test_firmware_plan.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

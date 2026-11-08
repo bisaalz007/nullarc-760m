@@ -100,3 +100,20 @@ Live Sequoia capture and historical HP evidence are in `hardware/dumps/hp_envy_7
 The current CPU aperture addresses differ from the earlier Linux snapshot; neither
 snapshot is compiled into initialization. Linux IP and memory-controller evidence
 remain prerequisites to replacing the remaining board-specific bootstrap constants.
+
+## Live-evidence integration
+
+`tools/linux-profile/collect.c --device-info` preserves selected AMDGPU_INFO fields
+alongside the original topology format. `phx_device_profile.py` validates the live
+capture against the supplied exact HP topology and generates a separate RADV-only
+property header. Phoenix patch 0009 calls it after the topology override; other GPU
+profiles retain their canned values. Linux-managed VA ranges/heap budgets and
+readiness flags never cross this boundary. Runtime clock telemetry remains absent.
+
+`phxfw` shares the freestanding firmware extractor with host tests and the legacy
+RDNA3 scaffold. The production `bringup5.sh` now consumes its complete validated
+plan, including MES/KIQ code/data, before any watchdog/hardware action. The new
+extractor does not start MES. `mesboot.c`, fixed PSP/TMR addresses and HP memory
+reservation discovery still need integration before diagnostic restrictions can go.
+Stock Linux hardware tests establish shader translator behavior independently of
+these unfinished macOS paths; see [Linux validation](LINUX_VALIDATION.md).

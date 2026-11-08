@@ -3,9 +3,9 @@
 Updated 2026-11-08. Fork: `yt42c2mvn2-cmd/nullarc-760m`.
 Branch: `codex/radeon-760m-driver-completion`. Continuation baseline: merged `main` at `f08b898` (PR #1).
 
-**HP acceleration is not functional or hardware-tested. This branch intentionally
+**HP macOS acceleration is not functional or hardware-tested. This branch intentionally
 allows only diagnostics on the captured HP PCI identity. Do not install an upstream
-780M release expecting these source changes.** No system drivers were installed,
+780M release expecting these source changes.** No macOS drivers were installed,
 loaded, or replaced during this session.
 
 ## Continuation after PR #1
@@ -59,11 +59,42 @@ plugin's upstream protocol/deprecation warnings remain. KXLD/AuxKC compatibility
 HP execution, hardware rendering, display takeover, suspend/resume and reset remain
 unverified. The HP currently runs Sequoia; Tahoe driver runtime testing is outstanding.
 
-The Linux collector can now capture topology, full available IP sysfs attributes,
-firmware-version/debugfs reports, memory inventory, relevant kernel messages and
-candidate firmware hashes without reloading drivers or accessing registers. Its
-sysfs/file handling is fixture-tested; actual Linux capture/compilation awaits the
-HP live session.
+## Live Linux continuation (2026-11-08)
+
+- **Measured evidence:** `hardware/dumps/hp_envy_760m/linux-2026-11-08.json`
+  records Linux Mint 22.3, kernel 6.14.0-37, all 39 IP instances, device-info
+  fields, 512 MiB UMA VRAM, firmware versions and decompressed-file hashes.
+  No capture errors. The live topology exactly equals the supplied JSON.
+  Critical GC 11.0.1 / MP0+MP1 13.0.4 / SDMA 6.0.1 / MMHUB 3.0.1 / DCN 3.1.4
+  versions and segment bases match the reference. Linux memory state does not
+  reserve any corresponding region under macOS.
+- **Real hardware execution:** hardened `vkprobe` refuses CPU fallback, invalid
+  queue selection and incorrect readback. The HP passed 256/256 compute values on
+  compute-only and graphics-capable queues. Actual authored MSL passed through the
+  packaged Metal plugin/AIR reader/translator and executed on stock Linux RADV:
+  compute returned 7; vertex+fragment draw returned 256/256 correct RGBA pixels.
+  Fences and host barriers were used. Vulkan validation reported no errors.
+  `tools/test_linux_gpu.py` reproduces these offscreen tests and records hashes.
+  **This does not test the macOS kernel, Darwin winsys, Metal API device or panel.**
+- **Firmware integration:** `rdna3_ucode_extract.*` now supports MES scheduler and
+  KIQ v1.0 code/data offsets with atomic rejection of incomplete/overlapping ranges.
+  `phxfw` validates the complete Phoenix firmware set and staging capacities before
+  `bringup5.sh` arms a watchdog or stages bytes. The live image differs from old
+  constants in MEC, MES and RLC payloads; header-derived offsets avoid truncation
+  and loading the wrong bytes. RLC_G remains last. The reference staging/PSP/TMR
+  addresses remain unchanged and are not enabled for HP. Bounds/header checks are
+  not cryptographic authenticity or firmware runtime compatibility verification.
+- **Measured RADV properties:** generated `phx_hp_760m_device.h`, generator and
+  Phoenix patch 0009 apply only to the exact HP topology identity. Chip revisions
+  12/13, 100000 kHz counter, 2600000/800000 kHz clock caps and cache geometry replace
+  the 780M capture's assumptions. Timestamp period is 10 ns in the HP mock; the
+  legacy mock remains unchanged. No Linux VA ranges, heap budgets, flags, firmware
+  versions or readiness bits are imported. Runtime clock telemetry is still absent.
+- **Validation:** new firmware-plan/pre-watchdog and measured-profile tests; both
+  firmware generations pass complete preflight; ASan/UBSan includes MES malformed
+  and truncation cases; Mesa patch/generator 0007..0009 roundtrip, 8/12-CU compiler
+  regressions, native source builds and final package checks are recorded below.
+  See `docs/LINUX_VALIDATION.md` for exact runtime scope and reproduction.
 
 ## PR #1 baseline stages and changed components
 
@@ -93,8 +124,9 @@ independent measurement of this machine:
 - 1 shader engine; 2 shader arrays; 6 physical CU slots per array.
 - 8 active CUs: masks `[0x0f, 0x0f]`; do not derive masks from CU count.
 - 4 physical RB pipes, enabled mask `0x0a`; preserve physical indexing.
-- No IP-discovery versions, GB_ADDR_CONFIG, firmware hashes/addresses, memory
-  aperture/reservation map, panel configuration, or validated initialization trace.
+- Original profile contains no IP-discovery versions or runtime configuration.
+  The later Linux capture above independently confirms its topology and adds
+  IP/firmware/device properties; macOS reservations and initialization remain unverified.
 
 The private 128-byte topology query is separate from the existing 192-byte N48N
 QueryInfo. Its `CAPTURED` flag never implies `RUNTIME_READY`; this branch never sets
@@ -110,7 +142,7 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK
 sh src/phxaccel/build.sh /path/to/MacKernelSDK
 ```
 
-Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0008 to Mesa
+Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0009 to Mesa
 `f5cb8ee032adabef599ae892ec4e42d796b84da9`. Each generator is an alternative to its corresponding patch, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
 
 ```sh
@@ -124,23 +156,34 @@ PR #1 used an external prebuilt AIR translator and did not build the full Metal
 bundle. The continuation above adds the pinned source build and real translation
 checks; source archives accompany development packages.
 
-## Next required hardware evidence
+## Next required hardware integration
 
-On Linux booted on the HP, build/run `tools/linux-profile/collect.c` as documented
-at its top. Validate the resulting JSON with `python3 tools/phx_profile.py captured.json`.
-Keep stderr's IP query results. Also collect the target's PCI `resource` file,
-full `device/ip_discovery/` sysfs tree if available, amdgpu initialization log and
-matching firmware filenames/hashes. The generic DRM HW_IP query alone does not
-identify PSP, SMU, MMHUB or DCN sufficiently.
-
-Next, compare the HP IP/base-address table and firmware layout with the reference,
-validate memory reservations against the live GOP scanout, then replace the Firebat
-constants with checked per-device data. Only then implement staged HP firmware,
-VM, MES/CP, fence and recovery tests. Require a verified GPU write/fence, compute
-readback, offscreen rendering/readback, and only subsequently Metal/panel tests
-before removing the diagnostic gates. No boot argument bypass is provided.
+The Linux evidence gap is closed for topology, IP/base tables, memory inventory
+and firmware identification. Keep the HP diagnostic gate until macOS-specific
+memory/scanout reservations and PSP/TMR addresses are derived and verified. The
+remaining Firebat literals in `mesboot.c` and raw PSP requests are not an HP plan.
+Next collect the new PhxBringup diagnostic properties on Sequoia, verify actual
+MC/physical mapping and firmware-framebuffer ownership, then implement bounded
+PSP/SMU, VM and MES/CP stages. Require a real NullArc write/fence, compute readback,
+offscreen rendering and only subsequently Metal-device/panel tests before enabling
+acceleration. Tahoe runtime validation, suspend/resume and hardware reset/recovery
+are still outstanding. Linux success cannot remove these gates.
 
 The existing 780M fallback is preserved and passes mock regression checks. The
 baseline has no verified dedicated 740M implementation; synthetic 4-CU validation
 must not be described as 740M hardware support. Upstream README performance claims
 remain upstream reports about Firebat, not results from this session.
+
+### Final validation for the Linux-evidence stage
+
+Both kexts, the full Metal plugin, pinned translator, patched RADV and all four
+CLI tools built successfully. Seven host C++ binaries and 19 Python test methods
+passed with firmware fixtures; the actual firmware extractor also passed ASan/UBSan.
+Mesa transport tests passed 134 legacy checks plus topology cases; patches 0007..0009
+match their generators byte-for-byte. The packaged MSL-to-AIR-to-SPIR-V-to-ACO
+compute/graphics tests passed under both 8-CU and 12-CU mocks, including the new
+10 ns HP timestamp-property check. Ten Linux hardware-test/build/validation steps
+passed; the current translated shader hashes match the HP-tested receipt.
+Existing kernel field-shadow and plugin protocol/deprecation warnings remain.
+No macOS device was activated, no target EFI was changed, and no firmware/register
+write or driver reload was performed outside normal Linux Vulkan submissions.

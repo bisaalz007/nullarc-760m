@@ -66,8 +66,11 @@ def relocate(path, pending, dest, origins):
 
 
 def source_inputs():
-    return {str(f.relative_to(REPO)):digest(f) for f in (REPO / 'src').rglob('*')
-            if f.is_file() and 'build' not in f.relative_to(REPO).parts}
+    native = [f for f in (REPO / 'src').rglob('*')
+              if f.is_file() and 'build' not in f.relative_to(REPO).parts]
+    native += [f for f in (REPO / 'tools/phxctl').rglob('*')
+               if f.is_file() and f.suffix in ('.c','.cpp','.h')]
+    return {str(f.relative_to(REPO)):digest(f) for f in native}
 
 
 def required_artifacts(mesa):
@@ -78,7 +81,7 @@ def required_artifacts(mesa):
         REPO / 'build/translator/nvmtl-translator-source.tar.gz',
         REPO / 'build/translator/SOURCE_COMMIT',
         mesa / 'build/src/amd/vulkan/libvulkan_radeon.dylib']
-    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile')]
+    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw')]
     return files
 
 
@@ -100,11 +103,13 @@ def verify_build_receipt(mesa):
 
 
 def assemble(a):
-    for name in ('phx_topology.h', 'phx_hp_760m.h'):
+    for name in ('phx_topology.h', 'phx_hp_760m.h', 'phx_hp_760m_device.h'):
         if (a.mesa / 'src/amd/common/darwin' / name).read_bytes() != (REPO / 'src/amd' / name).read_bytes():
             raise ValueError('Mesa topology headers differ; apply the documented patches')
     if 'native queues are not ready' not in (a.mesa / 'src/amd/common/darwin/ac_darwin_drm.c').read_text():
         raise ValueError('Mesa readiness patch 0008 is required')
+    if 'phx_hp_760m_apply_device_info(di)' not in (a.mesa / 'src/amd/common/darwin/ac_darwin_drm.c').read_text():
+        raise ValueError('Mesa measured device properties patch 0009 is required')
     receipt_path = REPO / 'build/stack-build.json'
     verify_build_receipt(a.mesa)
     dest = a.output.resolve()
@@ -138,7 +143,7 @@ def assemble(a):
             relocate(binary, pending, binary.parent, origins)
         run(['codesign', '--force', '--sign', '-', bundle])
         run(['codesign', '--verify', '--deep', '--strict', bundle])
-        for name in ('phxctl', 'mesboot', 'phxprofile'):
+        for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw'):
             copy(REPO / 'build/tools' / name, p / 'gpu/phxctl' / name)
         for name in ('phxboot.sh', 'full.sh', 'bringup5.sh', 'kinst.sh', 'local.phxboot.plist'):
             copy(REPO / 'tools/phxctl' / name, p / 'gpu' / name)
@@ -146,7 +151,7 @@ def assemble(a):
         copy(REPO / 'hardware/profiles/hp-760m.json', p / 'hardware/hp-760m.json')
         for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md', 'LICENSES'):
             copy(REPO / name, p / name)
-        for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md'):
+        for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
         for name in ('install_diagnostics.py',):
             copy(REPO / 'install' / name, p / name)
@@ -182,6 +187,7 @@ def main():
         if not all((a.sdk, a.vulkan_headers, a.translator_source)):
             ap.error('--sdk, --vulkan-headers and --translator-source are required for building')
         run(['python3', REPO / 'tools/phx_profile.py', '--check'])
+        run(['python3', REPO / 'tools/phx_device_profile.py'])
         run(['make', 'test'], cwd=REPO)
         for component in ('phxbringup', 'phxaccel'):
             run(['sh', REPO / 'src' / component / 'build.sh', a.sdk])
@@ -192,6 +198,8 @@ def main():
         for name in ('phxctl', 'mesboot', 'phxprofile'):
             run(['clang', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-O2', REPO / 'tools/phxctl' / (name+'.c'),
                  '-framework', 'IOKit', '-framework', 'CoreFoundation', '-o', tools / name])
+        run(['clang++', '-arch', 'x86_64', '-mmacosx-version-min=26.0', '-std=c++17', '-O2',
+             REPO / 'tools/phxctl/phxfw.cpp', REPO / 'src/amd/rdna3_ucode_extract.cpp', '-o', tools / 'phxfw'])
         build_receipt(a)
     assemble(a)
 

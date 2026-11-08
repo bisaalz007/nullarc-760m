@@ -292,7 +292,7 @@ bool PhxBringup::start(IOService *provider) {
         topology = &phx_hp_760m;
         setProperty("phx-profile", "hp-760m");
         setProperty("phx-profile-source", "captured-drm-not-live");
-        setProperty("phx-bringup-blocker", "HP IP discovery, memory layout and firmware validation required");
+        setProperty("phx-bringup-blocker", "HP runtime memory reservations, firmware/MES initialization and fence validation required");
         pci->setProperty("phx-diagnostic-only", kOSBooleanTrue);
         IOLog("PhxBringup: stage PCI/profile OK: HP 760M, 8 captured CUs; hardware writes disabled\n");
     }

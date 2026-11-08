@@ -9,7 +9,7 @@ build/package/offline translation test does not establish GPU execution.
 
 - macOS Tahoe, Xcode/CLT with SDK 26+, Python 3, Clang, Cargo/Rust >=1.87 and Ninja.
 - MacKernelSDK path; Vulkan-Headers checkout; configured Mesa at the documented
-  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0008.
+  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0009.
 - Clean NullMoth source checkout at `76df0f6af5c64c2af9a22090da8b3fe14616023e`
   (v2.4.1). Only its LGPL `translator/` is compiled/archived.
 - Compatible LLVM/Zstd AIR-reader runtime bundle, including
@@ -86,8 +86,8 @@ On the HP under macOS, `tools/collect_macos_evidence.py --output NEW_DIRECTORY`
 collects selected PCI, service and EDID facts without loading a driver, accessing
 registers, altering boot settings, or recording system serial numbers. This is
 useful on Sequoia; it cannot substitute for Linux IP discovery/firmware evidence.
-The existing read-only Linux DRM collector remains the next step for topology/IP
-queries. Historical HP BAR and panel evidence is stored separately from runtime
+The live Linux capture is now recorded in `hardware/dumps/hp_envy_760m`;
+see [Linux validation](LINUX_VALIDATION.md) for verified execution scope and reproduction. Historical HP BAR and panel evidence is stored separately from runtime
 configuration; never reuse its physical addresses as live values.
 
 For the Linux live session, build the existing C collector with installed libdrm
@@ -101,3 +101,9 @@ sudo python3 tools/linux-profile/collect_evidence.py --device /dev/dri/renderD12
 The exact PCI identity is checked before capture. Candidate firmware files are
 inventoried as present, not asserted to be loaded. Missing/privileged files are
 recorded explicitly. No registers, module state or firmware are changed.
+
+The package also includes `gpu/phxctl/phxfw`. Its offline `--phoenix-plan DIR`
+checks the complete known Phoenix firmware layout and emits tab-separated payload
+ranges; no firmware binary is shipped or loaded by this operation. `bringup5.sh`
+requires this preflight before watchdog/PSP access. Unsupported payload sets fail
+closed. Staging/PSP/TMR addresses remain reference-machine values, and HP stays gated.

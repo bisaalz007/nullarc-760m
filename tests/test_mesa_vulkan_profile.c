@@ -33,6 +33,8 @@ int main(int argc, char **argv) {
     assert(core2.activeComputeUnitCount == expected);
     assert(core.shaderEngineCount == 1 && core.shaderArraysPerEngineCount == 2);
     assert(strstr(p.properties.deviceName, expected == 8 ? "760M" : "780M"));
+    if (expected == 8) assert(p.properties.limits.timestampPeriod == 10.0f);
+    else assert(p.properties.limits.timestampPeriod > 10.01f && p.properties.limits.timestampPeriod < 10.03f);
     printf("[PASS] %s: %u CUs, SE=%u SA=%u CU/SA=%u (mock, no execution)\n", p.properties.deviceName,
            core2.activeComputeUnitCount, core.shaderEngineCount, core.shaderArraysPerEngineCount, core.computeUnitsPerShaderArray);
     // Compile a real storage-buffer shader using RADV/ACO, without dispatching.

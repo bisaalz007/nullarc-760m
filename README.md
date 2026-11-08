@@ -44,14 +44,20 @@ propagate transfer/status errors rather than reporting success after failure.
 **HP hardware bring-up, GPU execution and Metal acceleration are not verified.**
 The exact HP device remains diagnostic-only. A live SSH capture confirms its
 identity on Sequoia 15.8.2, its firmware framebuffer and 1920×1200 panel. Historical
-Linux/Windows evidence corroborates the panel's 60 Hz mode. IP discovery, firmware
-and memory-controller evidence are still required before enabling initialization.
+Linux/Windows evidence corroborates the panel's 60 Hz mode. Live Linux capture now
+confirms all 39 IP instances, topology, memory inventory and firmware versions.
+The actual Metal translator's compute and graphics shaders pass fenced readback
+on this HP through **stock Linux RADV** (not the Darwin winsys or NullArc kext).
+Phoenix patch 0009 supplies measured HP chip revisions, counter frequency, clock
+caps and cache geometry without importing Linux VA ranges or readiness flags.
+Firmware preflight derives payload ranges from headers instead of fixed sizes.
+macOS memory reservations and staged PSP/MES/queue initialization remain required.
 Existing Firebat runtime claims below are retained as upstream reports.
 
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.
-Mesa uses Phoenix patches 0001..0008; generator scripts are alternatives to applying
+Mesa uses Phoenix patches 0001..0009; generator scripts are alternatives to applying
 the corresponding patches, not additional steps.
 
 ## Status

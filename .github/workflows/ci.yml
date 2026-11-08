@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang make libdrm-dev pkg-config
+        sudo apt-get install -y clang make libdrm-dev pkg-config libvulkan-dev glslang-tools
 
     - name: Fetch Phoenix firmware fixtures (linux-firmware)
       run: make fixtures
@@ -39,3 +39,9 @@ jobs:
 
     - name: Compile read-only Linux hardware collector
       run: clang -std=c11 -Wall -Wextra -Werror $(pkg-config --cflags libdrm) tools/linux-profile/collect.c -o build/collect-phx-profile
+
+    - name: Compile hardware compute probe (no hardware run in CI)
+      run: |
+        glslangValidator -V --vn fill_spv tools/vkprobe/fill.comp -o build/fill_spv.h
+        clang -std=c11 -Wall -Wextra -Werror -Ibuild tools/vkprobe/vkprobe.c -lvulkan -o build/vkprobe
+        clang -std=c11 -Wall -Wextra -Werror tools/vkprobe/translated_render.c -lvulkan -o build/translated-render

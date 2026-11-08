@@ -14,6 +14,7 @@ class BuildReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, patch.object(build_stack,'REPO',Path(tmp)):
             root=Path(tmp);mesa=root/'mesa';source=root/'src/component.cpp'
             source.parent.mkdir(parents=True);source.write_text('source fixture')
+            tool=root/'tools/phxctl/phxfw.cpp';tool.parent.mkdir(parents=True);tool.write_text('tool fixture')
             for path in build_stack.required_artifacts(mesa):
                 path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'compiled-artifact fixture')
             receipt={'source_inputs':build_stack.source_inputs(),
@@ -26,6 +27,10 @@ class BuildReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'stale'):
                 build_stack.verify_build_receipt(mesa)
             source.write_text('source fixture')
+            tool.write_text('changed tool source')
+            with self.assertRaisesRegex(ValueError,'stale'):
+                build_stack.verify_build_receipt(mesa)
+            tool.write_text('tool fixture')
             (root/'build/translator/nvmtl-translator-source.tar.gz').write_bytes(b'wrong corresponding source')
             with self.assertRaisesRegex(ValueError,'artifact differs'):
                 build_stack.verify_build_receipt(mesa)
