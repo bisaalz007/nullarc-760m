@@ -366,3 +366,25 @@ confirms module loading, not GPU execution or IOAccelerator service operation.
 PhxBringup remains build 34, profile-diagnostic-only and decoded-not-initialized;
 development build 35 was not installed. Evidence:
 `hardware/dumps/hp_envy_760m/sequoia-translator-postboot-2026-11-08.json`.
+
+## Firmware reservation acquisition continuation
+
+Live HP still has build 34 in diagnostic mode and no NMXAccel/PhxAMDFB service.
+IORegistry does not expose its VBIOS or VFCT to the existing user-space collector;
+the exported memory-map node is not an EFI reservation map. The GPU's actual
+IOService ancestry includes IOACPIPlatformDevice, and IOACPIFamily 1.4 is loaded.
+
+Build 36 adds `src/amd/phx_vbios.h`, production cached-VFCT acquisition in
+`PhxBringup.cpp`, its explicit IOACPIFamily dependency and selected collector
+fields. It validates the full ACPI checksum, image bounds and exact BDF/device
+selection before parsing supported ATOM formats. No VBIOS command execution,
+register write, firmware submission, readiness change or fallback mask was added.
+Extra, protected and usage memory claims stay distinct and incomplete.
+
+Validation: native PhxBringup compiles with the same three pre-existing shadow
+warnings. Nine C++ binaries and 33 Python methods pass. The production parser
+passes ASan/UBSan, all truncations of the synthetic image, duplicate/wrong-device
+cases and 10,000 mutations. These fixtures are not an HP VBIOS capture. A build-36
+diagnostic update is being prepared for the already-authorized USB EFI, with the
+existing backup/rollback installer. A manual boot/capture is needed before this
+metadata can inform a safe HP memory plan. Acceleration remains unimplemented.

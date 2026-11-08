@@ -52,5 +52,16 @@ class EvidenceCollectorTests(unittest.TestCase):
         del pci['IORegistryEntryChildren'][0]['phx-fb-phys']
         self.assertNotIn('phx-fb-phys',mac.capture([pci])[0]['bringup'])
 
+    def test_firmware_metadata_preserves_unknown_fields_as_absent(self):
+        facts={'IOObjectClass':'PhxBringup','phx-stage':'profile-diagnostic-only',
+               'phx-vbios-status':'decoded-metadata-only','phx-vbios-firmware-table':0x30005,
+               'phx-vbios-extra-fw-bytes':0,'private-rom':b'not recorded'}
+        pci={k:v.to_bytes(4,'little') for k,v in mac.EXPECTED.items()}
+        pci['IORegistryEntryChildren']=[facts]
+        r=mac.capture([pci])[0]['bringup']
+        self.assertEqual(r['phx-vbios-extra-fw-bytes'],0)
+        self.assertNotIn('phx-vbios-fw-start-raw-kib',r)
+        self.assertNotIn('private-rom',r)
+
 
 if __name__=='__main__':unittest.main()

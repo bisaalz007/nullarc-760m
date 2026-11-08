@@ -139,3 +139,23 @@ The production queue adoption policy checks both VRAM and CPU aperture bounds,
 overflow-safe bounds protect VRAM reads/writes, PSP ring/staging and system-memory
 debug accesses. This does not prove ownership of any of those regions. HP PSP/TMR,
 GOP scanout reservations and actual queue initialization remain separate work.
+
+## Firmware reservation evidence (build 36)
+
+`PhxBringup::readFirmwareLayout` obtains the cached VFCT through the public
+IOACPIPlatformDevice ancestor API. It does not evaluate ACPI methods or read a ROM
+BAR. `phx_vbios.h` selects the exact PCI BDF/vendor/device image and decodes ATOM
+ROM 2.2/master data 2.1. Known VRAM usage 2.1/2.2 and firmware-info 3.4/3.5 fields
+are exported as selected `phx-vbios-*` properties. Other table revisions do not
+inherit their layouts. Raw start fields retain operation flags and KiB units;
+they are not interpreted as allocation permissions. Firmware-info extra/protected
+sizes and VRAM usage claims are distinct; they are never summed or treated as a
+complete reservation map. The collector preserves absence versus measured zero.
+
+Field layouts and offsets were checked against
+[Linux v6.14 atomfirmware.h](https://github.com/torvalds/linux/blob/v6.14/drivers/gpu/drm/amd/include/atomfirmware.h)
+and [the Linux VFCT acquisition path](https://github.com/torvalds/linux/blob/v6.14/drivers/gpu/drm/amd/amdgpu/amdgpu_bios.c).
+VFCT checksum, truncation, duplicate images, version rejection and 10,000 mutated
+inputs are covered by the same parser used in the kext. Missing VFCT has no
+speculative VRAM fallback. IOACPIFamily is an explicit dependency. This only
+collects evidence needed for a later ownership/initialization implementation.

@@ -74,6 +74,12 @@ VRAM and doorbell accesses now reject overflow and queue-buffer overlap. These
 changes build and pass host tests; build 35 has not been tested on the HP or added
 to the existing 0.1.1 release. Decoded memory does not establish ownership.
 
+Build 36 additionally reads the matching cached ACPI VFCT/ATOM image and exports
+supported firmware reservation metadata. The decoder checks checksums, PCI BDF,
+table bounds and exact known formats; missing/unknown data stays explicit. It
+does not execute VBIOS functions or enable HP hardware writes. Native compilation
+and parser tests pass; HP boot/capture of this build is pending.
+
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.

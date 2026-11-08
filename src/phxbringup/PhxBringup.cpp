@@ -11,6 +11,7 @@
 #include <IOKit/IOLocks.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/pci/IOPCIDevice.h>
+#include <IOKit/acpi/IOACPIPlatformDevice.h>
 #include <libkern/OSAtomic.h>
 #include <pexpert/pexpert.h>
 #include <sys/sysctl.h>
@@ -18,8 +19,9 @@
 #include "PhxNativeABI.h"
 #include "PhxExecutionPolicy.h"
 #include "../amd/phx_hp_760m.h"
+#include "../amd/phx_vbios.h"
 
-#define PHX_KEXT_BUILD 35u
+#define PHX_KEXT_BUILD 36u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -116,6 +118,7 @@ private:
     IOReturn pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint32_t nWords, uint64_t out[4]);
     void hdpFlush() const;
     void readFbLayout();
+    void readFirmwareLayout();
     void clearRing();
 
     const phx_topology *topology{nullptr};
@@ -326,6 +329,7 @@ bool PhxBringup::start(IOService *provider) {
             hdpFlushDword = remap >> 2;
         setProperty("phx-hdp-flush-dword", hdpFlushDword, 32);
     }
+    readFirmwareLayout();
     setProperty("phx-build", PHX_KEXT_BUILD, 32);
     setProperty("phx-stage", diagnosticOnly() ? "profile-diagnostic-only" : "E3");
     setProperty("phx-debug", debug);
@@ -420,6 +424,39 @@ void PhxBringup::readFbLayout() {
     }
     if (fbSize)
         pci->setProperty("VRAM,totalMB", fbSize >> 20, 32);
+}
+
+void PhxBringup::readFirmwareLayout() {
+    const OSData *table=nullptr;
+    for (IORegistryEntry *entry=pci;entry;entry=entry->getParentEntry(gIOServicePlane)) {
+        if (IOACPIPlatformDevice *acpi=OSDynamicCast(IOACPIPlatformDevice,entry)) {
+            table=acpi->getACPITableData("VFCT",0);
+            break;
+        }
+    }
+    if (!table) { setProperty("phx-vbios-status","no-vfct"); return; }
+    PhxVbiosInfo p{};
+    const auto result=phxDecodeVfct(static_cast<const uint8_t *>(table->getBytesNoCopy()),table->getLength(),
+        pci->getBusNumber(),pci->getDeviceNumber(),pci->getFunctionNumber(),
+        pci->configRead16(0),pci->configRead16(2),p);
+    if (result!=PhxVbiosResult::Decoded) {
+        setProperty("phx-vbios-status",result==PhxVbiosResult::MissingImage ? "no-matching-vfct-image" :
+            result==PhxVbiosResult::Unsupported ? "unsupported-atom-format" : "invalid-vfct-or-atom");
+        return;
+    }
+    setProperty("phx-vbios-status","decoded-metadata-only");
+    setProperty("phx-vbios-image-bytes",p.imageBytes,32);
+    setProperty("phx-vbios-firmware-revision",p.firmwareRevision,32);
+    setProperty("phx-vbios-firmware-table",(p.firmwareFormat<<16)|p.firmwareContent,32);
+    setProperty("phx-vbios-usage-table",(p.usageFormat<<16)|p.usageContent,32);
+    if (p.usageDecoded) {
+        setProperty("phx-vbios-fw-start-raw-kib",p.firmwareStartRawKiB,32);
+        setProperty("phx-vbios-fw-usage-bytes",p.firmwareUsageBytes,64);
+        if (p.usageContent==2) setProperty("phx-vbios-driver-start-raw-kib",p.driverStartRawKiB,32);
+        setProperty("phx-vbios-driver-usage-bytes",p.driverUsageBytes,64);
+    }
+    if (p.extraDecoded) setProperty("phx-vbios-extra-fw-bytes",p.extraFirmwareBytes,64);
+    if (p.protectedDecoded) setProperty("phx-vbios-protected-fw-bytes",p.protectedFirmwareBytes,64);
 }
 
 bool PhxBringup::memoryLayout(phx_memory_layout &out) const {

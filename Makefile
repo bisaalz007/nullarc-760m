@@ -12,7 +12,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_topology \
         $(TEST_BIN_DIR)/test_phx_execution \
         $(TEST_BIN_DIR)/test_phx_firmware_file \
-        $(TEST_BIN_DIR)/test_phx_memory
+        $(TEST_BIN_DIR)/test_phx_memory \
+        $(TEST_BIN_DIR)/test_phx_vbios
 
 .PHONY: all test clean kext fixtures
 
@@ -40,6 +41,9 @@ $(TEST_BIN_DIR)/test_phx_execution: tests/test_phx_execution.cpp src/phxbringup/
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 $(TEST_BIN_DIR)/test_phx_memory: tests/test_phx_memory.cpp src/amd/phx_memory_layout.h src/phxbringup/PhxNativeABI.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_vbios: tests/test_phx_vbios.cpp src/amd/phx_vbios.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 $(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)

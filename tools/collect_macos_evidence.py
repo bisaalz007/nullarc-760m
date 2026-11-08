@@ -18,7 +18,11 @@ EXPECTED = {'vendor-id':0x1002, 'device-id':0x1900, 'revision-id':0xca,
 FIELDS = tuple(EXPECTED) + ('class-code', 'model', 'assigned-addresses', 'reg', 'IODeviceMemory',
     'phx-build', 'phx-stage', 'phx-profile', 'phx-failure', 'phx-bringup-blocker',
     'phx-memory-status', 'phx-fb-mc-base', 'phx-fb-size', 'phx-fb-phys',
-    'phx-fb-aper-phys', 'phx-fb-aper-len', 'phx-hdp-flush-dword')
+    'phx-fb-aper-phys', 'phx-fb-aper-len', 'phx-hdp-flush-dword',
+    'phx-vbios-status', 'phx-vbios-image-bytes', 'phx-vbios-firmware-revision',
+    'phx-vbios-firmware-table', 'phx-vbios-usage-table', 'phx-vbios-fw-start-raw-kib',
+    'phx-vbios-fw-usage-bytes', 'phx-vbios-driver-start-raw-kib', 'phx-vbios-driver-usage-bytes',
+    'phx-vbios-extra-fw-bytes', 'phx-vbios-protected-fw-bytes')
 
 
 def safe(value):
