@@ -16,6 +16,7 @@ paths = [line.split('\t')[2] for line in subprocess.check_output(
     ['git', 'apply', '--numstat', str(patch)], text=True).splitlines()]
 sys.path.insert(0, str(repo / 'tools'))
 from mesa_phoenix_topology import apply
+from mesa_phoenix_readiness import apply as apply_readiness
 
 
 def materialize(root):
@@ -39,6 +40,12 @@ with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
     apply(generated)
     for path in paths:
         assert (generated / path).read_bytes() == (patched / path).read_bytes(), path
+    readiness = repo / 'mesa-patches-phoenix/0008-radv-darwin-require-native-queue-readiness.patch'
+    subprocess.run(['git', '-C', str(patched), 'apply', '--check', str(readiness)], check=True)
+    subprocess.run(['git', '-C', str(patched), 'apply', str(readiness)], check=True)
+    apply_readiness(generated)
+    for path in paths:
+        assert (generated / path).read_bytes() == (patched / path).read_bytes(), path
     before = {path: (generated / path).read_bytes() for path in paths}
     try:
         apply(generated)
@@ -46,4 +53,4 @@ with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
     except ValueError:
         pass
     assert before == {path: (generated / path).read_bytes() for path in paths}
-print('[PASS] patch applies; generator matches byte-for-byte; reapplication leaves files unchanged')
+print('[PASS] patches 0007/0008 apply; generators match byte-for-byte; reapplication leaves files unchanged')

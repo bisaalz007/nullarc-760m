@@ -65,6 +65,7 @@ static inline const char *nvmtl_pick_vk(const char *staged, const char *dev) {
  */
 #include <IOKit/IOKitLib.h>
 static uint16_t g_vendor;
+static int g_integrated_device;
 static uint16_t nvmtl_pci_vendor_of(io_service_t accel)
 {
     io_registry_entry_t pci = 0; uint16_t v = 0;
@@ -751,6 +752,7 @@ static int nvmtl_vk_initialize(void)
     nvlog("vk: pdev %u physical device(s) through this ICD (VkResult %d)", n, (int)er);
     VkPhysicalDevice pds[8]; if (n > 8) n = 8; pvkEnumeratePhysicalDevices(g_inst, &n, pds); g_pdev = pds[0];
     VkPhysicalDeviceProperties pp; pvkGetPhysicalDeviceProperties(g_pdev, &pp);
+    g_integrated_device = pp.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
     snprintf(g_name, sizeof g_name, "%s", pp.deviceName);
     g_lim = pp.limits;
     { VkPhysicalDeviceShaderSMBuiltinsPropertiesNV sm = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SM_BUILTINS_PROPERTIES_NV };
@@ -1090,6 +1092,7 @@ int nvmtl_vk_init(void) {
     pthread_once(&g_vk_once, nvmtl_vk_initialize_once);
     return g_state == 1 ? 0 : -1;
 }
+int nvmtl_vk_has_unified_memory(void) { return nvmtl_vk_init() == 0 && g_integrated_device; }
 const char *nvmtl_vk_device_name(void) { return g_state == 1 ? g_name : "(vulkan down)"; }
 void nvmtl_vk_limits(uint32_t *layers, uint32_t *shared_bytes, uint32_t wg[3], uint32_t *wg_inv, uint32_t *sm) {
     int up = g_state == 1;

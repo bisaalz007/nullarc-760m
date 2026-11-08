@@ -1,0 +1,33 @@
+From 00c05b9a2c9640d85629c54952f5cdd2e69b1abf Mon Sep 17 00:00:00 2001
+From: Codex <codex@local>
+Date: Sun, 8 Nov 2026 10:44:12 -0500
+Subject: [PATCH] radv/darwin: require native queue readiness before exposing a
+ device
+
+---
+ src/amd/common/darwin/ac_darwin_drm.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+index b74803e..5e5fee3 100644
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -189,6 +189,15 @@ acd_native_handshake(struct acd_kext *kext, const struct amdgpu_device *canned,
+       return -ENODEV;
+    }
+ 
++   /* A real kernel must have adopted graphics and compute queues before
++    * RADV advertises their canned capabilities. Mocks remain explicit. */
++   if (!env_is_1("RADV_DARWIN_MOCK") &&
++       (info.flags & (N48N_INFO_S1B_POSITIVE | N48N_INFO_NATIVE_BOOT)) !=
++       (N48N_INFO_S1B_POSITIVE | N48N_INFO_NATIVE_BOOT)) {
++      fprintf(stderr, "radv-darwin: native queues are not ready (flags 0x%x)\n", info.flags);
++      return -ENODEV;
++   }
++
+    /* GB_ADDR_CONFIG: the tiling layout the canned info and S1d's image assume. QueryInfo carries the live value
+     * (n48n_info.gb_addr_config); ReadRegs is root-only and refused for a user-application (G4 APP) session, so it is
+     * only the fallback for a kernel that left the field 0. */
+-- 
+2.50.1 (Apple Git-155)
+

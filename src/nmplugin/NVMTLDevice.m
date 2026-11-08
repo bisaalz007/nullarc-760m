@@ -39,6 +39,7 @@ static inline FILE *nvmtl_rel_fopen(const char *p, const char *m) { return nvmtl
 #define fopen(p, m) nvmtl_rel_fopen(p, m)
 #endif
 int nvmtl_vk_init(void);
+int nvmtl_vk_has_unified_memory(void);
 void nvmtl_gl_caps_enable(void);
 uint16_t nvmtl_vk_set_accelerator(mach_port_t accelerator);
 uint16_t nvmtl_vk_vendor(void);
@@ -2076,7 +2077,7 @@ static void nvmtl_log_compute_descriptor(MTLComputePipelineDescriptor *d) {
     nvlog("recommendedMaxWorkingSetSize -> %llu MB", (unsigned long long)(ws >> 20));
     return ws;
 }
-- (BOOL)hasUnifiedMemory { return NO; }
+- (BOOL)hasUnifiedMemory { return nvmtl_vk_has_unified_memory() ? YES : NO; }
 - (uint64_t)dedicatedMemorySize { return nvmtl_vk_vram_bytes(); }
 
 - (BOOL)nvmtlSampleCountOK:(NSUInteger)n {
