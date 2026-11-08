@@ -10,6 +10,7 @@
 #include <string.h>
 #include <CoreFoundation/CFNumber.h>
 #include "../../../src/amd/phx_memory_layout.h"
+#include "../../../src/amd/phx_hp_760m.h"
 typedef uint32_t io_connect_t;
 typedef uint32_t io_service_t;
 typedef uint32_t kern_return_t;
@@ -28,7 +29,19 @@ static inline CFTypeRef IORegistryEntryCreateCFProperty(io_service_t svc,const c
 }
 static inline kern_return_t IOConnectCallStructMethod(io_connect_t c,uint32_t selector,
     const void *in,size_t size,void *out,size_t *n) {
-    (void)c;(void)selector;(void)in;(void)size;(void)out;(void)n;return kIOReturnNotReady;
+    (void)c;(void)in;(void)size;
+    if (selector==PHX_SEL_TOPOLOGY && *n==sizeof(struct phx_topology)) {
+        memcpy(out,&phx_hp_760m,*n);
+        if (getenv("MESBOOT_TEST_OTHER_GPU")) ((struct phx_topology *)out)->device=0x1901;
+        return 0;
+    }
+    if (selector==PHX_SEL_MEMORY_LAYOUT && *n==sizeof(struct phx_memory_layout)) {
+        struct phx_memory_layout *p=out;memset(p,0,*n);
+        p->version=1;p->flags=3;p->raw_base=0x8000;p->raw_top=0x801f;p->raw_offset=0x260;
+        p->mc_base=0x8000000000ull;p->physical_base=0x260000000ull;p->vram_bytes=512ull<<20;
+        p->cpu_aperture_base=0x2b0000000ull;p->cpu_aperture_bytes=256ull<<20;return 0;
+    }
+    return kIOReturnNotReady;
 }
 static inline kern_return_t IOServiceOpen(io_service_t svc,uint32_t task,uint32_t type,io_connect_t *c) {
     (void)svc;(void)task;(void)type;*c=1;return 0;
@@ -42,6 +55,12 @@ static inline kern_return_t IOConnectCallScalarMethod(io_connect_t c,uint32_t se
     printf("test-call:%u\n",selector);
     if (selected("MESBOOT_TEST_FAIL",selector)) return 0xe00002bcu;
     if (out && n) memset(out,0,*n*sizeof(*out));
+    if (selector==106 && count==2 && out && n && *n==4) {
+        printf("test-psp-ctl:%llu:%llu\n",(unsigned long long)in[0],(unsigned long long)in[1]);
+        const char *status=getenv("PSP_TEST_STATUS"), *tmr=getenv("PSP_TEST_TMR_BYTES");
+        out[0]=status?strtoull(status,NULL,0):0;
+        if (in[0]==3) out[2]=tmr?strtoull(tmr,NULL,0):(64ull<<20);
+    }
     if (n && selected("MESBOOT_TEST_SHORT",selector) && *n) --*n;
     return 0;
 }

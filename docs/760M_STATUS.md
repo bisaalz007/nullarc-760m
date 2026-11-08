@@ -423,3 +423,54 @@ Expected module UUID: 389AD4FD-0B13-3162-AD0E-DFC7443A9CC2. The matching tool an
 source packet are on the HP under the existing Shared test directory. Manual
 reboot followed by the root-only private VBIOS capture is pending. Build 36 was
 the last independently verified running kernel. Staging is not GPU initialization.
+
+
+## Build 37 capture result and build 38 integration
+
+The HP successfully booted build 37 and its protected VFCT snapshot worked.
+The private 16,896-byte image has SHA-256
+`e94afef0bb72e8fd2d3e1695dfb55b9a201a8eff1891be0f06a531ceed6ac40a`.
+It contains ROM 2.3/master 2.1, firmware-info 3.4 and usage 2.1. The decoded
+extra firmware field is 2 MiB; usage start and both usage sizes are zero.
+Zero-valued usage fields do not prove ownership or a complete reservation map.
+The full ROM remains private. A sparse hexadecimal, non-executable metadata
+fixture and `hardware/dumps/hp_envy_760m/vbios-metadata.json` make the parser result
+reproducible. Build 38 adds the measured ROM prefix, preserving unknown-version
+rejection and original 2.2 handling.
+
+The new read-only scanout CLI ran with local administrator authentication on
+running build 37. Evidence is
+`hardware/dumps/hp_envy_760m/sequoia-build37-scanout.json`. All 48 documented DCN
+3.1.4 reads succeeded; two consecutive samples match. HUBP0 primary/secondary
+raw address low/high are 0/0x80; pitch is 0x77f and viewport 0x04b00780. The other
+three captured viewports are zero. No ownership conclusion follows from these
+raw samples; cursor, firmware and DMCUB reservations are not fully captured.
+No new reboot or HP hardware writes were needed for this read.
+
+PSP fixes in build 38:
+- Reject TMR requests above the existing capacity, instead of silently clamping.
+- Record confirmed TMR bytes only after transport success and zero PSP status.
+- Preserve/quarantine buffers after failed command fences or unacknowledged ring
+  creation/destruction. Require acknowledged destruction before reuse.
+- Serialize staging-state validation with the PSP lock and reject staging while
+  quarantined. Validate producer indices before command-buffer changes and skip
+  the cleared zero fence value on wrap.
+- Add selector-106 LOAD_TOC operation and `phxctl toc BYTES`; return required TMR
+  bytes from the documented response offset +16. Existing raw response ABI stays.
+
+These controller fixes do not remove HP diagnostic restrictions. No PSP/MES
+command or native GPU command has been executed on the HP by this work.
+
+Validation: the complete macOS-15 stack builds (both kexts, plugin, translator,
+RADV and four tools). Nine C++ binaries and 36 Python methods pass. The measured
+metadata parser passes ASan/UBSan and the existing 10,000 mutation cases. Actual
+CLI transport tests cover scanout failure/short replies/wrong GPU and TOC status,
+size/shape/error handling with explicit host mocks. PSP quarantine state tests
+cover failed completion and failed/successful destruction; they are not hardware
+DMA/recovery tests. Build 38 is not installed on the HP. The running build remains
+37; previously installed translation/compiler tests remain CPU-only evidence.
+
+Still required: establish exclusive GPU memory reservations, implement the HP
+PSP/SMU/GART/MES initialization using those allocations, and verify native fences
+and readbacks before accelerator/Metal/display activation. Full acceleration has
+not been achieved. A successful full binary build does not change that status.

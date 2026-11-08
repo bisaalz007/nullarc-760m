@@ -1,8 +1,29 @@
 #include "phxbringup/PhxExecutionPolicy.h"
+#include "phxbringup/PhxPspPolicy.h"
 #include <cassert>
 #include <cstdio>
 #include <map>
 int main() {
+    PhxPspState psp;
+    assert(psp.reusable() && !psp.confirmedTmrBytes);
+    psp.setupResult(4096, true, 0);
+    assert(psp.confirmedTmrBytes == 4096);
+    psp.setupResult(8192, true, 0x100); // IOKit success is not PSP success.
+    assert(!psp.confirmedTmrBytes);
+    psp.setupResult(8192, false, 0);
+    assert(!psp.confirmedTmrBytes);
+    psp.completed(false); // command DMA may still be in flight
+    assert(!psp.reusable());
+    psp.completed(true); // a late observation cannot release the quarantine
+    psp.setupResult(4096, true, 0);
+    assert(!psp.reusable() && !psp.confirmedTmrBytes);
+    psp.destroyed(false);
+    assert(!psp.reusable());
+    psp.destroyed(true);
+    assert(psp.reusable() && !psp.confirmedTmrBytes);
+    psp.setupResult(4096, true, 0);
+    psp.completed(false);
+    assert(!psp.confirmedTmrBytes);
     assert(phxCanonicalSpan(0x10000, 4096));
     assert(phxCanonicalSpan(0xffff800000000000ull, 4096));
     assert(!phxCanonicalSpan(0x7ffffffff000ull, 8192));

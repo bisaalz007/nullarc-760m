@@ -81,8 +81,20 @@ does not execute VBIOS functions or enable HP hardware writes. Native compilatio
 and parser tests pass. HP build 36 booted but reported an unsupported ATOM format;
 it did not establish reservations. Build 37 records the actual header versions
 and adds a root-only cached VBIOS snapshot (`phxprofile --dump-vbios NEW_FILE`)
-for inspecting that format. Its runtime capture is pending. HP firmware/queue
-initialization and acceleration remain unfinished.
+for inspecting that format. The HP capture succeeded: ROM 2.3/master 2.1,
+firmware-info 3.4, and 2 MiB extra firmware reservation metadata. Build 38
+supports the measured header and tests a redacted metadata fixture; the private
+ROM is not distributed. A root-only `phxprofile --scanout` capture also succeeded
+on running build 37 without another reboot (48 documented DCN registers, two
+matching samples). These snapshots do not establish complete VRAM ownership.
+
+Build 38 also fixes PSP TMR request truncation and false success tracking,
+quarantines command/staging buffers after timeouts until acknowledged ring
+destruction, and exposes the documented LOAD_TOC TMR-size reply through
+`phxctl toc BYTES` after explicit staging. These PSP changes are compiled and
+host-tested, not hardware-tested. The HP diagnostic restriction is preserved.
+The complete Sequoia stack builds; HP memory ownership, firmware/queue
+initialization, native GPU command execution and acceleration remain unfinished.
 
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).

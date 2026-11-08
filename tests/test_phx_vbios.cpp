@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <fstream>
+#include <iterator>
 
 using Bytes=std::vector<uint8_t>;
 static void w16(Bytes &b,size_t p,uint16_t x) { b.at(p)=(uint8_t)x; b.at(p+1)=(uint8_t)(x>>8); }
@@ -26,6 +28,24 @@ static PhxVbiosResult decode(const Bytes &b,PhxVbiosInfo &p) {
     return phxDecodeVfct(b.data(),b.size(),1,0,0,0x1002,0x1900,p);
 }
 int main() {
+    std::ifstream captured("tests/fixtures/hp-760m-atom-metadata.hex");
+    assert(captured.good());
+    size_t total=0,offset=0;captured>>total;assert(total==16896);
+    Bytes hp(total);std::string hex;
+    while (captured>>offset>>hex) {
+        assert(!(hex.size()%2) && offset<=hp.size() && hex.size()/2<=hp.size()-offset);
+        for (size_t i=0;i<hex.size()/2;++i)hp[offset+i]=(uint8_t)std::stoul(hex.substr(i*2,2),nullptr,16);
+    }
+    PhxVbiosInfo measured{};
+    assert(phxDecodeAtom(hp.data(),hp.size(),measured)==PhxVbiosResult::Decoded);
+    assert(measured.romFormat==2 && measured.romContent==3 && measured.masterContent==1);
+    assert(measured.firmwareFormat==3 && measured.firmwareContent==4 && measured.extraDecoded);
+    assert(measured.extraFirmwareBytes==2097152 && !measured.protectedDecoded);
+    assert(measured.usageDecoded && measured.usageContent==1 && !measured.firmwareUsageBytes && !measured.driverUsageBytes);
+    auto shortHeader=hp;w16(shortHeader,404,43);
+    assert(phxDecodeAtom(shortHeader.data(),shortHeader.size(),measured)==PhxVbiosResult::Invalid);
+    auto futureHeader=hp;futureHeader[404+3]=4;
+    assert(phxDecodeAtom(futureHeader.data(),futureHeader.size(),measured)==PhxVbiosResult::Unsupported);
     const auto good=fixture();PhxVbiosInfo p{};
     assert(decode(good,p)==PhxVbiosResult::Decoded);
     assert(p.imageBytes==512 && p.firmwareRevision==0x12345678 && p.usageDecoded);

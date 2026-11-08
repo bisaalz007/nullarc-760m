@@ -1,0 +1,55 @@
+{
+  "source": "HP cached ACPI VFCT image captured through build 37",
+  "source_sha256": "e94afef0bb72e8fd2d3e1695dfb55b9a201a8eff1891be0f06a531ceed6ac40a",
+  "source_bytes": 16896,
+  "meaning": "Redacted table metadata only; all other bytes zero; not executable or flashable firmware",
+  "regions": [
+    {
+      "offset": 0,
+      "bytes": 3
+    },
+    {
+      "offset": 72,
+      "bytes": 2
+    },
+    {
+      "offset": 404,
+      "bytes": 44
+    },
+    {
+      "offset": 768,
+      "bytes": 74
+    },
+    {
+      "offset": 14484,
+      "bytes": 108
+    },
+    {
+      "offset": 14472,
+      "bytes": 12
+    }
+  ],
+  "rom_version": [
+    2,
+    3
+  ],
+  "master_version": [
+    2,
+    1
+  ],
+  "firmware_version": [
+    3,
+    4
+  ],
+  "usage_version": [
+    2,
+    1
+  ],
+  "extra_firmware_bytes": 2097152,
+  "usage_start_raw_kib": 0,
+  "usage_firmware_bytes": 0,
+  "usage_driver_bytes": 0,
+  "ownership_validated": false,
+  "reconstructed_sha256": "5336cdeb8ac7fdb52c27a68f2583cf3b2f0567607f16d2e4a435d8b84df25314",
+  "fixture_format": "sparse hexadecimal: total byte count, then decimal offset and bytes; unlisted bytes are zero"
+}

@@ -169,3 +169,42 @@ released at service free. No unknown layout is accepted to establish readiness.
 The capture CLI creates a new mode-0600 file, refuses overwrite, checks reply
 lengths, removes failed captures and returns ownership to a valid sudo caller.
 The binary stays private; only selected decoded facts belong in public evidence.
+
+
+## Captured HP firmware and scanout (build 38)
+
+The build-37 private snapshot succeeded. The measured ROM 2.3 header is 44 bytes;
+its master-data pointer at +32 references master 2.1. Build 38 accepts that
+specific prefix alongside ROM 2.2, checks the complete declared bounds and still
+rejects future revisions. Firmware-info 3.4 reports 2048 KiB extra firmware
+memory. Usage 2.1 reports zero start/firmware/driver fields; those zeros do not
+prove unreserved VRAM. `vbios-metadata.json` records the source hash and redacted
+fixture regions. The executable ROM is neither committed nor packaged.
+
+`phxprofile --scanout` verifies the exact captured PCI profile, validates selector
+31 on the same connection, and reads 48 DCN 3.1.4 register addresses from the
+pinned Linux register header and measured segment bases. It collects two samples
+before emitting JSON and refuses failed/short replies. The capture is not atomic
+and does not cover all cursor/DMCUB/firmware allocations. Running HP build 37
+returned matching samples without another diagnostic kext installation. No
+register writes or GPU commands occurred.
+
+The PSP controller now distinguishes successful IOKit delivery from a zero PSP
+status before recording TMR setup. Oversized TMR requests fail rather than
+silently shrinking. A failed command fence or ring creation/destruction leaves
+buffers quarantined; command submission and firmware staging cannot reuse them
+until ring destruction is acknowledged. Producer indices are validated before
+command-buffer writes; zero fence values are skipped on counter wrap.
+
+Selector 106 op 3 uses an explicitly staged TOC at firmware-buffer offset zero
+and returns `psp_gfx_resp.tmr_size` (+16), independently of the old firmware-address
+outputs (+8/+12). The legacy raw-command ABI is unchanged. This is a prerequisite
+for a later allocator, not an HP firmware bootstrap implementation. The fixed
+reference TMR capacity remains explicit and rejects larger requirements. Sources:
+[Linux v6.14 PSP wire layout](https://github.com/torvalds/linux/blob/v6.14/drivers/gpu/drm/amd/amdgpu/psp_gfx_if.h)
+and [TOC/TMR setup](https://github.com/torvalds/linux/blob/v6.14/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c).
+
+No complete HP VRAM reservation allocator, PSP/MES bootstrap, native command
+execution, Metal device, accelerated framebuffer, or validated recovery exists.
+The collected evidence does not authorize substituting Firebat physical addresses
+or removing the diagnostic execution gate.

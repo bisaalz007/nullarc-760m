@@ -95,8 +95,10 @@ sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC
 ```
 
 Supply your actual EFI/OC path. This mode preserves boot/security settings and
-does not install an accelerator or enable WindowServer. Sequoia diagnostics and
-Tahoe acceleration runtime still need testing. Linux shader readback success is
+does not install an accelerator or enable WindowServer. HP Sequoia build-37
+firmware/scanout captures and CPU translation/compiler tests passed. This packaged
+build-38 kext and its PSP changes have not been runtime-tested; no macOS GPU
+execution or accelerated display is verified. Linux shader readback success is
 separate from macOS bring-up. No Apple software or personal EFI is distributed.
 ''')
         # Publish the directory atomically after payload/ZIP verification.

@@ -58,8 +58,10 @@ enum {
                                       Copies the chunk into the VRAM fw_buf through BAR0 (no submit). */
     PHXN_SEL_DBG_PSP_LOADIPFW = 105, /* in: [0] fw_type [1] fw_buf byte offset [2] size; submits GFX_CMD_ID_LOAD_IP_FW
                                         out: [0] resp.status [1] fence us [2] resp fw_addr_lo [3] resp fw_addr_hi */
-    PHXN_SEL_DBG_PSP_CTL = 106,    /* in: [0] op (1 SETUP_TMR, 2 AUTOLOAD_RLC) [1] arg (TMR size for op 1)
-                                      out: [0] resp.status [1] fence us [2] resp dword@+8 [3] resp dword@+12 */
+    PHXN_SEL_DBG_PSP_CTL = 106,    /* in: [0] op (1 SETUP_TMR, 2 AUTOLOAD_RLC, 3 LOAD_TOC) [1] byte size for op 1/3.
+                                      Op 3 uses already staged fw_buf offset 0; it does not allocate TMR.
+                                      out: [0] resp.status [1] fence us [2] resp dword@+8 [3] resp dword@+12;
+                                      op 3 instead returns [2] required TMR bytes (resp+16), [3] 0. */
     PHXN_SEL_DBG_PSP_RAW = 107,    /* in: [0] cmd_id [1..6] six command-union dwords (at +28); submits it verbatim.
                                       out: [0] resp.status [1] fence us [2] resp dword@+8 [3] resp dword@+12
                                       For experimenting with SETUP_TMR / LOAD_TOC params. Addresses are built in
@@ -108,6 +110,7 @@ enum {
 #define PHX_PSP_GFX_CMD_UNION_OFFSET 28u
 #define PHX_PSP_GFX_CMD_SETUP_TMR    5u
 #define PHX_PSP_GFX_CMD_LOAD_IP_FW   6u
+#define PHX_PSP_GFX_CMD_LOAD_TOC     0x20u
 #define PHX_PSP_GFX_CMD_AUTOLOAD_RLC 0x21u
 
 /* Fixed VRAM regions for firmware bring-up (absolute byte offsets, all within the 256 MiB BAR0 aperture, clear

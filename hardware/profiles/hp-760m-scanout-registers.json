@@ -1,0 +1,351 @@
+{
+  "format": 1,
+  "purpose": "read-only HP scanout evidence; no write authorization",
+  "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.14/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_offset.h",
+  "source_sha256": "b9f43d329ae6f1d697bfdb6570087fd984d8428b3f33926ca0d36893ecb6cb7a",
+  "base_source": "hardware/dumps/hp_envy_760m/linux-2026-11-08.json",
+  "hw_id": 271,
+  "version": [
+    3,
+    1,
+    4
+  ],
+  "registers": [
+    {
+      "name": "regHUBP0_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1509,
+      "dword": 15013
+    },
+    {
+      "name": "regHUBP0_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1510,
+      "dword": 15014
+    },
+    {
+      "name": "regHUBP0_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1511,
+      "dword": 15015
+    },
+    {
+      "name": "regHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1514,
+      "dword": 15018
+    },
+    {
+      "name": "regHUBP0_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1523,
+      "dword": 15027
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1543,
+      "dword": 15047
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1546,
+      "dword": 15050
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1547,
+      "dword": 15051
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1550,
+      "dword": 15054
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1551,
+      "dword": 15055
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1554,
+      "dword": 15058
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1555,
+      "dword": 15059
+    },
+    {
+      "name": "regHUBP1_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1729,
+      "dword": 15233
+    },
+    {
+      "name": "regHUBP1_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1730,
+      "dword": 15234
+    },
+    {
+      "name": "regHUBP1_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1731,
+      "dword": 15235
+    },
+    {
+      "name": "regHUBP1_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1734,
+      "dword": 15238
+    },
+    {
+      "name": "regHUBP1_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1743,
+      "dword": 15247
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1763,
+      "dword": 15267
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1766,
+      "dword": 15270
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1767,
+      "dword": 15271
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1770,
+      "dword": 15274
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1771,
+      "dword": 15275
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1774,
+      "dword": 15278
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1775,
+      "dword": 15279
+    },
+    {
+      "name": "regHUBP2_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1949,
+      "dword": 15453
+    },
+    {
+      "name": "regHUBP2_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1950,
+      "dword": 15454
+    },
+    {
+      "name": "regHUBP2_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1951,
+      "dword": 15455
+    },
+    {
+      "name": "regHUBP2_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1954,
+      "dword": 15458
+    },
+    {
+      "name": "regHUBP2_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1963,
+      "dword": 15467
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1983,
+      "dword": 15487
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1986,
+      "dword": 15490
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1987,
+      "dword": 15491
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1990,
+      "dword": 15494
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1991,
+      "dword": 15495
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1994,
+      "dword": 15498
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1995,
+      "dword": 15499
+    },
+    {
+      "name": "regHUBP3_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2169,
+      "dword": 15673
+    },
+    {
+      "name": "regHUBP3_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2170,
+      "dword": 15674
+    },
+    {
+      "name": "regHUBP3_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2171,
+      "dword": 15675
+    },
+    {
+      "name": "regHUBP3_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2174,
+      "dword": 15678
+    },
+    {
+      "name": "regHUBP3_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2183,
+      "dword": 15687
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2203,
+      "dword": 15707
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2206,
+      "dword": 15710
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2207,
+      "dword": 15711
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2210,
+      "dword": 15714
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2211,
+      "dword": 15715
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2214,
+      "dword": 15718
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2215,
+      "dword": 15719
+    }
+  ]
+}

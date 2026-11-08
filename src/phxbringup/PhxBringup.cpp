@@ -18,10 +18,11 @@
 
 #include "PhxNativeABI.h"
 #include "PhxExecutionPolicy.h"
+#include "PhxPspPolicy.h"
 #include "../amd/phx_hp_760m.h"
 #include "../amd/phx_vbios.h"
 
-#define PHX_KEXT_BUILD 37u
+#define PHX_KEXT_BUILD 38u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -117,7 +118,8 @@ private:
     void wreg(uint32_t reg, uint32_t value) const;
     uint32_t smuPoll() const;
     bool pspWaitTos(uint32_t timeoutMs) const;
-    IOReturn pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint32_t nWords, uint64_t out[4]);
+    IOReturn pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint32_t nWords, uint64_t out[4],
+                      uint32_t *tocTmrBytes = nullptr);
     void hdpFlush() const;
     void readFbLayout();
     void readFirmwareLayout();
@@ -149,7 +151,7 @@ private:
     // where the CPU stages ucode for LOAD_IP_FW. Offsets are VRAM byte offsets, Mc the matching MC addresses.
     uint64_t tmrOff{0}, tmrMc{0}, tmrSize{0};
     uint64_t fwBufOff{0}, fwBufMc{0}, fwBufSize{0};
-    bool tmrSetUp{false};
+    PhxPspState pspState{};
     // E8 state: the adopted queues (ring/wb/fence are VRAM byte offsets reached through BAR0) and the VMID 8
     // page-table pool (physically contiguous system memory; page 0 is the root). Sequence numbers are global across
     // the queues; each queue's fence holds the last sequence it finished, and fseq/fend keep its outstanding
@@ -504,7 +506,7 @@ void PhxBringup::clearRing() {
     fenceCounter = 0;
     tmrOff = tmrMc = tmrSize = 0;
     fwBufOff = fwBufMc = fwBufSize = 0;
-    tmrSetUp = false;
+    pspState = PhxPspState{};
 }
 
 // Drain the host data path so the PSP sees our VRAM writes before we ring the doorbell (C2PMSG_67).
@@ -1008,7 +1010,7 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
     IOReturn r = kIOReturnSuccess;
     IOLockLock(smuLock);
     if (op == 1) {
-        if (ringMc) {
+        if (ringMc || !pspState.reusable()) {
             r = kIOReturnExclusiveAccess;   // a ring is already live; destroy it first
         } else if ((carveOffset & 0xFFF) ||
                    !phxBufferSpan(carveOffset, PHX_PSP_FENCE_REL + 0x1000, PHX_VRAM_TMR_OFF) ||
@@ -1034,7 +1036,9 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                 IOSleep(20);
                 if (!pspWaitTos(2000)) {
                     r = kIOReturnTimeout;    // raw C2PMSG_64 (with PSP status in bits 15:0) returned in out[0]
-                    ringMc = 0;              // not established: allow destroy + retry
+                    // The PSP may still accept the request later. Keep the address
+                    // and quarantine the buffers until destruction is acknowledged.
+                    pspState.completed(false);
                 } else {
                     // Ring is live. Lay the GPCOM command + fence buffers just above it and zero them,
                     // then reset the doorbell so wptr agrees with our slot 0 (Linux psp_v13_0_ring_create).
@@ -1047,7 +1051,7 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                     tmrOff = PHX_VRAM_TMR_OFF;
                     tmrMc = fbMcBase + tmrOff;
                     tmrSize = 0;
-                    tmrSetUp = false;
+                    pspState = PhxPspState{};
                     fwBufOff = PHX_VRAM_FWBUF_OFF;
                     fwBufMc = fbMcBase + fwBufOff;
                     fwBufSize = PHX_VRAM_FWBUF_SIZE;
@@ -1064,9 +1068,12 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
     } else if (op == 2) {
         wreg(PHX_PSP_C2PMSG_64, PHX_GFX_CTRL_CMD_ID_DESTROY_RINGS);
         IOSleep(20);
-        if (!pspWaitTos(2000))
+        if (!pspWaitTos(2000)) {
             r = kIOReturnTimeout;
-        clearRing();
+            pspState.destroyed(false);
+        } else {
+            clearRing();
+        }
     } else if (op != 3) {
         r = kIOReturnBadArgument;
     }
@@ -1080,7 +1087,16 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
 // Core GPCOM submit (caller holds smuLock and a ring exists): write a prepared command — cmd_id plus up to
 // nWords union dwords at +28 — into the VRAM command buffer, ring the doorbell, wait for the PSP's fence and
 // read the response. Ports Linux psp_cmd_submit_buf / Cobalt64 psp_ring_cmd_submit.
-IOReturn PhxBringup::pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint32_t nWords, uint64_t out[4]) {
+IOReturn PhxBringup::pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint32_t nWords, uint64_t out[4],
+                             uint32_t *tocTmrBytes) {
+    if (tocTmrBytes) *tocTmrBytes = 0;
+    if (!pspState.reusable()) return kIOReturnNotReady;
+    if (nWords > 14 || (nWords && !unionWords)) return kIOReturnBadArgument;
+    // Validate the producer index before altering a buffer PSP might still read.
+    uint32_t wptr = rreg(PHX_PSP_C2PMSG_67);
+    const uint32_t ringSizeDw = PHX_PSP_RING_SIZE / 4;
+    const uint32_t frameSizeDw = PHX_PSP_GFX_FRAME_SIZE / 4;
+    if (wptr >= ringSizeDw || wptr % frameSizeDw) return kIOReturnInternalError;
     volatile uint8_t *base = reinterpret_cast<volatile uint8_t *>(fbAper->getVirtualAddress());
     volatile uint32_t *cmd = reinterpret_cast<volatile uint32_t *>(base + cmdOff);
     volatile uint32_t *fen = reinterpret_cast<volatile uint32_t *>(base + fenceOff);
@@ -1093,13 +1109,11 @@ IOReturn PhxBringup::pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint3
         cmd[PHX_PSP_GFX_CMD_UNION_OFFSET / 4 + i] = unionWords[i];
 
     uint32_t fence = ++fenceCounter;
+    if (!fence) fence = ++fenceCounter; // zero is the cleared, uncompleted fence
     fen[0] = 0;
 
     // Ring frame at the slot the current wptr points to.
-    uint32_t wptr = rreg(PHX_PSP_C2PMSG_67);
-    const uint32_t ringSizeDw = PHX_PSP_RING_SIZE / 4;         // 1024
-    const uint32_t frameSizeDw = PHX_PSP_GFX_FRAME_SIZE / 4;   // 16
-    uint32_t slot = (wptr % ringSizeDw == 0) ? 0 : wptr / frameSizeDw;
+    uint32_t slot = wptr / frameSizeDw;
     if (slot >= PHX_PSP_RING_SIZE / PHX_PSP_GFX_FRAME_SIZE)
         return kIOReturnInternalError;
     PhxGfxRbFrame frame;
@@ -1132,12 +1146,16 @@ IOReturn PhxBringup::pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint3
         us += 1000;
     }
     uint32_t status = cmd[PHX_PSP_GFX_RESP_OFFSET / 4];
+    pspState.completed(observed == fence);
     // Always succeed at the transport level so IOKit delivers the outputs; the PSP result is in out[].
     // out[1] = elapsed us (≈budget on a fence timeout), so userspace distinguishes timeout from a status code.
     out[0] = (observed == fence) ? status : 0xFFFFFFFFu;  // 0xFFFFFFFF = fence never arrived
     out[1] = us;
-    out[2] = cmd[(PHX_PSP_GFX_RESP_OFFSET + 8) / 4];   // resp.fw_addr_lo / session_id
-    out[3] = cmd[(PHX_PSP_GFX_RESP_OFFSET + 12) / 4];  // resp.fw_addr_hi
+    out[2] = observed == fence ? cmd[(PHX_PSP_GFX_RESP_OFFSET + 8) / 4] : 0;
+    out[3] = observed == fence ? cmd[(PHX_PSP_GFX_RESP_OFFSET + 12) / 4] : 0;
+    // Linux v6.14 psp_gfx_resp.tmr_size is +16, not fw_addr_lo (+8).
+    if (tocTmrBytes && observed == fence && status == 0)
+        *tocTmrBytes = cmd[(PHX_PSP_GFX_RESP_OFFSET + 16) / 4];
     return kIOReturnSuccess;
 }
 
@@ -1155,13 +1173,17 @@ IOReturn PhxBringup::pspSubmit(uint32_t cmdId, uint64_t out[4]) {
 
 // Selector 104: stage a chunk of firmware bytes into the VRAM fw_buf through BAR0 (no submit).
 IOReturn PhxBringup::fwStage(uint32_t dstOffset, const void *bytes, uint32_t len) {
-    if (!fbAper || !fwBufSize)
+    if (!fbAper)
         return kIOReturnNotReady;
+    IOLockLock(smuLock);
+    if (!ringMc || !fwBufSize || !pspState.reusable()) {
+        IOLockUnlock(smuLock); return kIOReturnNotReady;
+    }
     const uint64_t written = (static_cast<uint64_t>(len) + 3) & ~3ull;
     if ((dstOffset & 3) || !phxBufferSpan(dstOffset, written, fwBufSize) ||
-        !phxVramSpan(fwBufOff, fwBufSize, fbSize, fbAperLen))
-        return kIOReturnBadArgument;
-    IOLockLock(smuLock);
+        !phxVramSpan(fwBufOff, fwBufSize, fbSize, fbAperLen)) {
+        IOLockUnlock(smuLock); return kIOReturnBadArgument;
+    }
     volatile uint8_t *dst = reinterpret_cast<volatile uint8_t *>(fbAper->getVirtualAddress() + fwBufOff + dstOffset);
     const uint8_t *s = static_cast<const uint8_t *>(bytes);
     uint32_t i = 0;
@@ -1199,7 +1221,7 @@ IOReturn PhxBringup::loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t si
     return r;
 }
 
-// Selector 106: op 1 = SETUP_TMR (driver-managed TMR, Phoenix psp_13_0_4 is not in psp_skip_tmr), op 2 = AUTOLOAD_RLC.
+// Selector 106: SETUP_TMR, AUTOLOAD_RLC or LOAD_TOC (staged at firmware-buffer offset 0).
 IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
     if (!mmio || !fbAper)
         return kIOReturnNotReady;
@@ -1209,9 +1231,9 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
         r = kIOReturnNotReady;
     } else if (op == 1) {
         uint32_t size = arg ? arg : 0x400000u;
-        if (size > PHX_VRAM_TMR_CAP)
-            size = PHX_VRAM_TMR_CAP;
-        tmrSize = size;
+        if (size > PHX_VRAM_TMR_CAP || !phxVramSpan(tmrOff, size, fbSize, fbAperLen)) {
+            IOLockUnlock(smuLock); return kIOReturnBadArgument;
+        }
         // psp_gfx_cmd_setup_tmr (Linux psp_prep_tmr_cmd_buf): buf_phy_addr = TMR MC address, buf_size,
         // bitfield(virt_phy_addr=1 => 0x2), system_phy_addr = the REAL system-physical address of the TMR
         // (amdgpu_gmc_vram_pa = mc - vram_start + vram_base_offset = fbPhys + tmrOff on this UMA part).
@@ -1219,10 +1241,20 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
         uint32_t u[6] = {static_cast<uint32_t>(tmrMc), static_cast<uint32_t>(tmrMc >> 32), size, 0x2u,
                          static_cast<uint32_t>(tmrPa), static_cast<uint32_t>(tmrPa >> 32)};
         r = pspRunCmd(PHX_PSP_GFX_CMD_SETUP_TMR, u, 6, out);
-        if (r == kIOReturnSuccess)
-            tmrSetUp = true;
+        pspState.setupResult(size, r == kIOReturnSuccess, out[0]);
+        tmrSize = pspState.confirmedTmrBytes;
     } else if (op == 2) {
         r = pspRunCmd(PHX_PSP_GFX_CMD_AUTOLOAD_RLC, nullptr, 0, out);
+    } else if (op == 3) {
+        // TOC must first be staged at fw_buf offset zero. This submits only the
+        // verified Linux LOAD_TOC layout; it does not allocate or set up TMR.
+        if (!arg || !phxBufferSpan(0, arg, fwBufSize)) {
+            IOLockUnlock(smuLock); return kIOReturnBadArgument;
+        }
+        uint32_t u[3] = {static_cast<uint32_t>(fwBufMc), static_cast<uint32_t>(fwBufMc >> 32), arg};
+        uint32_t required = 0;
+        r = pspRunCmd(PHX_PSP_GFX_CMD_LOAD_TOC, u, 3, out, &required);
+        out[2] = required; out[3] = 0;
     } else {
         r = kIOReturnBadArgument;
     }

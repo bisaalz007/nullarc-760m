@@ -215,12 +215,23 @@ int main(int argc, char **argv)
              (unsigned long long)in[0], kr, (uint32_t)out[0], (unsigned long long)out[1], (uint32_t)out[2],
              (uint32_t)out[3]);
    } else if (!strcmp(argv[1], "tmr")) {
-      uint64_t in[2] = {1, argc >= 3 ? strtoull(argv[2], NULL, 0) : 0}, out[4] = {0, 0, 0, 0};
+      uint32_t size = 0;
+      if (argc > 3 || (argc == 3 && !phxParseUint32(argv[2], &size))) return 2;
+      uint64_t in[2] = {1, size}, out[4] = {0, 0, 0, 0};
       uint32_t n = 4;
       kern_return_t kr = checked_scalar(conn, SEL_DBG_PSP_CTL, in, 2, out, &n);
       if (!kr && out[0]) call_errors = 1;
       printf("tmr (size 0x%llx) -> kr 0x%08x  status 0x%08x  %llu us\n", (unsigned long long)in[1], kr,
              (uint32_t)out[0], (unsigned long long)out[1]);
+   } else if (!strcmp(argv[1], "toc") && argc == 3) {
+      uint32_t size;
+      if (!phxParseUint32(argv[2], &size) || !size) return 2;
+      uint64_t in[2] = {3, size}, out[4] = {0, 0, 0, 0};
+      uint32_t n = 4;
+      kern_return_t kr = checked_scalar(conn, SEL_DBG_PSP_CTL, in, 2, out, &n);
+      if (!kr && (out[0] || !out[2])) call_errors = 1;
+      printf("toc (staged bytes 0x%x) -> kr 0x%08x  status 0x%08x  %llu us  required TMR bytes 0x%llx\n",
+             size, kr, (uint32_t)out[0], (unsigned long long)out[1], (unsigned long long)out[2]);
    } else if (!strcmp(argv[1], "autoload")) {
       uint64_t in[2] = {2, 0}, out[4] = {0, 0, 0, 0};
       uint32_t n = 4;

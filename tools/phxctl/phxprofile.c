@@ -12,6 +12,43 @@
 #include <unistd.h>
 #include "../../src/amd/phx_topology.h"
 #include "../../src/amd/phx_vbios_abi.h"
+#include "../../src/amd/phx_memory_layout.h"
+#include "../../src/amd/phx_scanout_regs.h"
+
+static int scanout(io_connect_t conn,const struct phx_topology *p) {
+    if (!phx_topology_matches(p,0x1002,0x1900,0xca,0x103c,0x8c6a)) {
+        fprintf(stderr,"scanout register profile requires the exact HP GPU\n");return 1;
+    }
+    struct phx_memory_layout memory={0};size_t bytes=sizeof(memory);
+    kern_return_t kr=IOConnectCallStructMethod(conn,PHX_SEL_MEMORY_LAYOUT,NULL,0,&memory,&bytes);
+    if (kr || bytes!=sizeof(memory) || !phx_memory_layout_valid(&memory)) {
+        fprintf(stderr,"valid runtime memory query required (0x%x)\n",kr);return 1;
+    }
+    uint32_t values[2][PHX_SCANOUT_REG_COUNT];
+    for (unsigned sample=0;sample<2;++sample) for (size_t i=0;i<PHX_SCANOUT_REG_COUNT;++i) {
+        const uint64_t input[3]={phx_scanout_registers[i].dword,1,0xffffffffull};
+        bytes=sizeof(uint32_t);
+        kr=IOConnectCallMethod(conn,2,input,3,NULL,0,NULL,NULL,&values[sample][i],&bytes);
+        if (kr || bytes!=sizeof(uint32_t)) {
+            fprintf(stderr,"read-only scanout register 0x%x failed (0x%x); administrator access required\n",
+                    phx_scanout_registers[i].dword,kr);return 1;
+        }
+    }
+    printf("{\"format\":1,\"atomic\":false,\"register_writes\":false,\"gpu_commands_submitted\":false,"
+           "\"acceleration_verified\":false,\"memory\":{\"mc_base\":%llu,\"physical_base\":%llu,"
+           "\"vram_bytes\":%llu,\"aperture_base\":%llu,\"aperture_bytes\":%llu,\"flags\":%u},\"samples\":[",
+           (unsigned long long)memory.mc_base,(unsigned long long)memory.physical_base,
+           (unsigned long long)memory.vram_bytes,(unsigned long long)memory.cpu_aperture_base,
+           (unsigned long long)memory.cpu_aperture_bytes,memory.flags);
+    for (unsigned sample=0;sample<2;++sample) {
+        printf("%s[",sample?",":"");
+        for (size_t i=0;i<PHX_SCANOUT_REG_COUNT;++i)
+            printf("%s{\"name\":\"%s\",\"dword\":%u,\"value\":%u}",i?",":"",
+                   phx_scanout_registers[i].name,phx_scanout_registers[i].dword,values[sample][i]);
+        printf("]");
+    }
+    printf("]}\n");return 0;
+}
 
 static int dump_vbios(io_connect_t conn, const char *path, uint64_t bytes) {
     int fd=open(path,O_WRONLY|O_CREAT|O_EXCL,0600);
@@ -53,7 +90,10 @@ static int dump_vbios(io_connect_t conn, const char *path, uint64_t bytes) {
 
 int main(int argc,char **argv) {
     int dump=argc==3 && !strcmp(argv[1],"--dump-vbios");
-    if (argc!=1 && !dump) { fprintf(stderr,"phxprofile [--dump-vbios NEW_FILE (sudo, build 37+)]\n");return 2; }
+    int registers=argc==2 && !strcmp(argv[1],"--scanout");
+    if (argc!=1 && !dump && !registers) {
+        fprintf(stderr,"phxprofile [--dump-vbios NEW_FILE (sudo, build 37+)] | --scanout (sudo, HP, read-only JSON)\n");return 2;
+    }
     io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
     if (!svc) { fprintf(stderr, "PhxBringup is not loaded\n"); return 1; }
     io_connect_t conn = IO_OBJECT_NULL;
@@ -80,11 +120,13 @@ int main(int argc,char **argv) {
     struct phx_topology p = {0}; size_t size = sizeof(p);
     if (!kr && count != 4) kr = kIOReturnBadArgument;
     if (!kr) kr = IOConnectCallStructMethod(conn, PHX_SEL_TOPOLOGY, NULL, 0, &p, &size);
-    if (conn) IOServiceClose(conn);
     if (kr || size != sizeof(p) || !phx_topology_valid(&p)) {
+        if (conn) IOServiceClose(conn);
         fprintf(stderr, "captured profile unavailable or invalid (0x%x); older 780M kernels do not provide it\n", kr);
         return 1;
     }
+    if (registers) { int result=scanout(conn,&p);IOServiceClose(conn);return result; }
+    if (conn) IOServiceClose(conn);
     printf("PCI %04x:%04x rev %02x subsystem %04x:%04x\n", p.vendor, p.device, p.revision, p.subvendor, p.subdevice);
     printf("CAPTURED metadata, not a live fuse read: %u CUs, %u SE, %u SA/SE, %u physical CU slots/SA, RB mask 0x%x\n",
            p.cu_active_number, p.num_shader_engines, p.num_shader_arrays_per_engine, p.num_cu_per_sh, p.enabled_rb_pipes_mask);

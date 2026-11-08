@@ -1,0 +1,501 @@
+{
+  "format": 1,
+  "atomic": false,
+  "register_writes": false,
+  "gpu_commands_submitted": false,
+  "acceleration_verified": false,
+  "memory": {
+    "mc_base": 549755813888,
+    "physical_base": 10200547328,
+    "vram_bytes": 536870912,
+    "aperture_base": 11542724608,
+    "aperture_bytes": 268435456,
+    "flags": 3
+  },
+  "samples": [
+    [
+      {
+        "name": "regHUBP0_DCSURF_SURFACE_CONFIG",
+        "dword": 15013,
+        "value": 8
+      },
+      {
+        "name": "regHUBP0_DCSURF_ADDR_CONFIG",
+        "dword": 15014,
+        "value": 0
+      },
+      {
+        "name": "regHUBP0_DCSURF_TILING_CONFIG",
+        "dword": 15015,
+        "value": 128
+      },
+      {
+        "name": "regHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15018,
+        "value": 78645120
+      },
+      {
+        "name": "regHUBP0_DCHUBP_CNTL",
+        "dword": 15027,
+        "value": 987138
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SURFACE_PITCH",
+        "dword": 15047,
+        "value": 1919
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15050,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15051,
+        "value": 128
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15054,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15055,
+        "value": 128
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15058,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15059,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCSURF_SURFACE_CONFIG",
+        "dword": 15233,
+        "value": 8
+      },
+      {
+        "name": "regHUBP1_DCSURF_ADDR_CONFIG",
+        "dword": 15234,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCSURF_TILING_CONFIG",
+        "dword": 15235,
+        "value": 128
+      },
+      {
+        "name": "regHUBP1_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15238,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCHUBP_CNTL",
+        "dword": 15247,
+        "value": 987163
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SURFACE_PITCH",
+        "dword": 15267,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15270,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15271,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15274,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15275,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15278,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15279,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCSURF_SURFACE_CONFIG",
+        "dword": 15453,
+        "value": 8
+      },
+      {
+        "name": "regHUBP2_DCSURF_ADDR_CONFIG",
+        "dword": 15454,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCSURF_TILING_CONFIG",
+        "dword": 15455,
+        "value": 128
+      },
+      {
+        "name": "regHUBP2_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15458,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCHUBP_CNTL",
+        "dword": 15467,
+        "value": 987179
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SURFACE_PITCH",
+        "dword": 15487,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15490,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15491,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15494,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15495,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15498,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15499,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCSURF_SURFACE_CONFIG",
+        "dword": 15673,
+        "value": 8
+      },
+      {
+        "name": "regHUBP3_DCSURF_ADDR_CONFIG",
+        "dword": 15674,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCSURF_TILING_CONFIG",
+        "dword": 15675,
+        "value": 128
+      },
+      {
+        "name": "regHUBP3_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15678,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCHUBP_CNTL",
+        "dword": 15687,
+        "value": 987195
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SURFACE_PITCH",
+        "dword": 15707,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15710,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15711,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15714,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15715,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15718,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15719,
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "regHUBP0_DCSURF_SURFACE_CONFIG",
+        "dword": 15013,
+        "value": 8
+      },
+      {
+        "name": "regHUBP0_DCSURF_ADDR_CONFIG",
+        "dword": 15014,
+        "value": 0
+      },
+      {
+        "name": "regHUBP0_DCSURF_TILING_CONFIG",
+        "dword": 15015,
+        "value": 128
+      },
+      {
+        "name": "regHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15018,
+        "value": 78645120
+      },
+      {
+        "name": "regHUBP0_DCHUBP_CNTL",
+        "dword": 15027,
+        "value": 987138
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SURFACE_PITCH",
+        "dword": 15047,
+        "value": 1919
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15050,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15051,
+        "value": 128
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15054,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15055,
+        "value": 128
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15058,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15059,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCSURF_SURFACE_CONFIG",
+        "dword": 15233,
+        "value": 8
+      },
+      {
+        "name": "regHUBP1_DCSURF_ADDR_CONFIG",
+        "dword": 15234,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCSURF_TILING_CONFIG",
+        "dword": 15235,
+        "value": 128
+      },
+      {
+        "name": "regHUBP1_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15238,
+        "value": 0
+      },
+      {
+        "name": "regHUBP1_DCHUBP_CNTL",
+        "dword": 15247,
+        "value": 987163
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SURFACE_PITCH",
+        "dword": 15267,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15270,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15271,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15274,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15275,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15278,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15279,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCSURF_SURFACE_CONFIG",
+        "dword": 15453,
+        "value": 8
+      },
+      {
+        "name": "regHUBP2_DCSURF_ADDR_CONFIG",
+        "dword": 15454,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCSURF_TILING_CONFIG",
+        "dword": 15455,
+        "value": 128
+      },
+      {
+        "name": "regHUBP2_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15458,
+        "value": 0
+      },
+      {
+        "name": "regHUBP2_DCHUBP_CNTL",
+        "dword": 15467,
+        "value": 987179
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SURFACE_PITCH",
+        "dword": 15487,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15490,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15491,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15494,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15495,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15498,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15499,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCSURF_SURFACE_CONFIG",
+        "dword": 15673,
+        "value": 8
+      },
+      {
+        "name": "regHUBP3_DCSURF_ADDR_CONFIG",
+        "dword": 15674,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCSURF_TILING_CONFIG",
+        "dword": 15675,
+        "value": 128
+      },
+      {
+        "name": "regHUBP3_DCSURF_PRI_VIEWPORT_DIMENSION",
+        "dword": 15678,
+        "value": 0
+      },
+      {
+        "name": "regHUBP3_DCHUBP_CNTL",
+        "dword": 15687,
+        "value": 987195
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SURFACE_PITCH",
+        "dword": 15707,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS",
+        "dword": 15710,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15711,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS",
+        "dword": 15714,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+        "dword": 15715,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+        "dword": 15718,
+        "value": 0
+      },
+      {
+        "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+        "dword": 15719,
+        "value": 0
+      }
+    ]
+  ]
+}

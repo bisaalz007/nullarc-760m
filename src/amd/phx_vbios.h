@@ -39,7 +39,10 @@ static inline PhxVbiosResult phxDecodeAtom(const uint8_t *rom, size_t size, PhxV
           (h[4]=='M'&&h[5]=='O'&&h[6]=='T'&&h[7]=='A'))) return PhxVbiosResult::Invalid;
     PhxVbiosInfo p{};
     p.imageBytes=(uint32_t)size; p.romHeaderKnown=true; p.romFormat=h[2]; p.romContent=h[3];
-    if (h[2]!=2 || h[3]!=2) { out=p; return PhxVbiosResult::Unsupported; }
+    // HP capture e94afef0... has ROM 2.3, size 44, with the same measured
+    // master-data pointer at +32. No semantics are assigned to its new tail.
+    if (h[2]!=2 || (h[3]!=2 && h[3]!=3)) { out=p; return PhxVbiosResult::Unsupported; }
+    if (h[3]==3 && !phxVbiosTable(rom,size,header,44)) return PhxVbiosResult::Invalid;
     const size_t master=phxVbios16(h+32);
     if (!phxVbiosTable(rom,size,master,28)) return PhxVbiosResult::Invalid;
     p.masterHeaderKnown=true; p.masterFormat=rom[master+2]; p.masterContent=rom[master+3];
