@@ -31,6 +31,16 @@ def assemble(a):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}',a.version) or '..' in a.version:
         raise ValueError('invalid release version')
     stack=verify(a.stack)
+    fixtures=None
+    if stack.get('experimental_hp_bootstrap') is True:
+        fixture_root=ROOT/'build/metal-stack-test'
+        fixtures=json.loads((fixture_root/'fixture-receipt.json').read_text())
+        if fixtures.get('independent_spirv_validation') is not True or fixtures.get('gpu_commands_submitted')!=0:
+            raise ValueError('missing offline fixture validation')
+        for name,sha in fixtures['inputs'].items():
+            if digest(a.stack/name)!=sha:raise ValueError('shader fixture runtime inputs differ; rerun test_metal_stack')
+        for name,sha in fixtures['shaders'].items():
+            if digest(fixture_root/name)!=sha:raise ValueError('shader fixture differs')
     commit=git('rev-parse','HEAD').decode().strip()
     if git('status','--porcelain'): raise ValueError('commit source changes before assembling a release')
     if stack.get('source_commit')!=commit: raise ValueError('stack source commit differs from checkout')
@@ -53,6 +63,11 @@ def assemble(a):
     with tempfile.TemporaryDirectory(prefix='.nullarc-release-',dir=dest.parent) as tmp:
         tmp=Path(tmp);p=tmp/name;shutil.copytree(a.stack,p)
         fw=p/'gpu/fw';fw.mkdir()
+        if fixtures:
+            validation=p/'validation';validation.mkdir()
+            for source,target in [('store.spv','store.spv'),('triangle_vertex.spv','vertex.spv'),('solid_fragment.spv','fragment.spv')]:
+                shutil.copy2(ROOT/'build/metal-stack-test'/source,validation/target)
+            shutil.copy2(ROOT/'build/metal-stack-test/fixture-receipt.json',validation/'fixture-receipt.json')
         for item in expected:shutil.copy2(a.firmware/item['name'],fw/item['name'])
         (fw/'manifest.json').write_text(json.dumps({'source':'HP Linux Mint linux-firmware 20240318.git3b128b60-0ubuntu2.22',
             'files':expected,'runtime_compatibility_verified':False},indent=2)+'\n')
@@ -60,11 +75,11 @@ def assemble(a):
         (p/'sources/mesa-darwin-phoenix.patch').write_bytes(git('diff','f5cb8ee032adabef599ae892ec4e42d796b84da9','HEAD',cwd=a.mesa))
         (p/'README.txt').write_text(f'NullArc Radeon 760M {a.version} development prerelease\n'
             f'Source commit: {commit}\nRead INSTALL.md before running install.sh.\n'
-            'HP: diagnostic installation only; --windowserver refuses acceleration.\n'
+            'HP: diagnostic boot; local-admin experimental bootstrap; acceleration unverified.\n'
             'Includes AMD firmware under LICENSES/LICENSE.amdgpu.txt; no automatic activation.\n')
         metadata={k:v for k,v in stack.items() if k not in ('files','format','policy','acceleration_verified')}
         metadata.update(release_version=a.version,firmware_included=True,
-                        firmware_loading_enabled_on_hp=False,release_kind='development-prerelease')
+                        firmware_loading_enabled_on_hp=stack.get('experimental_hp_bootstrap') is True,release_kind='development-prerelease')
         write(p,metadata);verify(p)
         bundle=tmp/(name+'.zip');zip_tree(p,bundle,name)
         kext=tmp/('PhxBringup.kext-'+a.version+'.zip')

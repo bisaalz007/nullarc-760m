@@ -13,6 +13,7 @@ class MesbootTransportTests(unittest.TestCase):
             subprocess.run(['cc','-std=gnu11','-Wall','-Wextra','-Werror','-I'+str(ROOT/'tests/mocks'),
                             str(ROOT/'tools/phxctl/mesboot.c'),'-o',str(binary)],check=True)
             clean={k:v for k,v in os.environ.items() if not k.startswith(('MESBOOT_','ADOPT'))}
+            clean.update(MESBOOT_SCHED_PC='0xfffffffff0005000',MESBOOT_KIQ_PC='0xfffffffff0005000')
             cases=[('dump','MESBOOT_TEST_FAIL','0'),('dump','MESBOOT_TEST_SHORT','0'),
                    ('dump','MESBOOT_TEST_FAIL','31'),('dump','MESBOOT_TEST_SHORT','31'),
                    ('dump','MESBOOT_TEST_FAIL','2'),('dump','MESBOOT_TEST_SHORT','2'),
@@ -38,7 +39,7 @@ class MesbootTransportTests(unittest.TestCase):
                     args=[str(binary),step]+(['0','0'] if step=='db' else [])
                     r=subprocess.run(args,env=env,capture_output=True,text=True,timeout=10)
                     self.assertNotEqual(r.returncode,0,r.stdout+r.stderr)
-                    self.assertEqual(r.stdout.splitlines(),['test-call:0','test-call:31'])
+                    self.assertEqual(r.stdout.splitlines(),['test-call:0','test-call:31','test-call:33'] if mode=='different' else ['test-call:0','test-call:31'])
                 r=subprocess.run([str(binary),'layout'],env=env,capture_output=True,text=True,timeout=10)
                 self.assertEqual(r.returncode,1 if mode=='invalid' else 0,r.stdout+r.stderr)
                 if mode=='hp':self.assertIn('physical=0x260000000 size=0x20000000',r.stdout)

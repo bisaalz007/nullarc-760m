@@ -1,0 +1,890 @@
+{
+  "format": 1,
+  "purpose": "read-only scanout, cursor and DMCUB reservation evidence; not allocation permission",
+  "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.14/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_offset.h",
+  "source_sha256": "b9f43d329ae6f1d697bfdb6570087fd984d8428b3f33926ca0d36893ecb6cb7a",
+  "base_source": "hardware/dumps/hp_envy_760m/linux-2026-11-08.json",
+  "hw_id": 271,
+  "version": [
+    3,
+    1,
+    4
+  ],
+  "registers": [
+    {
+      "name": "regHUBP0_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1509,
+      "dword": 15013
+    },
+    {
+      "name": "regHUBP0_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1510,
+      "dword": 15014
+    },
+    {
+      "name": "regHUBP0_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1511,
+      "dword": 15015
+    },
+    {
+      "name": "regHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1514,
+      "dword": 15018
+    },
+    {
+      "name": "regHUBP0_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1523,
+      "dword": 15027
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1543,
+      "dword": 15047
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1546,
+      "dword": 15050
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1547,
+      "dword": 15051
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1550,
+      "dword": 15054
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1551,
+      "dword": 15055
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1554,
+      "dword": 15058
+    },
+    {
+      "name": "regHUBPREQ0_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1555,
+      "dword": 15059
+    },
+    {
+      "name": "regHUBP1_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1729,
+      "dword": 15233
+    },
+    {
+      "name": "regHUBP1_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1730,
+      "dword": 15234
+    },
+    {
+      "name": "regHUBP1_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1731,
+      "dword": 15235
+    },
+    {
+      "name": "regHUBP1_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1734,
+      "dword": 15238
+    },
+    {
+      "name": "regHUBP1_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1743,
+      "dword": 15247
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1763,
+      "dword": 15267
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1766,
+      "dword": 15270
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1767,
+      "dword": 15271
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1770,
+      "dword": 15274
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1771,
+      "dword": 15275
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1774,
+      "dword": 15278
+    },
+    {
+      "name": "regHUBPREQ1_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1775,
+      "dword": 15279
+    },
+    {
+      "name": "regHUBP2_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1949,
+      "dword": 15453
+    },
+    {
+      "name": "regHUBP2_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1950,
+      "dword": 15454
+    },
+    {
+      "name": "regHUBP2_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1951,
+      "dword": 15455
+    },
+    {
+      "name": "regHUBP2_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1954,
+      "dword": 15458
+    },
+    {
+      "name": "regHUBP2_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1963,
+      "dword": 15467
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1983,
+      "dword": 15487
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1986,
+      "dword": 15490
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1987,
+      "dword": 15491
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1990,
+      "dword": 15494
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1991,
+      "dword": 15495
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1994,
+      "dword": 15498
+    },
+    {
+      "name": "regHUBPREQ2_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1995,
+      "dword": 15499
+    },
+    {
+      "name": "regHUBP3_DCSURF_SURFACE_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2169,
+      "dword": 15673
+    },
+    {
+      "name": "regHUBP3_DCSURF_ADDR_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2170,
+      "dword": 15674
+    },
+    {
+      "name": "regHUBP3_DCSURF_TILING_CONFIG",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2171,
+      "dword": 15675
+    },
+    {
+      "name": "regHUBP3_DCSURF_PRI_VIEWPORT_DIMENSION",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2174,
+      "dword": 15678
+    },
+    {
+      "name": "regHUBP3_DCHUBP_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2183,
+      "dword": 15687
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SURFACE_PITCH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2203,
+      "dword": 15707
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2206,
+      "dword": 15710
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2207,
+      "dword": 15711
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2210,
+      "dword": 15714
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_SECONDARY_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2211,
+      "dword": 15715
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2214,
+      "dword": 15718
+    },
+    {
+      "name": "regHUBPREQ3_DCSURF_PRIMARY_META_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2215,
+      "dword": 15719
+    },
+    {
+      "name": "regDMCUB_REGION0_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 398,
+      "dword": 13902
+    },
+    {
+      "name": "regDMCUB_REGION0_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 399,
+      "dword": 13903
+    },
+    {
+      "name": "regDMCUB_REGION1_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 400,
+      "dword": 13904
+    },
+    {
+      "name": "regDMCUB_REGION1_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 401,
+      "dword": 13905
+    },
+    {
+      "name": "regDMCUB_REGION2_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 402,
+      "dword": 13906
+    },
+    {
+      "name": "regDMCUB_REGION2_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 403,
+      "dword": 13907
+    },
+    {
+      "name": "regDMCUB_REGION4_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 406,
+      "dword": 13910
+    },
+    {
+      "name": "regDMCUB_REGION4_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 407,
+      "dword": 13911
+    },
+    {
+      "name": "regDMCUB_REGION5_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 408,
+      "dword": 13912
+    },
+    {
+      "name": "regDMCUB_REGION5_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 409,
+      "dword": 13913
+    },
+    {
+      "name": "regDMCUB_REGION6_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 410,
+      "dword": 13914
+    },
+    {
+      "name": "regDMCUB_REGION6_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 411,
+      "dword": 13915
+    },
+    {
+      "name": "regDMCUB_REGION7_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 412,
+      "dword": 13916
+    },
+    {
+      "name": "regDMCUB_REGION7_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 413,
+      "dword": 13917
+    },
+    {
+      "name": "regDMCUB_REGION0_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 414,
+      "dword": 13918
+    },
+    {
+      "name": "regDMCUB_REGION1_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 415,
+      "dword": 13919
+    },
+    {
+      "name": "regDMCUB_REGION2_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 416,
+      "dword": 13920
+    },
+    {
+      "name": "regDMCUB_REGION4_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 417,
+      "dword": 13921
+    },
+    {
+      "name": "regDMCUB_REGION5_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 418,
+      "dword": 13922
+    },
+    {
+      "name": "regDMCUB_REGION6_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 419,
+      "dword": 13923
+    },
+    {
+      "name": "regDMCUB_REGION7_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 420,
+      "dword": 13924
+    },
+    {
+      "name": "regDMCUB_REGION3_CW0_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 421,
+      "dword": 13925
+    },
+    {
+      "name": "regDMCUB_REGION3_CW1_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 422,
+      "dword": 13926
+    },
+    {
+      "name": "regDMCUB_REGION3_CW2_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 423,
+      "dword": 13927
+    },
+    {
+      "name": "regDMCUB_REGION3_CW3_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 424,
+      "dword": 13928
+    },
+    {
+      "name": "regDMCUB_REGION3_CW4_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 425,
+      "dword": 13929
+    },
+    {
+      "name": "regDMCUB_REGION3_CW5_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 426,
+      "dword": 13930
+    },
+    {
+      "name": "regDMCUB_REGION3_CW6_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 427,
+      "dword": 13931
+    },
+    {
+      "name": "regDMCUB_REGION3_CW7_BASE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 428,
+      "dword": 13932
+    },
+    {
+      "name": "regDMCUB_REGION3_CW0_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 429,
+      "dword": 13933
+    },
+    {
+      "name": "regDMCUB_REGION3_CW1_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 430,
+      "dword": 13934
+    },
+    {
+      "name": "regDMCUB_REGION3_CW2_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 431,
+      "dword": 13935
+    },
+    {
+      "name": "regDMCUB_REGION3_CW3_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 432,
+      "dword": 13936
+    },
+    {
+      "name": "regDMCUB_REGION3_CW4_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 433,
+      "dword": 13937
+    },
+    {
+      "name": "regDMCUB_REGION3_CW5_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 434,
+      "dword": 13938
+    },
+    {
+      "name": "regDMCUB_REGION3_CW6_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 435,
+      "dword": 13939
+    },
+    {
+      "name": "regDMCUB_REGION3_CW7_TOP_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 436,
+      "dword": 13940
+    },
+    {
+      "name": "regDMCUB_REGION3_CW0_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 437,
+      "dword": 13941
+    },
+    {
+      "name": "regDMCUB_REGION3_CW0_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 438,
+      "dword": 13942
+    },
+    {
+      "name": "regDMCUB_REGION3_CW1_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 439,
+      "dword": 13943
+    },
+    {
+      "name": "regDMCUB_REGION3_CW1_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 440,
+      "dword": 13944
+    },
+    {
+      "name": "regDMCUB_REGION3_CW2_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 441,
+      "dword": 13945
+    },
+    {
+      "name": "regDMCUB_REGION3_CW2_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 442,
+      "dword": 13946
+    },
+    {
+      "name": "regDMCUB_REGION3_CW3_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 443,
+      "dword": 13947
+    },
+    {
+      "name": "regDMCUB_REGION3_CW3_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 444,
+      "dword": 13948
+    },
+    {
+      "name": "regDMCUB_REGION3_CW4_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 445,
+      "dword": 13949
+    },
+    {
+      "name": "regDMCUB_REGION3_CW4_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 446,
+      "dword": 13950
+    },
+    {
+      "name": "regDMCUB_REGION3_CW5_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 447,
+      "dword": 13951
+    },
+    {
+      "name": "regDMCUB_REGION3_CW5_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 448,
+      "dword": 13952
+    },
+    {
+      "name": "regDMCUB_REGION3_CW6_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 449,
+      "dword": 13953
+    },
+    {
+      "name": "regDMCUB_REGION3_CW6_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 450,
+      "dword": 13954
+    },
+    {
+      "name": "regDMCUB_REGION3_CW7_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 451,
+      "dword": 13955
+    },
+    {
+      "name": "regDMCUB_REGION3_CW7_OFFSET_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 452,
+      "dword": 13956
+    },
+    {
+      "name": "regDMCUB_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 502,
+      "dword": 14006
+    },
+    {
+      "name": "regDMCUB_CNTL2",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 512,
+      "dword": 14016
+    },
+    {
+      "name": "regDCN_VM_FB_LOCATION_BASE",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1141,
+      "dword": 14645
+    },
+    {
+      "name": "regDCN_VM_FB_OFFSET",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1143,
+      "dword": 14647
+    },
+    {
+      "name": "regCURSOR0_0_CURSOR_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1656,
+      "dword": 15160
+    },
+    {
+      "name": "regCURSOR0_0_CURSOR_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1657,
+      "dword": 15161
+    },
+    {
+      "name": "regCURSOR0_0_CURSOR_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1658,
+      "dword": 15162
+    },
+    {
+      "name": "regCURSOR0_0_CURSOR_SIZE",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1659,
+      "dword": 15163
+    },
+    {
+      "name": "regCURSOR0_1_CURSOR_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1876,
+      "dword": 15380
+    },
+    {
+      "name": "regCURSOR0_1_CURSOR_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1877,
+      "dword": 15381
+    },
+    {
+      "name": "regCURSOR0_1_CURSOR_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1878,
+      "dword": 15382
+    },
+    {
+      "name": "regCURSOR0_1_CURSOR_SIZE",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1879,
+      "dword": 15383
+    },
+    {
+      "name": "regCURSOR0_2_CURSOR_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2096,
+      "dword": 15600
+    },
+    {
+      "name": "regCURSOR0_2_CURSOR_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2097,
+      "dword": 15601
+    },
+    {
+      "name": "regCURSOR0_2_CURSOR_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2098,
+      "dword": 15602
+    },
+    {
+      "name": "regCURSOR0_2_CURSOR_SIZE",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2099,
+      "dword": 15603
+    },
+    {
+      "name": "regCURSOR0_3_CURSOR_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2316,
+      "dword": 15820
+    },
+    {
+      "name": "regCURSOR0_3_CURSOR_SURFACE_ADDRESS",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2317,
+      "dword": 15821
+    },
+    {
+      "name": "regCURSOR0_3_CURSOR_SURFACE_ADDRESS_HIGH",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2318,
+      "dword": 15822
+    },
+    {
+      "name": "regCURSOR0_3_CURSOR_SIZE",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2319,
+      "dword": 15823
+    },
+    {
+      "name": "regHUBP0_DCSURF_PRI_VIEWPORT_START",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1513,
+      "dword": 15017
+    },
+    {
+      "name": "regHUBP1_DCSURF_PRI_VIEWPORT_START",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1733,
+      "dword": 15237
+    },
+    {
+      "name": "regHUBP2_DCSURF_PRI_VIEWPORT_START",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 1953,
+      "dword": 15457
+    },
+    {
+      "name": "regHUBP3_DCSURF_PRI_VIEWPORT_START",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 2173,
+      "dword": 15677
+    }
+  ]
+}

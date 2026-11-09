@@ -25,8 +25,8 @@ $SUDO bash -c 'nohup shutdown -r +3 >/dev/null 2>&1 &'
 P psp destroy >/dev/null 2>&1 || true
 P psp create 0x1100000 >/dev/null
 P stage "$HOME/gpu/fw/$TOC_FILE" "$TOC_OFFSET" "$TOC_SIZE" "$TOC_STAGE" >/dev/null
-P raw 0x20 0x04000000 0x80 "$TOC_SIZE" 0 0 0 >/dev/null
-P raw 0x5 0x08000000 0x80 0x4000000 0x2 0x0C000000 0x6A >/dev/null
+P toc "$TOC_SIZE"
+P tmr
 echo "== load firmware =="
 L(){ P loadfw "$@" 2>&1 | grep loadfw >> ~/gpu/fwaddr.log; }
 : > ~/gpu/fwaddr.log

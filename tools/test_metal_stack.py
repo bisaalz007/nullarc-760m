@@ -5,6 +5,8 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import json
+import hashlib
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -18,6 +20,8 @@ def main():
     a = ap.parse_args()
     a.package = a.package.resolve(); a.mesa = a.mesa.resolve()
     out = REPO / 'build/metal-stack-test'; out.mkdir(parents=True, exist_ok=True)
+    receipt=out/'fixture-receipt.json'
+    if receipt.exists():receipt.unlink()
     (out / 'cache/aircache').mkdir(parents=True, exist_ok=True)
     def run(args, **kw): subprocess.run([str(x) for x in args], check=True, timeout=90, **kw)
     run(['xcrun','metal','-mmacosx-version-min='+a.min_macos,'-c',REPO / 'tests/shaders/store.metal','-o',out/'store.air'])
@@ -36,6 +40,12 @@ def main():
         env = dict(os.environ, RADV_DARWIN_MOCK='1', RADV_DARWIN_MOCK_PROFILE=profile,
                    RADV_DARWIN_CANNED='phoenix', MESA_SHADER_CACHE_DISABLE='true')
         run([out/'radv-test',a.package/'PhxGPU/nvmtl/libvulkan_radeon.dylib',str(count),out/'store.spv','main',out/'triangle_vertex.spv',out/'solid_fragment.spv'],env=env)
+    digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+    inputs=['PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver',
+            'PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib','PhxGPU/nvmtl/libvulkan_radeon.dylib']
+    receipt.write_text(json.dumps({'inputs':{n:digest(a.package/n) for n in inputs},
+        'shaders':{n:digest(out/n) for n in ('store.spv','triangle_vertex.spv','solid_fragment.spv')},
+        'independent_spirv_validation':True,'aco_mock_cu_profiles':[8,12],'gpu_commands_submitted':0},indent=2)+'\n')
     print('[PASS] packaged source Metal -> AIR reader -> translator -> SPIR-V validation -> RADV/ACO (8/12-CU mocks); no GPU execution')
 
 

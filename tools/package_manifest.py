@@ -28,15 +28,18 @@ def inventory(root):
 
 
 def write(root, metadata):
-    document = dict(metadata, format=1, policy='hp-diagnostic-only', acceleration_verified=False,
+    policy='hp-experimental-bootstrap' if metadata.get('experimental_hp_bootstrap') is True else 'hp-diagnostic-only'
+    document = dict(metadata, format=1, policy=policy, acceleration_verified=False,
                     files=inventory(root))
     (root / NAME).write_text(json.dumps(document, indent=2, sort_keys=True) + '\n')
 
 
 def verify(root):
     document = json.loads((root / NAME).read_text())
-    if document.get('format') != 1 or document.get('policy') != 'hp-diagnostic-only' or document.get('acceleration_verified') is not False:
+    if document.get('format') != 1 or document.get('policy') not in ('hp-diagnostic-only','hp-experimental-bootstrap') or document.get('acceleration_verified') is not False:
         raise ValueError('unsupported package policy or acceleration claim')
+    if document.get('policy')=='hp-experimental-bootstrap' and document.get('bootstrap_requires_local_admin') is not True:
+        raise ValueError('experimental bootstrap requires explicit local administrator policy')
     files = document.get('files')
     if not isinstance(files, dict) or not files or inventory(root) != files:
         raise ValueError('package file inventory or hashes differ')
@@ -49,6 +52,6 @@ if __name__ == '__main__':
     a = ap.parse_args()
     try:
         d = verify(a.package.resolve())
-        print(f'verified {len(d["files"])} files; HP diagnostic-only, acceleration unverified')
+        print(f'verified {len(d["files"])} files; {d["policy"]}, acceleration unverified')
     except (ValueError, OSError) as e:
         ap.exit(1, f'{e}\n')

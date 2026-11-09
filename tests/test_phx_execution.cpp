@@ -1,9 +1,21 @@
 #include "phxbringup/PhxExecutionPolicy.h"
 #include "phxbringup/PhxPspPolicy.h"
+#include "phxbringup/PhxFirmwareState.h"
 #include <cassert>
 #include <cstdio>
 #include <map>
 int main() {
+    PhxFirmwareState firmware;
+    assert(!firmware.complete() && !firmware.mayLoad(8) && !firmware.mayLoad(999));
+    for (unsigned i=0;i<16;++i) {
+        const uint32_t type=PhxFirmwareState::types[i];assert(firmware.mayLoad(type));
+        firmware.acknowledge(type,true,0);
+    }
+    assert(firmware.mayLoad(8) && !firmware.complete());
+    firmware.acknowledge(8,false,0);assert(!firmware.complete());
+    firmware.acknowledge(8,true,0x100);assert(!firmware.complete());
+    firmware.acknowledge(8,true,0);assert(firmware.complete());
+    firmware.reset();assert(!firmware.complete() && !firmware.mayLoad(8));
     PhxPspState psp;
     assert(psp.reusable() && !psp.confirmedTmrBytes);
     psp.setupResult(4096, true, 0);

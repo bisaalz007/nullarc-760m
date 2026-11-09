@@ -463,7 +463,9 @@ bool PhxAMDFB::start(IOService *provider)
     IOPCIDevice *profilePCI = OSDynamicCast(IOPCIDevice, provider);
     if (profilePCI && phx_topology_matches(&phx_hp_760m,
             profilePCI->configRead16(0), profilePCI->configRead16(2), profilePCI->configRead8(8),
-            profilePCI->configRead16(0x2c), profilePCI->configRead16(0x2e))) {
+            profilePCI->configRead16(0x2c), profilePCI->configRead16(0x2e)) &&
+            (profilePCI->getProperty("nmxgpu-claimed")!=kOSBooleanTrue ||
+             profilePCI->getProperty("phx-diagnostic-only")!=kOSBooleanFalse)) {
         PFBLOG("captured profile only: HP panel takeover requires validated bring-up");
         return false;
     }

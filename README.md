@@ -96,6 +96,18 @@ host-tested, not hardware-tested. The HP diagnostic restriction is preserved.
 The complete Sequoia stack builds; HP memory ownership, firmware/queue
 initialization, native GPU command execution and acceleration remain unfinished.
 
+Build 39 adds an explicit experimental HP engine path. It compares live display,
+cursor and DMCUB configuration with the captured Sequoia reservation profile,
+requires the PCI provider's exclusive open, and leases nonoverlapping PSP,
+firmware, MES and TMR regions. TMR size comes from LOAD_TOC (the HP Linux driver
+reports 64 MiB), with no 16 MiB clamp or copied Linux allocation address. GART
+scratch/fault pages are owned allocations. Firmware acknowledgements and kernel
+RELEASE_MEM probes gate autoload and queue readiness. Native compute and
+translated-render probes reject mock transport. The accelerator's HP gate now
+requires a positive native claim. Default boot remains diagnostic; the new path
+requires local administrator execution and is not yet runtime-verified. No Metal
+or accelerated display success is claimed by this build.
+
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.

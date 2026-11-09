@@ -162,6 +162,13 @@ int main(int argc, char **argv)
    if (open_kext())
       return 1;
 
+   if (!strcmp(argv[1],"begin-hp") || !strcmp(argv[1],"abort")) {
+      if (argc!=2) { IOServiceClose(conn);return 2; }
+      kern_return_t kr=checked_scalar(conn,!strcmp(argv[1],"begin-hp")?115:114,NULL,0,NULL,NULL);
+      printf("%s -> kr 0x%08x\n",argv[1],kr);
+      IOServiceClose(conn);return kr?1:0;
+   }
+
    if (!strcmp(argv[1], "regs")) {
       for (int i = 2; i < argc; i++) {
          uint32_t reg = (uint32_t)strtoul(argv[i], NULL, 0), v = 0;

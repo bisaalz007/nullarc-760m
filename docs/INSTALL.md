@@ -151,3 +151,20 @@ execute VBIOS or initialize the GPU. The capture stays mode 0600 and is assigned
 to the invoking sudo user where available. Keep the raw image private and inspect
 it before sharing decoded facts. Older kexts refuse this operation. Capturing the
 image does not enable acceleration or validate memory ownership.
+
+
+## Build 39 explicit engine experiment
+
+Build-39 development packets support an experimental, local-administrator HP
+bootstrap. Cold boot still performs diagnostics only. The experiment checks the
+running kext UUID, exclusive PCI ownership, live reservations, firmware, queues
+and actual native shader readbacks. Unknown configurations and existing owners
+are refused. Do not use an older packet's tools with this kext.
+
+With the matching packet and build 39 loaded, preflight is:
+`python3 gpu/phxctl/hp_bringup.py --package . --output NEW_REPORT_DIRECTORY`.
+Adding `--execute` under sudo performs GPU initialization and native compute/
+render tests; it can expose a kernel/firmware fault. It does not arm WindowServer,
+set NVRAM, install a daemon or reboot. `--claim` additionally requires the matching
+PhxAccel UUID and requests accelerator attachment only after shader readbacks.
+Do not use `--claim` to infer Metal or display success. Keep the installer backup.

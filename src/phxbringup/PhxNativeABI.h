@@ -16,11 +16,13 @@
 #include "../amd/phx_topology.h"
 #include "../amd/phx_memory_layout.h"
 #include "../amd/phx_vbios_abi.h"
+#include "../amd/phx_bootstrap_layout.h"
 static_assert(sizeof(phx_topology) == 128, "topology wire size");
 static_assert(sizeof(phx_memory_layout) == 80, "memory snapshot wire size");
 
 static inline bool phxDiagnosticSelector(uint32_t selector) {
-    return phx_topology_diagnostic_selector(selector) || selector == PHX_SEL_MEMORY_LAYOUT || selector == PHX_SEL_VBIOS_READ;
+    return phx_topology_diagnostic_selector(selector) || selector == PHX_SEL_MEMORY_LAYOUT || selector == PHX_SEL_VBIOS_READ ||
+           selector == PHX_SEL_BOOTSTRAP_LAYOUT;
 }
 
 #define PHXN_UC_TYPE      0x4E34384Eu   /* 'N48N' */
@@ -72,6 +74,8 @@ enum {
     PHXN_SEL_DBG_ADOPTQ = 112,     /* in: [0] ring VRAM off [1] ring dwords [2] wb VRAM off (wptr shadow at +16) [3] doorbell byte off [4] wptr [5] fence VRAM off | queue (0 compute, 1 gfx) */
     PHXN_SEL_DBG_CLAIM = 113,      /* in: [0] 1 = mark the GPU driven (nmxgpu-claimed) and re-run matching so PhxAccel starts. */
     PHXN_SEL_DBG_SYSMEM = 111,     /* in: [0] op (1 alloc [1] bytes, 2 read [1] off, 3 write [1] off [2] val, 4 free)  out: [0] phys  [1] len/value */
+    PHXN_SEL_DBG_ABORT = 114,      /* no inputs/outputs: mark failed bootstrap lost; root + phxdebug; no hardware writes */
+    PHXN_SEL_HP_BEGIN = 115,       /* no inputs/outputs: root only, exact HP reservation checks + exclusive PCI claim */
     PHXN_SEL_DBG_DOORBELL = 110,   /* in: [0] doorbell BAR2 byte offset (8-aligned) [1] value lo [2] value hi; writes a 64-bit doorbell. */
 };
 

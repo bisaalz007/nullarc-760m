@@ -33,6 +33,6 @@ int main() {
     q=p; q.raw_top=0x817f; q.raw_offset=0x6a0; q.physical_base=0x6a0000000ull; q.vram_bytes=6ull<<30;
     assert(phx_memory_layout_valid(&q)); // Reference memory remains representable.
     for (unsigned selector=0;selector<120;++selector)
-        assert(phxDiagnosticSelector(selector)==(selector==31 || selector==32 || phx_topology_diagnostic_selector(selector)));
+        assert(phxDiagnosticSelector(selector)==(selector==31 || selector==32 || selector==33 || phx_topology_diagnostic_selector(selector)));
     puts("[PASS] runtime memory ABI, HP/reference addressing, malformed data, spans and selector policy");
 }

@@ -208,3 +208,38 @@ No complete HP VRAM reservation allocator, PSP/MES bootstrap, native command
 execution, Metal device, accelerated framebuffer, or validated recovery exists.
 The collected evidence does not authorize substituting Firebat physical addresses
 or removing the diagnostic execution gate.
+
+
+## Build 39 bootstrap ownership and readiness
+
+`beginHpBootstrap` is an administrator-only operation, separate from cold boot.
+It opens the IOPCIDevice, checks actual configuration twice through the pinned
+DCN register list and validates cached ATOM metadata. Unknown configurations or
+an existing PCI owner stop before hardware initialization; the owner's service
+class is reported when available. IOPCIDevice's public implementation delegates
+open ownership to IOService: https://github.com/apple-oss-distributions/IOPCIFamily/blob/main/IOPCIDevice.cpp.
+The exact profile gate protects the measured console prefix and confirms every
+captured active DMCUB window remains in the firmware exclusion. A PCI-assigned CPU
+BAR may relocate; the MC backing and capacity must match the captured profile.
+
+The serialized arena owns bootstrap intervals. TMR is allocated only after PSP
+reports its required size, naturally aligned where possible and at least 1 MiB
+aligned otherwise (Linux PSP_TMR_ALIGNMENT). PSP MC and system physical fields
+come from the running kernel's decoder and lease offset. The existing reference
+scratch policy is retained explicitly; HP does not inherit reference addresses.
+User BOs retain the existing system-backed UMA/GPUVM design; their VRAM-domain
+budgets do not mean they occupy the resident PSP/MES carve-out.
+
+MES writes are restricted to its lease. Queue adoption checks both queues and
+emits the same RELEASE_MEM packet as actual IB submission; only the GPU can
+replace the cleared/old fence with the new sequence. Both queues must pass before
+native readiness/topology flags become positive. Claiming the accelerator is a
+later operation. Failed bootstrap cannot silently reset leases, free DMA-exposed
+pages or pretend commands retired. A reboot remains necessary after loss.
+
+`hp_bringup.py` validates package, firmware plan, shader fixtures and running
+kernel UUID before opting into hardware operations. It stages firmware, boots
+PSP/SMU/GART/MES, runs native compute and translated offscreen rendering, and can
+claim PhxAccel only after readbacks pass and the expected accelerator UUID is
+loaded. It changes no NVRAM/boot/security settings and starts no daemon. The
+native probes load the selected RADV ICD directly and reject mock environments.

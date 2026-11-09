@@ -639,7 +639,8 @@ public:
 #ifdef NMX_ACCEL
         if (IOPCIDevice *p = OSDynamicCast(IOPCIDevice, provider)) {
             if (phx_topology_matches(&phx_hp_760m, p->configRead16(0), p->configRead16(2),
-                    p->configRead8(8), p->configRead16(0x2c), p->configRead16(0x2e))) {
+                    p->configRead8(8), p->configRead16(0x2c), p->configRead16(0x2e)) &&
+                    (p->getProperty("nmxgpu-claimed")!=kOSBooleanTrue || p->getProperty("phx-diagnostic-only")!=kOSBooleanFalse)) {
                 ALOG("HP captured profile: accelerator requires validated native bring-up");
                 return false;
             }

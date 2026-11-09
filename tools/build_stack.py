@@ -72,6 +72,8 @@ def source_inputs():
               if f.is_file() and 'build' not in f.relative_to(REPO).parts]
     native += [f for f in (REPO / 'tools/phxctl').rglob('*')
                if f.is_file() and f.suffix in ('.c','.cpp','.h')]
+    native += [f for f in (REPO / 'tools/vkprobe').rglob('*')
+               if f.is_file() and f.suffix in ('.c','.h','.comp')]
     return {str(f.relative_to(REPO)):digest(f) for f in native}
 
 
@@ -83,7 +85,7 @@ def required_artifacts(mesa, mesa_build=None):
         REPO / 'build/translator/nvmtl-translator-source.tar.gz',
         REPO / 'build/translator/SOURCE_COMMIT',
         (mesa_build or mesa / 'build') / 'src/amd/vulkan/libvulkan_radeon.dylib']
-    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw')]
+    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw','vkprobe-native','render-native')]
     return files
 
 
@@ -147,8 +149,9 @@ def assemble(a):
             relocate(binary, pending, binary.parent, origins)
         run(['codesign', '--force', '--sign', '-', bundle])
         run(['codesign', '--verify', '--deep', '--strict', bundle])
-        for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw'):
+        for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw','vkprobe-native','render-native'):
             copy(REPO / 'build/tools' / name, p / 'gpu/phxctl' / name)
+        copy(REPO/'tools/phxctl/hp_bringup.py',p/'gpu/phxctl/hp_bringup.py')
         for name in ('phxboot.sh', 'full.sh', 'bringup5.sh', 'kinst.sh', 'local.phxboot.plist'):
             copy(REPO / 'tools/phxctl' / name, p / 'gpu' / name)
         # No firmware or automatic activation: these remain blocked on HP.
@@ -158,7 +161,7 @@ def assemble(a):
         for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
                      'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
-        for name in ('install_diagnostics.py','install_components.py'):
+        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py'):
             copy(REPO / 'install' / name, p / name)
         for name in ('install.sh','uninstall.sh'):
             copy(REPO / 'install' / name, p / name)
@@ -169,7 +172,8 @@ def assemble(a):
         copy(REPO / 'tools/collect_macos_evidence.py', p / 'collect_macos_evidence.py')
         copy(REPO / 'tools/package_manifest.py', p / 'package_manifest.py')
         (p / 'README.txt').write_text('NullArc 760M development stack, macOS '+a.min_macos+'+\n'
-            'HP policy: diagnostic-only. GPU execution and acceleration are not verified.\n'
+            'HP boots diagnostic-only; explicit local-admin bootstrap experiment available.\n'
+            'GPU execution and acceleration are not verified by compilation.\n'
             'No firmware or automatic activation is included. See docs/BUILD_STACK.md.\n')
         src = {str(f.relative_to(REPO)):digest(f) for folder in ('src', 'tools', 'install')
                for f in (REPO / folder).rglob('*') if f.is_file() and 'build' not in f.relative_to(REPO).parts and '__pycache__' not in f.parts}
@@ -179,10 +183,11 @@ def assemble(a):
                     'source_inputs':src, 'mesa_commit':output(['git', '-C', a.mesa, 'rev-parse', 'HEAD']),
                     'translator_commit':(translator / 'SOURCE_COMMIT').read_text().strip(),
                     'minimum_macos':a.min_macos, 'native_targets':native_targets,
+                    'experimental_hp_bootstrap':True,'bootstrap_requires_local_admin':True,
                     'validation':'compiled and offline-tested; native HP acceleration unverified'}
         write(p, metadata); verify(p)
         p.rename(dest)
-    print(f'Assembled {dest}; HP diagnostic-only')
+    print(f'Assembled {dest}; HP diagnostic boot, explicit experimental bootstrap')
 
 
 def main():
@@ -190,6 +195,7 @@ def main():
     ap.add_argument('--sdk', type=Path)
     ap.add_argument('--vulkan-headers', type=Path)
     ap.add_argument('--translator-source', type=Path)
+    ap.add_argument('--glslang',type=Path,help='glslang executable for the authored native compute probe')
     ap.add_argument('--mesa', type=Path, required=True)
     ap.add_argument('--mesa-build', type=Path, help='configured Mesa build directory; defaults to MESA/build')
     ap.add_argument('--min-macos', choices=('15.0','26.0'), default='26.0')
@@ -202,8 +208,8 @@ def main():
     a.mesa_build=(a.mesa_build or a.mesa/'build').resolve()
     build_env=dict(os.environ,NULLARC_MIN_MACOS=a.min_macos)
     if not a.assemble_only:
-        if not all((a.sdk, a.vulkan_headers, a.translator_source)):
-            ap.error('--sdk, --vulkan-headers and --translator-source are required for building')
+        if not all((a.sdk, a.vulkan_headers, a.translator_source,a.glslang)):
+            ap.error('--sdk, --vulkan-headers, --translator-source and --glslang are required for building')
         run(['python3', REPO / 'tools/phx_profile.py', '--check'])
         run(['python3', REPO / 'tools/phx_device_profile.py'])
         run(['make', 'test'], cwd=REPO)
@@ -218,6 +224,12 @@ def main():
                  '-framework', 'IOKit', '-framework', 'CoreFoundation', '-o', tools / name])
         run(['clang++', '-arch', 'x86_64', '-mmacosx-version-min='+a.min_macos, '-std=c++17', '-O2',
              REPO / 'tools/phxctl/phxfw.cpp', REPO / 'src/amd/rdna3_ucode_extract.cpp', '-o', tools / 'phxfw'])
+        includes=REPO/'build/probe-include';includes.mkdir(exist_ok=True)
+        run([a.glslang,'-V','--vn','fill_spv',REPO/'tools/vkprobe/fill.comp','-o',includes/'fill_spv.h'])
+        for source,name in [('vkprobe.c','vkprobe-native'),('translated_render.c','render-native')]:
+            run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-std=gnu11','-O2',
+                 '-DPHX_DIRECT_RADV','-I',a.vulkan_headers/'include','-I',includes,
+                 REPO/'tools/vkprobe'/source,'-o',tools/name])
         build_receipt(a)
     assemble(a)
 

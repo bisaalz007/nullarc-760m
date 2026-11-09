@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include "mes_v11_api_def.h"
 #include "../../src/amd/phx_memory_layout.h"
+#include "../../src/amd/phx_bootstrap_layout.h"
+#include "mes_ring.h"
+#include <errno.h>
 
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
@@ -24,9 +27,14 @@
 static io_connect_t conn;
 static struct phx_memory_layout memory_layout;
 static uint64_t vram_mc, fb_pa;
+static struct phx_bootstrap_layout bootstrap;
+static int abort_on_failure;
 
 static void fail(const char *operation, kern_return_t kr)
 {
+   // This call is compiled before the checked-transport macros: no recursion if
+   // the transport itself failed. Read-only preflight never arms this path.
+   if (abort_on_failure) IOConnectCallScalarMethod(conn,114,NULL,0,NULL,NULL);
    fprintf(stderr, "mesboot: %s failed (0x%x); stopped before further GPU operations\n", operation, kr);
    exit(EXIT_FAILURE);
 }
@@ -99,6 +107,14 @@ static uint32_t vr(uint64_t off)
    IOConnectCallMethod(conn, SEL_DBG_VRAM_READ, in, 2, NULL, 0, NULL, NULL, buf, &sz);
    return buf[0];
 }
+static uint64_t vr64(uint64_t off)
+{
+   for (unsigned i=0;i<8;++i) {
+      const uint32_t hi=vr(off+4),lo=vr(off),again=vr(off+4);
+      if (hi==again) return ((uint64_t)hi<<32)|lo;
+   }
+   fail("unstable 64-bit fence",kIOReturnTimeout);return 0;
+}
 
 
 #define VRAM_MC vram_mc                 // decoded by the running kernel
@@ -119,11 +135,17 @@ static void require_reference_memory(void)
 {
    if (memory_layout.flags & (PHX_MEMORY_DIAGNOSTIC_ONLY | PHX_MEMORY_DEVICE_LOST))
       fail("diagnostic-only or lost GPU; no initialization plan", kIOReturnBadArgument);
-   /* The remaining default-page and aperture register sequence is Firebat-only.
-    * A decoded HP address must never silently make that sequence applicable. */
-   if (vram_mc != 0x8000000000ull || fb_pa != 0x6a0000000ull ||
-       memory_layout.vram_bytes != (6ull << 30) || memory_layout.cpu_aperture_bytes < (128ull << 20))
-      fail("reference memory/default-page plan does not match runtime layout", kIOReturnBadArgument);
+   // Require real kernel leases
+   // before any register/VRAM write, not merely an addressable framebuffer BAR.
+   size_t bytes=sizeof(bootstrap);
+   IOConnectCallMethod(conn,PHX_SEL_BOOTSTRAP_LAYOUT,NULL,0,NULL,0,NULL,NULL,&bootstrap,&bytes);
+   if (!phx_bootstrap_layout_valid(&bootstrap,memory_layout.cpu_aperture_bytes) ||
+       bootstrap.mes_offset!=0x2000000ull || bootstrap.mes_bytes<0x800000ull)
+      fail("exclusive bootstrap allocations unavailable",kIOReturnBadArgument);
+   const int reference=bootstrap.flags==PHX_BOOTSTRAP_REFERENCE_COMPAT && fb_pa==0x6a0000000ull && memory_layout.vram_bytes==(6ull<<30);
+   const int hp=bootstrap.flags==PHX_BOOTSTRAP_HP_CAPTURED_PROFILE && fb_pa==0x260000000ull && memory_layout.vram_bytes==(512ull<<20);
+   if (vram_mc!=0x8000000000ull || (!reference && !hp))
+      fail("bootstrap policy and memory identity disagree",kIOReturnBadArgument);
 }
 
 #define SEG0(o) (0x1260u + (o))
@@ -141,6 +163,7 @@ static void require_reference_memory(void)
 
 static int env_on(const char *n) { const char *v = getenv(n); return v && *v && *v != '0'; }
 static int use_mc;
+static uint64_t mes_pc[2];
 #define VA(off) ((use_mc ? VRAM_MC : GART_VA) + (off))
 #define MC(off) (VRAM_MC + (off))
 
@@ -156,9 +179,16 @@ static void gart(void)
    wr(SEG0(0x16f3), (uint32_t)((FB_PA + GART_PT) | 1)); wr(SEG0(0x16f4), (uint32_t)((FB_PA + GART_PT) >> 32));   // PDB base = physical (FB_PA + vram offset), as the Linux trace
    // system aperture / AGP / defaults exactly as the Linux trace (gfxhub_v3_0_init_system_aperture_regs)
    wr(SEG0(0x167c), 0); wr(SEG0(0x167b), 0x00ffffff); wr(SEG0(0x167a), 0);      // AGP_BASE/BOT/TOP (AGP off)
-   wr(SEG0(0x167d), 0x00200000); wr(SEG0(0x167e), 0x00205fff);                  // SYSTEM_APERTURE LOW/HIGH = VRAM MC range
-   wr(SEG0(0x15a8), 0x006a0f9f); wr(SEG0(0x15a9), 0);                           // SYSTEM_APERTURE_DEFAULT_ADDR LSB/MSB
-   wr(SEG0(0x15cb), 0x0000a23c); wr(SEG0(0x15cc), 0);                           // L2 protection fault default addr
+   const uint64_t scratch=bootstrap.mes_offset+bootstrap.mes_bytes-4096;
+   for (unsigned i=0;i<4096;i+=4) vw(scratch+i,0);
+   const uint64_t scratch_pa=FB_PA+scratch;
+   // Linux gfxhub_v3_0_init_system_aperture_regs: range in 256-KiB
+   // units, scratch/default page addresses in 4-KiB units. Both pages are owned.
+   wr(SEG0(0x167d),(uint32_t)(VRAM_MC>>18));
+   wr(SEG0(0x167e),(uint32_t)((VRAM_MC+memory_layout.vram_bytes-1)>>18));
+   wr(SEG0(0x15a8),(uint32_t)(scratch_pa>>12)); wr(SEG0(0x15a9),(uint32_t)(scratch_pa>>44));
+   wr(SEG0(0x15cb),(uint32_t)(bootstrap.fault_page_physical>>12));
+   wr(SEG0(0x15cc),(uint32_t)(bootstrap.fault_page_physical>>44));
    wr(SEG0(0x15c5), 0x00060000);                                                // L2_PROTECTION_FAULT_CNTL2
    wr(SEG0(0x15c4), env_on("FAULT_DEFAULT") ? 0x3ffffffc : 0x00000002);   // debug: no default-page redirect so faults are recorded                                                // L2_PROTECTION_FAULT_CNTL (fault handling on; was missing -> silent drops)
    wr(SEG0(0x15ce), 0xffffffff); wr(SEG0(0x15cf), 0x0000000f); wr(SEG0(0x15d0), 0);  // identity aperture LOW/HIGH (disabled)
@@ -187,7 +217,13 @@ static void gart(void)
    wr(SEG1(0x900), 0);
    wr(SEG0(0x1e1f), rd(SEG0(0x1e1f)) | 0x8000);   // CP_DEBUG.CPG_UTCL1_ERROR_HALT_DISABLE (linux sets it with the gfxhub)
    wr(SEG0(0x16ab + 17), 0x00F80001);          // GCVM_INVALIDATE_ENG17_REQ (the engine amdgpu uses for gmc flushes)
-   usleep(2000);
+   unsigned ack_wait;
+   for (ack_wait=0;ack_wait<2000;++ack_wait) {
+      const uint32_t ack=rd(SEG0(0x16bd+17));
+      if (ack!=0xffffffffu && (ack&1u)) break;
+      usleep(100);
+   }
+   if (ack_wait==2000) fail("GART TLB invalidation timeout",kIOReturnTimeout);
    printf("gart: ack17=0x%x ctx0=0x%x\n", rd(SEG0(0x16bd + 17)), rd(SEG0(0x1688)));
 }
 static void grbm_select(uint32_t me, uint32_t pipe, uint32_t queue, uint32_t vmid)
@@ -196,10 +232,9 @@ static void grbm_select(uint32_t me, uint32_t pipe, uint32_t queue, uint32_t vmi
 }
 static void mes_start(void)
 {
-   // uc start from fw headers: lo=0xF0005000? taken from the header words (same for sched + kiq)
-   const uint64_t uc = 0xFFFFFFFFF0005000ull >> 2;
    wr(SEG1(0x2807), (1u << 16) | (1u << 17));                // PIPE0/1 RESET
    for (int p = 0; p < 2; p++) {
+      const uint64_t uc=mes_pc[p]>>2; // independently validated scheduler/KIQ header entry points
       grbm_select(3, p, 0, 0);
       wr(SEG1(0x2800), (uint32_t)uc);
       wr(SEG1(0x289d), (uint32_t)(uc >> 32));
@@ -345,11 +380,22 @@ static void sched_init(void)
 }
 static int mes_submit(void *pkt, size_t size, size_t api_status_off, const char *what)
 {
+   if (!phxMesShape(size,api_status_off,API_FRAME_SIZE_IN_DWORDS*4,sch_seq))
+      fail("invalid MES packet/sequence",kIOReturnBadArgument);
+   const uint32_t needed=(uint32_t)(size/4)+API_FRAME_SIZE_IN_DWORDS;
+   uint32_t rptr=0;int room=0;
+   for (unsigned i=0;i<400;++i) {
+      grbm_select(3,0,0,0);rptr=rd(SEG0(0x1fb3));grbm_select(0,0,0,0);
+      if (phxMesRoom(sch_wptr,rptr,1024,needed)) { room=1;break; }
+      usleep(5000);
+   }
+   if (!room) fail("MES ring space timeout",kIOReturnTimeout);
    uint32_t *dw = pkt;
    uint64_t status_va = VA(SCH_WB + 64);
    for (int i = 0; i < 4; i++) vw(SCH_WB + 64 + i * 4, 0);
-   *(uint64_t *)((char *)pkt + api_status_off) = status_va;
-   *(uint64_t *)((char *)pkt + api_status_off + 8) = 1;
+   const uint64_t wanted=sch_seq+1;
+   memcpy((char *)pkt+api_status_off,&status_va,sizeof(status_va));
+   memcpy((char *)pkt+api_status_off+8,&wanted,sizeof(wanted));
    union MESAPI__QUERY_MES_STATUS q;
    memset(&q, 0, sizeof(q));
    q.header.type = MES_API_TYPE_SCHEDULER;
@@ -359,21 +405,23 @@ static int mes_submit(void *pkt, size_t size, size_t api_status_off, const char 
    q.api_status.api_completion_fence_addr = VA(SCH_WB + 32);
    q.api_status.api_completion_fence_value = sch_seq;
    uint32_t *qd = (uint32_t *)&q;
-   for (size_t i = 0; i < size / 4; i++) vw(SCH_RING + (sch_wptr + i) * 4, dw[i]);
-   for (size_t i = 0; i < sizeof(q) / 4; i++) vw(SCH_RING + (sch_wptr + size / 4 + i) * 4, qd[i]);
+   for (size_t i = 0; i < size / 4; i++) vw(SCH_RING + ((sch_wptr + i)&1023u) * 4, dw[i]);
+   for (size_t i = 0; i < sizeof(q) / 4; i++) vw(SCH_RING + ((sch_wptr + size / 4 + i)&1023u) * 4, qd[i]);
    sch_wptr += (uint32_t)((size + sizeof(q)) / 4);
    vw(SCH_WB + 16, sch_wptr); vw(SCH_WB + 20, 0);          // wptr shadow (polled by MES) before the doorbell
    db(0x16 * 4, sch_wptr);
    for (int t = 0; t < 400; t++) {
       usleep(5000);
-      if (vr(SCH_WB + 32) == (uint32_t)sch_seq) break;
+      if (phxMesCompleted(sch_seq,vr64(SCH_WB+32),vr64(SCH_WB+64))) break;
    }
    grbm_select(3, 0, 0, 0);
    printf("  sched hqd: rptr=%u wptr_lo=%u dbctl=0x%08x active=%u\n", rd(SEG0(0x1fb3)), rd(SEG0(0x323f)), rd(SEG0(0x1fb8)), rd(SEG0(0x1fab)));
    grbm_select(0, 0, 0, 0);
-   uint32_t f = vr(SCH_WB + 32), st = vr(SCH_WB + 64);
-   printf("mes %s: fence=%u (want %llu) status=%u -> %s\n", what, f, (unsigned long long)sch_seq, st, (f == sch_seq && st) ? "OK" : "TIMEOUT");
-   if (!(f == sch_seq && st)) fail("MES completion timeout", kIOReturnTimeout);
+   const uint64_t f=vr64(SCH_WB+32),st=vr64(SCH_WB+64);
+   printf("mes %s: fence=%llu (want %llu) status=%llu -> %s\n",what,
+      (unsigned long long)f,(unsigned long long)sch_seq,(unsigned long long)st,
+      phxMesCompleted(sch_seq,f,st)?"OK":"TIMEOUT");
+   if (!phxMesCompleted(sch_seq,f,st)) fail("MES completion timeout", kIOReturnTimeout);
    return 0;
 }
 #define CMP_RING 0x2540000ull
@@ -802,6 +850,15 @@ int main(int argc, char **argv)
    if (!known || (!strcmp(argv[1], "db") && argc != 4)) {
       fprintf(stderr, "unknown or incomplete mesboot step\n"); return 2;
    }
+   if (!strcmp(argv[1],"mes") || !strcmp(argv[1],"all")) {
+      const char *names[2]={"MESBOOT_SCHED_PC","MESBOOT_KIQ_PC"};
+      for (unsigned i=0;i<2;++i) {
+         const char *v=getenv(names[i]);char *end=NULL;errno=0;
+         if (!v || !*v || *v=='-') { fprintf(stderr,"MES entry points required from phxfw --mes-start-pcs\n");return 2; }
+         mes_pc[i]=strtoull(v,&end,0);
+         if (errno || *end || !mes_pc[i] || (mes_pc[i]&3)) { fprintf(stderr,"invalid MES entry point\n");return 2; }
+      }
+   }
    if (open_kext()) return 1;
    memory_snapshot();
    if (!strcmp(argv[1], "layout")) {
@@ -814,6 +871,7 @@ int main(int argc, char **argv)
       return 0;
    }
    require_reference_memory();
+   abort_on_failure=1;
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;
    if (!strcmp(argv[1], "db") && argc >= 4) { printf("db +0x%llx <- %llu kr=0x%x\n", strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0), db(strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0))); return 0; }
@@ -827,7 +885,7 @@ int main(int argc, char **argv)
       printf("claim -> kr 0x%x\n", IOConnectCallScalarMethod(conn, 113, in, 1, NULL, NULL));
    }
    if (!strcmp(argv[1], "gfx")) {   // MES already running (after kiqsched): continue its ring where the last run left it
-      sch_wptr = vr(SCH_WB + 16); sch_seq = vr(SCH_WB + 32);
+      sch_wptr = vr(SCH_WB + 16); sch_seq = vr64(SCH_WB + 32);
       printf("sched ring: wptr=%u seq=%llu\n", sch_wptr, (unsigned long long)sch_seq);
       gfx_via_mes();
    }

@@ -8,7 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#ifdef PHX_DIRECT_RADV
+#define VK_NO_PROTOTYPES
+#endif
 #include <vulkan/vulkan.h>
+#ifdef PHX_DIRECT_RADV
+#include "radv_direct.h"
+#endif
 
 #include "fill_spv.h" /* glslangValidator -V --vn fill_spv fill.comp -o fill_spv.h */
 

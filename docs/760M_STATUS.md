@@ -474,3 +474,47 @@ Still required: establish exclusive GPU memory reservations, implement the HP
 PSP/SMU/GART/MES initialization using those allocations, and verify native fences
 and readbacks before accelerator/Metal/display activation. Full acceleration has
 not been achieved. A successful full binary build does not change that status.
+
+
+## Build 39 — coupled reservation and engine experiment
+
+Implemented, not yet runtime-tested on HP:
+- `phx_vram_arena.h`: exclusive interval leases, exclusions, stale-handle checks,
+  pinning and quarantine. PSP/TMR/staging/MES regions cannot overlap.
+- `phx_hp_memory.h`, reservation register profile and Sequoia capture: exact live
+  configuration gate, with only documented status bits ignored. The measured
+  9,216,000-byte console is conservatively protected through 16 MiB; active DMCUB
+  windows lie in firmware's top 2 MiB. Captured hardware cursors are disabled.
+- PhxBringup selector 115: administrator-only explicit start; exclusive PCI open,
+  live reservation checks and allocations precede DMA enable. No boot auto-start.
+- PSP: dynamic LOAD_TOC-sized TMR, separate MC/physical address calculation,
+  all 17 successful engine-firmware acknowledgements before RLC autoload.
+- MES/GART: owned scratch/default page, 64-bit fences, bounded ring-space checks,
+  wrapping packet writes, real firmware-header PCs and abort-on-failure handling.
+- Queue adoption: leases, cross-queue overlap/doorbell checks and actual kernel
+  RELEASE_MEM acknowledgement before ready flags. Native GB_ADDR_CONFIG is read
+  after engine power-up; HP BO budgets use its decoded sizes.
+- PhxAccel/framebuffer: HP requires positive native claim and cleared diagnostic
+  property; boot arming remains separate. Source build includes native compute
+  and offscreen translated graphics probes plus explicit `hp_bringup.py` harness.
+- Build/release: probe source receipts, glslang input, validated shader fixtures
+  and an explicit administrator-only experimental package policy.
+
+Fresh Linux capture confirmed a 64 MiB PSP TMR at Linux MC address 0x8018000000;
+that address is not imported into macOS. Linux and Sequoia firmware/cursor/window
+captures are separately labelled under `hardware/dumps/hp_envy_760m`. The
+Sequoia samples differ only in HUBP0 status, not allocation configuration.
+
+Host tests cover exact capture mismatch rejection, firmware sequencing, allocator
+fragmentation/stale handles/quarantine and MES counter rollover. Hardware driver
+initialization, native shader readbacks, Metal, display and runtime recovery
+remain unverified until the explicit experiment succeeds. Retaining DMA-exposed
+memory and requiring reboot is the current failure policy; no GPU reset or
+suspend/resume implementation is claimed. Build-38 release assets are unchanged.
+
+Build-39 static validation completed: full Sequoia stack (both kexts, plugin,
+translator, RADV and six native tools), ten C++ binaries and 37 Python methods
+passed. Captured-profile/arena tests passed ASan/UBSan. Metal/AIR/SPIR-V and ACO
+offline validation passed for explicit 8/12-CU mocks with zero submissions.
+The native probe correctly rejects mock transport. No HP engine command has
+yet been issued; the running HP kext is still build 37.

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <CoreFoundation/CFNumber.h>
 #include "../../../src/amd/phx_memory_layout.h"
+#include "../../../src/amd/phx_bootstrap_layout.h"
 #include "../../../src/amd/phx_hp_760m.h"
 typedef uint32_t io_connect_t;
 typedef uint32_t io_service_t;
@@ -86,6 +87,15 @@ static inline kern_return_t IOConnectCallMethod(io_connect_t c,uint32_t selector
         if (mode && !strcmp(mode,"different")) { p->raw_offset = 0x260; p->physical_base = 0x260000000ull; }
         if (mode && !strcmp(mode,"invalid")) ++p->physical_base;
         if (mode && !strcmp(mode,"lost")) p->flags |= PHX_MEMORY_DEVICE_LOST;
+    }
+    if (selector==PHX_SEL_BOOTSTRAP_LAYOUT && bout && bsize && *bsize==sizeof(struct phx_bootstrap_layout)) {
+        struct phx_bootstrap_layout *p=bout;
+        p->version=1;p->flags=PHX_BOOTSTRAP_REFERENCE_COMPAT;
+        p->ring_offset=0x1100000;p->ring_bytes=0x9000;p->firmware_offset=0x4000000;p->firmware_bytes=0x1000000;
+        p->tmr_offset=0x8000000;p->tmr_bytes=0x4000000;p->mes_offset=0x2000000;p->mes_bytes=0x800000;
+        p->fault_page_physical=0x100000;
+        if (getenv("MESBOOT_TEST_NO_LEASES")) p->flags=0;
+        if (getenv("MESBOOT_TEST_OVERLAP")) p->tmr_offset=p->mes_offset;
     }
     if (bsize && selected("MESBOOT_TEST_SHORT",selector) && *bsize) --*bsize;
     return 0;

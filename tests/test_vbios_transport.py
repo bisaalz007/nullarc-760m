@@ -40,6 +40,11 @@ class VbiosTransportTests(unittest.TestCase):
             self.assertEqual([len(s) for s in report['samples']],[48,48])
             self.assertFalse(report['register_writes'])
             self.assertNotIn('test-call:108',r.stdout)
+            full=subprocess.run([str(binary),'--reservations'],env=clean,capture_output=True,text=True)
+            self.assertEqual(full.returncode,0,full.stderr)
+            protected=json.loads(full.stdout[full.stdout.index('{'):])
+            self.assertEqual([len(s) for s in protected['samples']],[125,125])
+            self.assertTrue(any('DMCUB_REGION' in e['name'] for e in protected['samples'][0]))
             for env in [dict(clean,MESBOOT_TEST_OTHER_GPU='1'),dict(clean,MESBOOT_TEST_FAIL='2'),
                         dict(clean,MESBOOT_TEST_SHORT='2')]:
                 r=subprocess.run([str(binary),'--scanout'],env=env,capture_output=True,text=True)

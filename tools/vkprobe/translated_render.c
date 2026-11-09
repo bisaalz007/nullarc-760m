@@ -3,7 +3,13 @@
  * Offscreen only: no display takeover. Requires AMD 1002:1900 and Mesa RADV.
  * Linux success is not evidence of the macOS kernel/winsys execution path.
  */
+#ifdef PHX_DIRECT_RADV
+#define VK_NO_PROTOTYPES
+#endif
 #include <vulkan/vulkan.h>
+#ifdef PHX_DIRECT_RADV
+#include "radv_direct.h"
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

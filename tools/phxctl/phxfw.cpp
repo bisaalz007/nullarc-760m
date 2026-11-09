@@ -50,7 +50,7 @@ static bool slot(uint32_t type, uint32_t &offset, uint32_t &capacity) {
     }
 }
 
-static bool decode(const std::string &path, uint64_t kind, std::vector<UcodePayload> &payloads) {
+static bool decode(const std::string &path, uint64_t kind, std::vector<UcodePayload> &payloads, uint64_t *mesPc=nullptr) {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
     if (!f) return false;
     const auto size = f.tellg();
@@ -86,10 +86,25 @@ static bool decode(const std::string &path, uint64_t kind, std::vector<UcodePayl
         }
     }
     payloads.assign(out, out + count);
+    if (mesPc) {
+        if (kind!=kHostFwFile_MES && kind!=kHostFwFile_MES_KIQ) return false;
+        const auto *m=reinterpret_cast<const mes_firmware_header_v1_0 *>(bytes.data());
+        *mesPc=(uint64_t(m->mes_uc_start_addr_hi)<<32)|m->mes_uc_start_addr_lo;
+        if (!*mesPc || (*mesPc&3)) return false;
+    }
     return true;
 }
 
 int main(int argc, char **argv) {
+    if (argc==3 && !strcmp(argv[1],"--mes-start-pcs")) {
+        std::vector<UcodePayload> payloads;uint64_t scheduler=0,kiq=0;
+        const std::string dir=argv[2];
+        if (!decode(dir+"/gc_11_0_1_mes_2.bin",kHostFwFile_MES,payloads,&scheduler) ||
+            !decode(dir+"/gc_11_0_1_mes1.bin",kHostFwFile_MES_KIQ,payloads,&kiq)) {
+            fprintf(stderr,"invalid MES entry-point headers\n");return 1;
+        }
+        printf("0x%llx 0x%llx\n",(unsigned long long)scheduler,(unsigned long long)kiq);return 0;
+    }
     if (argc == 4 && !strcmp(argv[1], "--inspect-mes")) {
         if (strcmp(argv[2], "scheduler") && strcmp(argv[2], "kiq")) return 2;
         std::vector<UcodePayload> p;

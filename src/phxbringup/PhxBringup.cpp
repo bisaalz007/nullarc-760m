@@ -19,10 +19,13 @@
 #include "PhxNativeABI.h"
 #include "PhxExecutionPolicy.h"
 #include "PhxPspPolicy.h"
+#include "PhxFirmwareState.h"
 #include "../amd/phx_hp_760m.h"
 #include "../amd/phx_vbios.h"
+#include "../amd/phx_vram_arena.h"
+#include "../amd/phx_hp_memory.h"
 
-#define PHX_KEXT_BUILD 38u
+#define PHX_KEXT_BUILD 39u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -89,14 +92,23 @@ public:
     IOReturn loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t size, uint64_t out[4]);
     IOReturn pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]);
     IOReturn pspRaw(uint32_t cmdId, const uint32_t words[6], uint64_t out[4]);
-    bool debugEnabled() const { return debug; }
+    bool hpMemoryReady() const { return __atomic_load_n(&hpBootstrapAuthorized,__ATOMIC_ACQUIRE); }
+    bool debugEnabled() const { return debug || hpMemoryReady(); }
+    uint32_t addressConfig() { // GC 11.0.1 GB_ADDR_CONFIG, cached after power-up
+        if (!isLost() && accelerationReady() && !liveAddressConfig) liveAddressConfig=rreg(0x263e);
+        return liveAddressConfig;
+    }
+    uint64_t visibleBudget() const { return topology ? (fbSize<fbAperLen ? fbSize : fbAperLen) : kVisTotal; }
+    uint64_t highBudget() const { return topology ? fbSize-visibleBudget() : kHiTotal; }
     // E8: GPU execution. The userspace bring-up maps MES queues (compute = 0, gfx = 1) and hands them over (adoptQueue);
     // user BOs are then mapped into the VMID 8 page table and SUBMIT writes INDIRECT_BUFFERs into the queue's ring.
     IOReturn adoptQueue(const uint64_t in[6]);
     IOReturn claimAccel();
-    bool diagnosticOnly() const { return topology != nullptr; }
+    bool diagnosticOnly() const { return topology != nullptr && !hpMemoryReady(); }
+    IOReturn beginHpBootstrap();
     const phx_topology *capturedTopology() const { return topology; }
     bool memoryLayout(phx_memory_layout &out) const;
+    void bootstrapLayout(phx_bootstrap_layout &out);
     IOReturn readVbios(uint64_t offset, uint32_t bytes, void *out) const;
     bool gpuReady() const { return !isLost() && (gq[0].ready || gq[1].ready); }
     bool engineReady(uint32_t ip) const {
@@ -124,6 +136,7 @@ private:
     void readFbLayout();
     void readFirmwareLayout();
     void clearRing();
+    IOReturn prepareBootstrap(uint64_t requestedRing); // caller holds smuLock
 
     const phx_topology *topology{nullptr};
     IOPCIDevice *pci{nullptr};
@@ -133,6 +146,7 @@ private:
     uint64_t fbMcBase{0}, fbSize{0}, fbPhys{0};
     uint32_t fbBaseRaw{0}, fbTopRaw{0}, fbOffsetRaw{0};
     OSData *vbiosImage{nullptr}; // Immutable cached ACPI image; retained until service free.
+    PhxVbiosInfo firmwareInfo{};
     // BAR0 framebuffer aperture: the CPU window into the first fbAperLen bytes of VRAM. It is an MMIO
     // region above system RAM (phys 0x8_2040_0000 here, 256 MiB), so CPU writes through it reach the
     // GPU's local memory and never the macOS heap. This is how the PSP ring is initialised.
@@ -152,6 +166,14 @@ private:
     uint64_t tmrOff{0}, tmrMc{0}, tmrSize{0};
     uint64_t fwBufOff{0}, fwBufMc{0}, fwBufSize{0};
     PhxPspState pspState{};
+    PhxFirmwareState firmwareState{};
+    PhxVramArena<32> bootstrapArena{}; // guarded by smuLock
+    PhxVramLease pspLease{}, firmwareLease{}, tmrLease{}, mesLease{};
+    IOBufferMemoryDescriptor *faultPage{nullptr};
+    uint32_t requiredTmrBytes{0};
+    bool firmwareAutoloaded{false};
+    bool hpBootstrapAuthorized{false},pciOwned{false},bootstrapDmaStarted{false};
+    uint32_t liveAddressConfig{0};
     // E8 state: the adopted queues (ring/wb/fence are VRAM byte offsets reached through BAR0) and the VMID 8
     // page-table pool (physically contiguous system memory; page 0 is the root). Sequence numbers are global across
     // the queues; each queue's fence holds the last sequence it finished, and fseq/fend keep its outstanding
@@ -197,6 +219,8 @@ private:
     uint64_t *vmPte(VmCtx &c, uint64_t va, bool alloc);
     bool vmFlushTlb(uint32_t vmid);
     void ringPut(GpuQueue &q, uint32_t idx, uint32_t value);
+    void emitReleaseFence(GpuQueue &q,uint32_t &index,uint64_t sequence);
+    void publishQueue(GpuQueue &q);
     uint32_t deviceLost{0};
     bool debug{false};
     bool smuUsed{false};
@@ -236,6 +260,7 @@ private:
     IOReturn doQueryInfo(IOExternalMethodArguments *a);
     IOReturn doTopology(IOExternalMethodArguments *a);
     IOReturn doMemoryLayout(IOExternalMethodArguments *a);
+    IOReturn doBootstrapLayout(IOExternalMethodArguments *a);
     IOReturn doVbiosRead(IOExternalMethodArguments *a);
     IOReturn doReadRegs(IOExternalMethodArguments *a);
     IOReturn doBoCreate(IOExternalMethodArguments *a);
@@ -324,6 +349,7 @@ bool PhxBringup::start(IOService *provider) {
     doorbellMap = pci->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress2);
     smuLock = IOLockAlloc();
     gpuLock = IOLockAlloc();
+    if (!smuLock || !gpuLock) { stop(provider);return false; }
     uint32_t dbg = 0;
     debug = PE_parse_boot_argn("phxdebug", &dbg, sizeof(dbg)) && dbg == 1;
     if (mmio) {
@@ -353,7 +379,13 @@ void PhxBringup::stop(IOService *provider) {
         sysctl_unregister_oid(&sysctl__debug_phxbos_flush_bytes);
         gSysctlUp = 0;
     }
-    if (gpuRetired() < gSeq) failDevice("driver stop before fence retirement");
+    if (bootstrapDmaStarted) failDevice("driver stop without verified PSP/MES halt");
+    else if (gpuRetired() < gSeq) failDevice("driver stop before fence retirement");
+    if (faultPage) {
+        if (!bootstrapDmaStarted) { faultPage->complete(kIODirectionInOut);faultPage->release(); }
+        else IOLog("PhxBringup: retaining exposed bootstrap fault page until reboot\n");
+        faultPage=nullptr;
+    }
     clearRing();
     if (fbAper) {
         fbAper->release();
@@ -385,6 +417,7 @@ void PhxBringup::stop(IOService *provider) {
         mmio = nullptr;
     }
     if (pci) {
+        if (pciOwned && !bootstrapDmaStarted) pci->close(this);
         pci->release();
         pci = nullptr;
     }
@@ -460,6 +493,7 @@ void PhxBringup::readFirmwareLayout() {
         return;
     }
     setProperty("phx-vbios-status","decoded-metadata-only");
+    firmwareInfo=p;
     setProperty("phx-vbios-image-bytes",p.imageBytes,32);
     setProperty("phx-vbios-firmware-revision",p.firmwareRevision,32);
     setProperty("phx-vbios-firmware-table",(p.firmwareFormat<<16)|p.firmwareContent,32);
@@ -500,6 +534,21 @@ bool PhxBringup::memoryLayout(phx_memory_layout &out) const {
     return true;
 }
 
+void PhxBringup::bootstrapLayout(phx_bootstrap_layout &out) {
+    out={};out.version=PHX_BOOTSTRAP_VERSION;
+    IOLockLock(smuLock);
+    if (pspLease.id) {
+        out.flags=bootstrapArena.ready() && !isLost() ?
+            (topology ? PHX_BOOTSTRAP_HP_CAPTURED_PROFILE : PHX_BOOTSTRAP_REFERENCE_COMPAT) : PHX_BOOTSTRAP_QUARANTINED;
+        out.ring_offset=pspLease.offset;out.ring_bytes=pspLease.bytes;
+        out.firmware_offset=firmwareLease.offset;out.firmware_bytes=firmwareLease.bytes;
+        out.tmr_offset=tmrLease.offset;out.tmr_bytes=tmrLease.bytes;
+        out.mes_offset=mesLease.offset;out.mes_bytes=mesLease.bytes;
+        if (faultPage) out.fault_page_physical=faultPage->getPhysicalAddress();
+    }
+    IOLockUnlock(smuLock);
+}
+
 void PhxBringup::clearRing() {
     ringMc = ringOff = 0;
     cmdOff = cmdMc = fenceOff = fenceMc = 0;
@@ -507,6 +556,8 @@ void PhxBringup::clearRing() {
     tmrOff = tmrMc = tmrSize = 0;
     fwBufOff = fwBufMc = fwBufSize = 0;
     pspState = PhxPspState{};
+    firmwareState.reset();
+    requiredTmrBytes=0;
 }
 
 // Drain the host data path so the PSP sees our VRAM writes before we ring the doorbell (C2PMSG_67).
@@ -610,6 +661,79 @@ uint64_t *PhxBringup::ptTable(const VmCtx &c, uint64_t phys) const {
 }
 
 // The physical address of table i, allocating (zeroed, flushed) the chunk it lives in; 0 when that fails.
+// Preserve the existing reference board's scratch policy, but account for every
+// region exclusively. This is deliberately NOT an ownership attestation for HP.
+// A future HP pool must come from its complete firmware/display reservation map.
+IOReturn PhxBringup::prepareBootstrap(uint64_t requestedRing) {
+    if (topology) {
+        phx_memory_layout memory{};uint32_t first[PHX_RESERVATION_REG_COUNT],second[PHX_RESERVATION_REG_COUNT];
+        if (!pciOwned || !memoryLayout(memory)) return kIOReturnNotReady;
+        for (unsigned i=0;i<PHX_RESERVATION_REG_COUNT;++i) first[i]=rreg(phx_reservation_registers[i].dword);
+        for (unsigned i=0;i<PHX_RESERVATION_REG_COUNT;++i) second[i]=rreg(phx_reservation_registers[i].dword);
+        if (!phxHpMemoryMatches(memory,firmwareInfo,first,second)) {
+            setProperty("phx-bringup-blocker","live HP firmware/display reservation configuration differs from captured profile");
+            return kIOReturnUnsupported;
+        }
+    } else if (fbMcBase!=0x8000000000ull || fbPhys!=0x6a0000000ull ||
+        fbSize!=(6ull<<30) || fbAperLen<(256ull<<20)) return kIOReturnUnsupported;
+    if (firmwareAutoloaded || (!bootstrapArena.ready() && pspLease.id)) return kIOReturnNotReady;
+    if (pspLease.id) return requestedRing==pspLease.offset ? kIOReturnSuccess : kIOReturnExclusiveAccess;
+    PhxVramArena<32> pending;
+    PhxVramLease ring,fw,mes;
+    // Existing reference console [0,0xfa0000); round its exclusion up to 16 MiB.
+    // Existing MES experiments use [32,40) MiB, including GART/MQDs/readbacks.
+    const uint64_t prefix=topology ? phx_hp_console_exclusion : 16ull<<20;
+    if (!pending.begin(fbAperLen) || !pending.exclude(0,prefix) || !pending.seal() ||
+        !pending.allocateAt(32ull<<20,8ull<<20,mes) ||
+        !pending.allocateAt(requestedRing,PHX_PSP_FENCE_REL+0x1000,ring) ||
+        !pending.allocateAt(PHX_VRAM_FWBUF_OFF,PHX_VRAM_FWBUF_SIZE,fw)) return kIOReturnBadArgument;
+    IOBufferMemoryDescriptor *page=IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+        kernel_task,kIODirectionInOut|kIOMemoryPhysicallyContiguous,4096,kPtAddrMask);
+    if (!page) return kIOReturnNoMemory;
+    if (page->prepare(kIODirectionInOut)!=kIOReturnSuccess) {
+        page->release();return kIOReturnNoMemory;
+    }
+    if (!page->getPhysicalAddress()) { page->complete(kIODirectionInOut);page->release();return kIOReturnNoMemory; }
+    bzero(page->getBytesNoCopy(),4096);
+    for (unsigned i=0;i<4096;i+=64) flushLine(static_cast<uint8_t *>(page->getBytesNoCopy())+i);
+    bootstrapArena=pending;pspLease=ring;firmwareLease=fw;mesLease=mes;faultPage=page;
+    setProperty("phx-vram-policy",topology ? "hp-captured-reservation-leases" : "reference-compatibility-leases");
+    return kIOReturnSuccess;
+}
+
+IOReturn PhxBringup::beginHpBootstrap() {
+    if (!topology || !pci || !mmio || !fbAper || !doorbellMap || isLost()) return kIOReturnNotReady;
+    IOLockLock(smuLock);
+    if (hpBootstrapAuthorized) { IOLockUnlock(smuLock);return kIOReturnExclusiveAccess; }
+    if (!pci->open(this)) {
+        if (OSIterator *it=pci->getChildIterator(gIOServicePlane)) {
+            while (OSObject *object=it->getNextObject()) {
+                IOService *client=OSDynamicCast(IOService,object);
+                if (client && pci->isOpen(client)) setProperty("phx-pci-open-client",client->getMetaClass()->getClassName());
+            }
+            it->release();
+        }
+        setProperty("phx-bringup-blocker","PCI provider already open; no hardware initialization attempted");
+        IOLockUnlock(smuLock);return kIOReturnExclusiveAccess;
+    }
+    pciOwned=true;
+    const IOReturn result=prepareBootstrap(0x1100000);
+    if (result!=kIOReturnSuccess) { pci->close(this);pciOwned=false;IOLockUnlock(smuLock);return result; }
+    // Enable DMA only after the provider claim, live reservation checks and all
+    // initial leases succeed. No PSP or GPU command is submitted by this stage.
+    const uint16_t before=pci->configRead16(kIOPCIConfigCommand);
+    pci->setMemoryEnable(true);pci->setBusMasterEnable(true);
+    if ((pci->configRead16(kIOPCIConfigCommand)&6u)!=6u) {
+        pci->configWrite16(kIOPCIConfigCommand,before);pci->close(this);pciOwned=false;
+        IOLockUnlock(smuLock);return kIOReturnIOError;
+    }
+    __atomic_store_n(&hpBootstrapAuthorized,true,__ATOMIC_RELEASE);
+    setProperty("phx-stage","bootstrap-memory-reserved");
+    setProperty("phx-bringup-blocker","PSP/SMU/MES initialization and compute/graphics readbacks still required");
+    IOLog("PhxBringup: HP bootstrap memory leased; GPU execution not yet validated\n");
+    IOLockUnlock(smuLock);return kIOReturnSuccess;
+}
+
 uint64_t PhxBringup::ptTablePhys(VmCtx &c, uint32_t i) {
     const uint32_t k = i / kPtChunkPages;
     if (k >= kPtChunks)
@@ -656,6 +780,7 @@ void PhxBringup::failDevice(const char *stage) {
     if (__atomic_exchange_n(&deviceLost, 1u, __ATOMIC_ACQ_REL)) return;
     setProperty("phx-stage", "device-lost");
     setProperty("phx-failure", stage);
+    if (pci) pci->setProperty("nmxgpu-claimed",kOSBooleanFalse);
     IOLog("PhxBringup: device lost at %s; GPU memory retained, reboot required\n", stage);
 }
 
@@ -790,7 +915,23 @@ IOReturn PhxBringup::adoptQueue(const uint64_t in[6]) {
     const uint32_t qi = static_cast<uint32_t>(in[5] & 1);
     if (!phxQueueLayoutValid(ringOff, ringDw, wbOff, fenceOff, dbByte, fbSize, fbAperLen, doorbellMap->getLength()))
         return kIOReturnBadArgument;
+    IOLockLock(smuLock);
+    const bool owned=bootstrapArena.contains(mesLease,ringOff,ringDw*4) &&
+        bootstrapArena.contains(mesLease,wbOff,32) && bootstrapArena.contains(mesLease,fenceOff,8);
+    if (owned) bootstrapArena.pin(mesLease);
+    IOLockUnlock(smuLock);
+    if (!owned) return kIOReturnNotPermitted;
     IOLockLock(gpuLock);
+    if (gq[qi].ready || isLost()) { IOLockUnlock(gpuLock);return kIOReturnBusy; }
+    const GpuQueue &other=gq[1-qi];
+    if (other.ready) {
+        const uint64_t a[3]={ringOff,wbOff,fenceOff}, an[3]={ringDw*4,32,8};
+        const uint64_t b[3]={other.ringOff,other.wbOff,other.fenceOff}, bn[3]={static_cast<uint64_t>(other.ringDw)*4,32,8};
+        bool collision=dbByte==other.dbByte;
+        for (unsigned i=0;i<3;++i) for (unsigned j=0;j<3;++j)
+            collision |= a[i]<b[j]+bn[j] && b[j]<a[i]+an[i];
+        if (collision) { IOLockUnlock(gpuLock);return kIOReturnExclusiveAccess; }
+    }
     GpuQueue &q = gq[qi];
     bzero(&q, sizeof(q));
     q.gfx = qi == 1;
@@ -804,8 +945,21 @@ IOReturn PhxBringup::adoptQueue(const uint64_t in[6]) {
     fence[0] = static_cast<uint32_t>(gSeq);
     fence[1] = static_cast<uint32_t>(gSeq >> 32);
     hdpFlush();
-    q.ready = true;
+    // A queue is not ready merely because userspace supplied its addresses.
+    // Submit the same RELEASE_MEM packet used by real IB submissions and require
+    // the GPU to replace the old fence value before publishing readiness.
+    if (gSeq==UINT64_MAX) { IOLockUnlock(gpuLock);return kIOReturnNoResources; }
+    const uint64_t probe=++gSeq;uint32_t words=0;
+    emitReleaseFence(q,words,probe);q.wptr+=words;publishQueue(q);
+    unsigned waited=0;
+    for (;waited<2000 && queueFence(q)!=probe;++waited) IOSleep(1);
+    if (queueFence(q)!=probe) {
+        failDevice(qi ? "graphics queue RELEASE_MEM probe timeout" : "compute queue RELEASE_MEM probe timeout");
+        IOLockUnlock(gpuLock);return kIOReturnTimeout;
+    }
+    q.doneEnd=q.wptr;q.ready=true;
     IOLockUnlock(gpuLock);
+    setProperty("phx-stage",accelerationReady() ? "native-queues-tested" : "compute-queue-tested");
     IOLog("PhxBringup: adopted %s queue ring=+0x%llx (%llu dw) wptr=%llu doorbell=+0x%llx\n",
           qi ? "gfx" : "compute", ringOff, ringDw, wptr, dbByte);
     return kIOReturnSuccess;
@@ -817,6 +971,9 @@ IOReturn PhxBringup::claimAccel() {
     if (diagnosticOnly() || !pci || !accelerationReady())
         return kIOReturnNotReady;
     pci->setProperty("nmxgpu-claimed", kOSBooleanTrue);
+    if (topology) pci->setProperty("phx-diagnostic-only",kOSBooleanFalse);
+    setProperty("phx-stage","native-queues-ready");
+    removeProperty("phx-bringup-blocker");
     pci->registerService();
     IOLog("PhxBringup: GPU claimed for PhxAccel, matching re-run\n");
     return kIOReturnSuccess;
@@ -894,6 +1051,33 @@ uint64_t PhxBringup::gpuRetired() const {
     return r;
 }
 
+void PhxBringup::emitReleaseFence(GpuQueue &q,uint32_t &k,uint64_t seq) {
+    const uint64_t fenceMc = fbMcBase + q.fenceOff;
+    ringPut(q, k++, 0xC0064900);                                   // RELEASE_MEM, as gfx_v11_0_ring_emit_fence
+    ringPut(q, k++, 0x06603514);                                   // GCR SEQ|GL2_WB|GLM_INV|GLM_WB, CP 3, CACHE_FLUSH_AND_INV_TS, idx 5
+    ringPut(q, k++, 0x40000000);                                   // DATA_SEL 2 (64-bit), no interrupt
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc));
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc >> 32));
+    ringPut(q, k++, static_cast<uint32_t>(seq));
+    ringPut(q, k++, static_cast<uint32_t>(seq >> 32));
+    ringPut(q, k++, 0);
+}
+
+void PhxBringup::publishQueue(GpuQueue &q) {
+    // BAR0 is write-combined: drain the WC buffers so the packets are in VRAM before the CP is told about them
+    __asm__ __volatile__("sfence" ::: "memory");
+    (void)*reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + q.ringOff);
+    hdpFlush();
+    volatile uint32_t *wb = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + q.wbOff + 16);
+    wb[0] = static_cast<uint32_t>(q.wptr);
+    wb[1] = static_cast<uint32_t>(q.wptr >> 32);
+    __asm__ __volatile__("sfence" ::: "memory");
+    (void)wb[0];
+    hdpFlush();
+    __asm__ __volatile__("mfence" ::: "memory");
+    *reinterpret_cast<volatile uint64_t *>(doorbellMap->getVirtualAddress() + q.dbByte) = q.wptr;
+}
+
 IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seqOut) {
     // Each packet stream requires its actual engine; never send graphics to MEC.
     if (!engineReady(gfx ? 0u : 1u)) return kIOReturnNotReady;
@@ -940,32 +1124,13 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
     }
     const uint64_t seq = ++gSeq;
     hwv[vmid - kFirstUserVmid].lastSeq = seq;
-    const uint64_t fenceMc = fbMcBase + q.fenceOff;
-    ringPut(q, k++, 0xC0064900);                                   // RELEASE_MEM, as gfx_v11_0_ring_emit_fence
-    ringPut(q, k++, 0x06603514);                                   // GCR SEQ|GL2_WB|GLM_INV|GLM_WB, CP 3, CACHE_FLUSH_AND_INV_TS, idx 5
-    ringPut(q, k++, 0x40000000);                                   // DATA_SEL 2 (64-bit), no interrupt
-    ringPut(q, k++, static_cast<uint32_t>(fenceMc));
-    ringPut(q, k++, static_cast<uint32_t>(fenceMc >> 32));
-    ringPut(q, k++, static_cast<uint32_t>(seq));
-    ringPut(q, k++, static_cast<uint32_t>(seq >> 32));
-    ringPut(q, k++, 0);
+    emitReleaseFence(q,k,seq);
     q.wptr += k;
     q.fseq[q.tail & 63] = seq;
     q.fend[q.tail & 63] = q.wptr;
     __asm__ __volatile__("" ::: "memory");
     q.tail = q.tail + 1;
-    // BAR0 is write-combined: drain the WC buffers so the packets are in VRAM before the CP is told about them
-    __asm__ __volatile__("sfence" ::: "memory");
-    (void)*reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + q.ringOff);
-    hdpFlush();
-    volatile uint32_t *wb = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + q.wbOff + 16);
-    wb[0] = static_cast<uint32_t>(q.wptr);
-    wb[1] = static_cast<uint32_t>(q.wptr >> 32);
-    __asm__ __volatile__("sfence" ::: "memory");
-    (void)wb[0];
-    hdpFlush();
-    __asm__ __volatile__("mfence" ::: "memory");
-    *reinterpret_cast<volatile uint64_t *>(doorbellMap->getVirtualAddress() + q.dbByte) = q.wptr;
+    publishQueue(q);
     IOLockUnlock(gpuLock);
     *seqOut = seq;
     return kIOReturnSuccess;
@@ -985,8 +1150,14 @@ IOReturn PhxBringup::vramWrite(uint32_t byteOff, uint32_t value) {
         return kIOReturnNotReady;
     if ((byteOff & 3) || !phxVramSpan(byteOff, 4, fbSize, fbAperLen))
         return kIOReturnBadArgument;
+    IOLockLock(smuLock);
+    // MES may write only its own bootstrap lease, never PSP/TMR/staging memory.
+    if (pspLease.id && !bootstrapArena.contains(mesLease,byteOff,4)) {
+        IOLockUnlock(smuLock);return kIOReturnNotPermitted;
+    }
     *reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + byteOff) = value;
     __asm__ __volatile__("sfence" ::: "memory");
+    IOLockUnlock(smuLock);
     return kIOReturnSuccess;
 }
 
@@ -1010,13 +1181,14 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
     IOReturn r = kIOReturnSuccess;
     IOLockLock(smuLock);
     if (op == 1) {
-        if (ringMc || !pspState.reusable()) {
+        if (ringMc || !pspState.reusable() || firmwareAutoloaded) {
             r = kIOReturnExclusiveAccess;   // a ring is already live; destroy it first
         } else if ((carveOffset & 0xFFF) ||
-                   !phxBufferSpan(carveOffset, PHX_PSP_FENCE_REL + 0x1000, PHX_VRAM_TMR_OFF) ||
                    !phxVramSpan(carveOffset, PHX_PSP_FENCE_REL + 0x1000, fbSize, fbAperLen) ||
                    !phxVramSpan(PHX_VRAM_FWBUF_OFF, PHX_VRAM_FWBUF_SIZE, fbSize, fbAperLen)) {
             r = kIOReturnBadArgument;        // ring+cmd+fence must sit below the TMR; fw_buf must fit the aperture
+        } else if ((r=prepareBootstrap(carveOffset))!=kIOReturnSuccess) {
+            // No zero-test or register write can substitute for a valid lease.
         } else {
             volatile uint32_t *ring = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + carveOffset);
             uint32_t nonzero = 0;
@@ -1029,6 +1201,8 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                 r = kIOReturnNotReady;       // SOS not ready to accept the ring
             } else {
                 ringMc = fbMcBase + carveOffset;
+                bootstrapDmaStarted=true;
+                bootstrapArena.pin(pspLease); // PSP can DMA after the following mailbox write.
                 wreg(PHX_PSP_C2PMSG_69, static_cast<uint32_t>(ringMc));
                 wreg(PHX_PSP_C2PMSG_70, static_cast<uint32_t>(ringMc >> 32));
                 wreg(PHX_PSP_C2PMSG_71, PHX_PSP_RING_SIZE);
@@ -1039,6 +1213,7 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                     // The PSP may still accept the request later. Keep the address
                     // and quarantine the buffers until destruction is acknowledged.
                     pspState.completed(false);
+                    bootstrapArena.quarantine();
                 } else {
                     // Ring is live. Lay the GPCOM command + fence buffers just above it and zero them,
                     // then reset the doorbell so wptr agrees with our slot 0 (Linux psp_v13_0_ring_create).
@@ -1048,8 +1223,8 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                     cmdMc = fbMcBase + cmdOff;
                     fenceMc = fbMcBase + fenceOff;
                     fenceCounter = 0;
-                    tmrOff = PHX_VRAM_TMR_OFF;
-                    tmrMc = fbMcBase + tmrOff;
+                    tmrOff = tmrLease.offset;
+                    tmrMc = tmrLease.id ? fbMcBase + tmrOff : 0;
                     tmrSize = 0;
                     pspState = PhxPspState{};
                     fwBufOff = PHX_VRAM_FWBUF_OFF;
@@ -1066,11 +1241,13 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
             }
         }
     } else if (op == 2) {
+        if (firmwareAutoloaded) { IOLockUnlock(smuLock);return kIOReturnBusy; }
         wreg(PHX_PSP_C2PMSG_64, PHX_GFX_CTRL_CMD_ID_DESTROY_RINGS);
         IOSleep(20);
         if (!pspWaitTos(2000)) {
             r = kIOReturnTimeout;
             pspState.destroyed(false);
+            bootstrapArena.quarantine();
         } else {
             clearRing();
         }
@@ -1147,6 +1324,7 @@ IOReturn PhxBringup::pspRunCmd(uint32_t cmdId, const uint32_t *unionWords, uint3
     }
     uint32_t status = cmd[PHX_PSP_GFX_RESP_OFFSET / 4];
     pspState.completed(observed == fence);
+    if (observed!=fence) bootstrapArena.quarantine();
     // Always succeed at the transport level so IOKit delivers the outputs; the PSP result is in out[].
     // out[1] = elapsed us (≈budget on a fence timeout), so userspace distinguishes timeout from a status code.
     out[0] = (observed == fence) ? status : 0xFFFFFFFFu;  // 0xFFFFFFFF = fence never arrived
@@ -1210,12 +1388,15 @@ IOReturn PhxBringup::loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t si
         return kIOReturnBadArgument;
     IOLockLock(smuLock);
     IOReturn r;
-    if (!ringMc) {
+    if (!ringMc || !pspState.confirmedTmrBytes || firmwareAutoloaded) {
         r = kIOReturnNotReady;
+    } else if (!firmwareState.mayLoad(fwType)) {
+        r = kIOReturnBadArgument;
     } else {
         uint64_t mc = fwBufMc + fwBufOffset;
         uint32_t u[4] = {static_cast<uint32_t>(mc), static_cast<uint32_t>(mc >> 32), size, fwType};
         r = pspRunCmd(PHX_PSP_GFX_CMD_LOAD_IP_FW, u, 4, out);
+        firmwareState.acknowledge(fwType,r==kIOReturnSuccess,out[0]);
     }
     IOLockUnlock(smuLock);
     return r;
@@ -1230,10 +1411,21 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
     if (!ringMc) {
         r = kIOReturnNotReady;
     } else if (op == 1) {
-        uint32_t size = arg ? arg : 0x400000u;
-        if (size > PHX_VRAM_TMR_CAP || !phxVramSpan(tmrOff, size, fbSize, fbAperLen)) {
+        const uint32_t size=arg ? arg : requiredTmrBytes;
+        // Linux psp_tmr_init obtains the required size from LOAD_TOC. Never use
+        // an arbitrary default, or quietly give PSP less memory than it requested.
+        if (!requiredTmrBytes || size<requiredTmrBytes || !bootstrapArena.ready() || firmwareAutoloaded) {
             IOLockUnlock(smuLock); return kIOReturnBadArgument;
         }
+        if (!tmrLease.id && !bootstrapArena.allocate(size, (size>=1u<<20 && !(size&(size-1))) ? size : 1ull<<20,tmrLease)) {
+            IOLockUnlock(smuLock);return kIOReturnNoMemory;
+        }
+        if (size>tmrLease.bytes || !bootstrapArena.contains(tmrLease,tmrLease.offset,size)) {
+            IOLockUnlock(smuLock);return kIOReturnBadArgument;
+        }
+        tmrOff=tmrLease.offset;tmrMc=fbMcBase+tmrOff;
+        firmwareState.reset();
+        bootstrapArena.pin(tmrLease); // keep even on failure; firmware may have observed it
         // psp_gfx_cmd_setup_tmr (Linux psp_prep_tmr_cmd_buf): buf_phy_addr = TMR MC address, buf_size,
         // bitfield(virt_phy_addr=1 => 0x2), system_phy_addr = the REAL system-physical address of the TMR
         // (amdgpu_gmc_vram_pa = mc - vram_start + vram_base_offset = fbPhys + tmrOff on this UMA part).
@@ -1244,7 +1436,11 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
         pspState.setupResult(size, r == kIOReturnSuccess, out[0]);
         tmrSize = pspState.confirmedTmrBytes;
     } else if (op == 2) {
+        if (!pspState.confirmedTmrBytes || !firmwareState.complete() || firmwareAutoloaded) {
+            IOLockUnlock(smuLock);return kIOReturnNotReady;
+        }
         r = pspRunCmd(PHX_PSP_GFX_CMD_AUTOLOAD_RLC, nullptr, 0, out);
+        if (r==kIOReturnSuccess && out[0]==0) firmwareAutoloaded=true;
     } else if (op == 3) {
         // TOC must first be staged at fw_buf offset zero. This submits only the
         // verified Linux LOAD_TOC layout; it does not allocate or set up TMR.
@@ -1253,7 +1449,9 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
         }
         uint32_t u[3] = {static_cast<uint32_t>(fwBufMc), static_cast<uint32_t>(fwBufMc >> 32), arg};
         uint32_t required = 0;
+        requiredTmrBytes=0;
         r = pspRunCmd(PHX_PSP_GFX_CMD_LOAD_TOC, u, 3, out, &required);
+        if (r==kIOReturnSuccess && out[0]==0) requiredTmrBytes=required;
         out[2] = required; out[3] = 0;
     } else {
         r = kIOReturnBadArgument;
@@ -1268,6 +1466,7 @@ IOReturn PhxBringup::pspRaw(uint32_t cmdId, const uint32_t words[6], uint64_t ou
     if (!mmio || !fbAper)
         return kIOReturnNotReady;
     IOLockLock(smuLock);
+    if (pspLease.id) { IOLockUnlock(smuLock);return kIOReturnNotPermitted; }
     IOReturn r = ringMc ? pspRunCmd(cmdId, words, 6, out) : kIOReturnNotReady;
     IOLockUnlock(smuLock);
     return r;
@@ -1446,7 +1645,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
                                                 IOExternalMethodDispatch *, OSObject *, void *) {
     // Enforced before WAITSEQ's separate locking and before debug handlers.
     if (owner->isLost() && !phxDiagnosticSelector(selector)) return kIOReturnAborted;
-    if (owner->diagnosticOnly() && !phxDiagnosticSelector(selector)) return kIOReturnNotReady;
+    if (owner->diagnosticOnly() && !phxDiagnosticSelector(selector) && selector!=PHXN_SEL_HP_BEGIN) return kIOReturnNotReady;
     if (selector == PHXN_SEL_WAITSEQ)
         return doWaitSeq(a);
 
@@ -1460,6 +1659,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_QUERYINFO: r = doQueryInfo(a); break;
         case PHX_SEL_TOPOLOGY: r = doTopology(a); break;
         case PHX_SEL_MEMORY_LAYOUT: r = doMemoryLayout(a); break;
+        case PHX_SEL_BOOTSTRAP_LAYOUT: r = doBootstrapLayout(a); break;
         case PHX_SEL_VBIOS_READ: r = doVbiosRead(a); break;
         case PHXN_SEL_READREGS:  r = doReadRegs(a); break;
         case PHXN_SEL_BOCREATE:  r = doBoCreate(a); break;
@@ -1482,6 +1682,17 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_DBG_SYSMEM: r = doDbgSysMem(a); break;
         case PHXN_SEL_DBG_ADOPTQ: r = doDbgAdoptQueue(a); break;
         case PHXN_SEL_DBG_CLAIM: r = doDbgClaim(a); break;
+        case PHXN_SEL_HP_BEGIN:
+            if (!privileged) r=kIOReturnNotPrivileged;
+            else if (!shape(a,0,0,0,0)) r=kIOReturnBadArgument;
+            else r=owner->beginHpBootstrap();
+            break;
+        case PHXN_SEL_DBG_ABORT:
+            if (!privileged) r=kIOReturnNotPrivileged;
+            else if (!owner->debugEnabled()) r=kIOReturnUnsupported;
+            else if (!shape(a,0,0,0,0)) r=kIOReturnBadArgument;
+            else { owner->failDevice("userspace PSP/MES bootstrap failure");r=kIOReturnSuccess; }
+            break;
         default:                 r = kIOReturnBadArgument; break;
         }
     }
@@ -1510,6 +1721,7 @@ IOReturn IOAccelPhxNativeClient::doTopology(IOExternalMethodArguments *a) {
     const phx_topology *p = owner->capturedTopology();
     if (!p) return kIOReturnUnsupported; // Preserve legacy 780M fallback.
     bcopy(p, a->structureOutput, sizeof(*p));
+    if (owner->accelerationReady()) static_cast<phx_topology *>(a->structureOutput)->flags|=PHX_TOPOLOGY_RUNTIME_READY;
     return kIOReturnSuccess;
 }
 
@@ -1519,6 +1731,13 @@ IOReturn IOAccelPhxNativeClient::doMemoryLayout(IOExternalMethodArguments *a) {
     if (!owner->memoryLayout(p)) return kIOReturnNotReady;
     bcopy(&p, a->structureOutput, sizeof(p));
     return kIOReturnSuccess;
+}
+
+IOReturn IOAccelPhxNativeClient::doBootstrapLayout(IOExternalMethodArguments *a) {
+    if (!privileged) return kIOReturnNotPrivileged;
+    if (!shape(a,0,0,0,sizeof(phx_bootstrap_layout))) return kIOReturnBadArgument;
+    phx_bootstrap_layout p{};owner->bootstrapLayout(p);
+    bcopy(&p,a->structureOutput,sizeof(p));return kIOReturnSuccess;
 }
 
 IOReturn IOAccelPhxNativeClient::doVbiosRead(IOExternalMethodArguments *a) {
@@ -1539,14 +1758,20 @@ IOReturn IOAccelPhxNativeClient::doQueryInfo(IOExternalMethodArguments *a) {
     inf.flags = owner->accelerationReady() ? PHXN_INFO_S1B_POSITIVE | PHXN_INFO_NATIVE_BOOT : 0;
     if (owner->isLost()) inf.flags |= PHXN_INFO_HUNG;
     inf.vmid = PHXN_VMID;
-    inf.gb_addr_config = kGbAddrConfig;
+    inf.gb_addr_config = owner->addressConfig();
+    if (!inf.gb_addr_config || inf.gb_addr_config==0xffffffffu) {
+        if (owner->capturedTopology()) {
+            if (owner->accelerationReady()) return kIOReturnNotReady;
+            inf.gb_addr_config=0;
+        } else inf.gb_addr_config=kGbAddrConfig;
+    }
     inf.gc_version = kGcVersion;
     inf.ring_size_dw = 4096;
     inf.max_ibs = PHXN_MAX_IBS;
-    inf.vram_vis_total = kVisTotal;
-    inf.vram_vis_free = kVisTotal - visUsed;
-    inf.vram_hi_total = kHiTotal;
-    inf.vram_hi_free = kHiTotal - hiUsed;
+    inf.vram_vis_total = owner->visibleBudget();
+    inf.vram_vis_free = visUsed<=inf.vram_vis_total ? inf.vram_vis_total-visUsed : 0;
+    inf.vram_hi_total = owner->highBudget();
+    inf.vram_hi_free = hiUsed<=inf.vram_hi_total ? inf.vram_hi_total-hiUsed : 0;
     inf.gtt_cap = kGttCap;
     inf.gtt_used = gttUsed;
     inf.gtt_max_bo = kGttMaxBo;
@@ -1603,12 +1828,12 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
     uint32_t domain, bits;
     uint64_t *pool;
     if (d & PHX_AMDGPU_GEM_DOMAIN_VRAM) {
-        if (visUsed + size <= kVisTotal) {
+        if (size<=owner->visibleBudget() && visUsed<=owner->visibleBudget()-size) {
             domain = 4;
             bits = PHXN_PLACED_CPU_MAPPABLE | PHXN_PLACED_ZEROED;
             pool = &visUsed;
         } else if ((f & PHX_AMDGPU_GEM_CREATE_NO_CPU_ACCESS) && !(f & PHX_AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) &&
-                   hiUsed + size <= kHiTotal) {
+                   size<=owner->highBudget() && hiUsed<=owner->highBudget()-size) {
             domain = 4;
             bits = PHXN_PLACED_HI_POOL | PHXN_PLACED_ZEROED;
             pool = &hiUsed;

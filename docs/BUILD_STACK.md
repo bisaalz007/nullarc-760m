@@ -28,6 +28,7 @@ python3 tools/build_stack.py \
   --sdk /path/to/MacKernelSDK \
   --vulkan-headers /path/to/Vulkan-Headers \
   --translator-source /path/to/NullMoth-v2.4.1 \
+  --glslang /path/to/glslang \
   --mesa /path/to/patched-mesa \
   --air-runtime /path/to/compatible/NVMTLDriver.bundle \
   --dependency-notices /path/to/native-dependency-notices \
@@ -159,3 +160,11 @@ version. It rejects a newer transitive dependency or a mismatched build receipt.
 Run the compiler test with `--min-macos 15.0` as well. The source-built package
 passed loader, AIR translation and mock ACO pipeline tests on the HP's actual
 Sequoia 15.8.2; native kernel/Metal-device/GPU rendering remain separate tests.
+
+
+Build 39 also produces `vkprobe-native` and `render-native` plus the explicit
+administrator-only `gpu/phxctl/hp_bringup.py` experiment. Native probes require
+an absolute `PHX_RADV_DRIVER` path and refuse mock transport. The Metal stack test
+writes a shader-fixture receipt; experimental release assembly checks it against
+the exact packaged plugin/translator/RADV and includes the validated SPIR-V.
+This is preparation for hardware testing, not an acceleration success claim.
