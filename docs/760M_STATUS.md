@@ -518,3 +518,30 @@ passed. Captured-profile/arena tests passed ASan/UBSan. Metal/AIR/SPIR-V and ACO
 offline validation passed for explicit 8/12-CU mocks with zero submissions.
 The native probe correctly rejects mock transport. No HP engine command has
 yet been issued; the running HP kext is still build 37.
+
+### HP build-39 installation check
+
+The HP preparation report confirms component backup/copy and USB EFI backup/copy
+completed. Backups are `/Users/Shared/nullarc-component-backups/backup-oz84ev5b`
+and `/Volumes/EFI/EFI/OC/.nullarc-diagnostic-backup-xt4k7k6k`. Independent SSH reads
+verified both installed binaries against the package: PhxBringup UUID
+`014F7217-A726-3497-A963-604079AADD1F`, PhxAccel UUID
+`535B5212-AD0C-34E1-9F0F-489176793105`. The parsed OpenCore configuration is
+unchanged. The currently running kext is actually build 38 (UUID
+`17848C8F-1493-39EB-AD2A-0A99FDFBF572`), not build 37; the old accelerator UUID
+`A672A59E-9077-35D7-840D-360640764497` remains loaded.
+
+Preparation stopped at the update request: Sequoia rejected `--start-only`.
+Its live `kmutil help load` documents `--load-style start-only`. The source
+installer now uses that syntax and checks capabilities before copying files.
+Three command-boundary regression tests pass without loading any extension.
+The original experimental39 ZIP contains the faulty preparation helper; do not
+rerun it to request the update. For this already-staged HP, the pending local
+administrator command is:
+
+```
+sudo /usr/bin/kmutil load --bundle-path /Library/Extensions/PhxAccel.kext --load-style start-only
+```
+
+No OS update approval, new loaded UUID, reboot, GPU initialization, native shader
+execution or acceleration success is inferred from the installation report.

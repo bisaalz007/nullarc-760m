@@ -25,13 +25,17 @@ def main():
         if r.returncode and not refusal:raise ValueError(name+' failed; inspect result.json before rebooting')
         if refusal:report['macos_approval_or_reboot_required']=True
         print(name+(': OS approval/reboot required' if refusal else ': passed'),flush=True)
+        return r.stdout+r.stderr
     try:
         run('component-preflight',[root/'install.sh','--components','--check'])
         run('usb-efi-preflight',[root/'install.sh','--diagnostics','--oc',a.oc,'--check'])
         if a.execute:
+            help_text=run('accelerator-load-capabilities',['/usr/bin/kmutil','load','--help'])
+            if '--load-style' not in help_text or 'start-only' not in help_text:
+                raise ValueError('kmutil start-only load style unavailable; no files installed')
             run('component-backup-and-copy',[root/'install.sh','--components'])
             run('usb-efi-backup-and-copy',[root/'install.sh','--diagnostics','--oc',a.oc])
-            run('accelerator-update-request',['/usr/bin/kmutil','load','--bundle-path','/Library/Extensions/PhxAccel.kext','--start-only'],True)
+            run('accelerator-update-request',['/usr/bin/kmutil','load','--bundle-path','/Library/Extensions/PhxAccel.kext','--load-style','start-only'],True)
             report['files_staged']=True
     except (OSError,ValueError,subprocess.SubprocessError) as e:
         report['error']=str(e);print(str(e),file=sys.stderr);return 1
