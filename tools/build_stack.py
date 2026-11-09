@@ -74,6 +74,7 @@ def source_inputs():
                if f.is_file() and f.suffix in ('.c','.cpp','.h')]
     native += [f for f in (REPO / 'tools/vkprobe').rglob('*')
                if f.is_file() and f.suffix in ('.c','.h','.comp')]
+    native.append(REPO/'tools/mtlprobe/mtlprobe.m')
     return {str(f.relative_to(REPO)):digest(f) for f in native}
 
 
@@ -85,7 +86,7 @@ def required_artifacts(mesa, mesa_build=None):
         REPO / 'build/translator/nvmtl-translator-source.tar.gz',
         REPO / 'build/translator/SOURCE_COMMIT',
         (mesa_build or mesa / 'build') / 'src/amd/vulkan/libvulkan_radeon.dylib']
-    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw','vkprobe-native','render-native')]
+    files += [REPO / 'build/tools' / name for name in ('phxctl','mesboot','phxprofile','phxfw','vkprobe-native','render-native','mtlprobe')]
     return files
 
 
@@ -149,9 +150,10 @@ def assemble(a):
             relocate(binary, pending, binary.parent, origins)
         run(['codesign', '--force', '--sign', '-', bundle])
         run(['codesign', '--verify', '--deep', '--strict', bundle])
-        for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw','vkprobe-native','render-native'):
+        for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw','vkprobe-native','render-native','mtlprobe'):
             copy(REPO / 'build/tools' / name, p / 'gpu/phxctl' / name)
-        copy(REPO/'tools/phxctl/hp_bringup.py',p/'gpu/phxctl/hp_bringup.py')
+        for name in ('hp_bringup.py','hp_boot.py'):
+            copy(REPO/'tools/phxctl'/name,p/'gpu/phxctl'/name)
         for name in ('phxboot.sh', 'full.sh', 'bringup5.sh', 'kinst.sh', 'local.phxboot.plist'):
             copy(REPO / 'tools/phxctl' / name, p / 'gpu' / name)
         # No firmware or automatic activation: these remain blocked on HP.
@@ -161,7 +163,7 @@ def assemble(a):
         for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
                      'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
-        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py'):
+        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py','install_hp_boot.py'):
             copy(REPO / 'install' / name, p / name)
         for name in ('install.sh','uninstall.sh'):
             copy(REPO / 'install' / name, p / name)
@@ -230,6 +232,9 @@ def main():
             run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-std=gnu11','-O2',
                  '-DPHX_DIRECT_RADV','-I',a.vulkan_headers/'include','-I',includes,
                  REPO/'tools/vkprobe'/source,'-o',tools/name])
+        run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-fobjc-arc',
+             '-Wall','-Wextra','-Werror','-framework','Foundation','-framework','Metal','-framework','IOKit',
+             REPO/'tools/mtlprobe/mtlprobe.m','-o',tools/'mtlprobe'])
         build_receipt(a)
     assemble(a)
 

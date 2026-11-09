@@ -7,6 +7,7 @@ stage is bounded; failure stops, saves evidence and marks bootstrap lost. Native
 probes refuse mocks and must pass before the optional accelerator claim.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -79,6 +80,13 @@ def main():
             accel=macho_uuid(root/'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel')
             if not any(accel in line.upper() and 'com.luuumi.PhxAccel' in line for line in loaded.splitlines()):
                 raise ValueError('new accelerator UUID must be loaded before --claim')
+            if not (tools/'mtlprobe').is_file():raise ValueError('HP-only Metal probe missing from packet')
+            # Metal discovers installed bundles; bind its evidence to this packet.
+            for packaged,installed in [('PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver','/Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver'),
+                    ('PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib','/Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib'),
+                    ('PhxGPU/nvmtl/libvulkan_radeon.dylib','/Library/GPUBundles/nvmtl/libvulkan_radeon.dylib')]:
+                if hashlib.sha256((root/packaged).read_bytes()).digest()!=hashlib.sha256(Path(installed).read_bytes()).digest():
+                    raise ValueError('installed Metal runtime differs from packet: '+installed)
         if not a.execute:report['preflight_passed']=True;return
         if service.get('phx-stage')!='profile-diagnostic-only':raise ValueError('fresh diagnostic boot required; no retry after partial initialization')
         report['executed']=True;began=True
@@ -106,7 +114,14 @@ def main():
         report['native_compute_verified']=True;save()
         run('native-translated-render-readback',[tools/'render-native',root/'validation/vertex.spv',root/'validation/fragment.spv'],timeout=60)
         report['native_render_verified']=True;save()
-        if a.claim:run('accelerator-claim',[tools/'mesboot','claim'])
+        if a.claim:
+            run('accelerator-claim',[tools/'mesboot','claim'])
+            cache=a.output/'metal-cache';cache.mkdir();air=a.output/'metal-aircache';air.mkdir()
+            env.update(XDG_CACHE_HOME=str(cache),NVMTL_AIRCACHE=str(air),NVMTL_LOG_PATH=str(a.output/'metal-plugin.log'))
+            run('metal-hp-device',[tools/'mtlprobe','--hp','list'])
+            run('metal-compute-readback',[tools/'mtlprobe','--hp'],timeout=90)
+            run('metal-render-readback',[tools/'mtlprobe','--hp','render'],timeout=90)
+            report['metal_verified']=True;save()
     except (ValueError,OSError,subprocess.SubprocessError) as e:
         report['error']=str(e)
         if began:

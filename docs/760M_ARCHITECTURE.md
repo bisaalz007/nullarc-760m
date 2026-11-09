@@ -4,6 +4,13 @@ The root README was read before modification. Its production stack matches the
 current source; several older notes describe earlier experiments and a separate
 mock driver, so their success labels do not apply to HP hardware.
 
+Current runtime evidence: build 39 successfully initializes the HP PSP/TMR,
+firmware, GART and MES, validates kernel queue fences, executes native Darwin
+RADV compute/render and passes public Metal compute/render readbacks. The older
+inventory/gap notes below describe the starting state; the build-39 continuation
+and captured execution reports supersede their execution blockers. WindowServer,
+cold-boot service execution, reset and suspend/resume still require work.
+
 ```text
 App / WindowServer
   Metal -> src/nmplugin/NVMTLDevice.m (includes other plugin .m files)
@@ -243,3 +250,10 @@ PSP/SMU/GART/MES, runs native compute and translated offscreen rendering, and ca
 claim PhxAccel only after readbacks pass and the expected accelerator UUID is
 loaded. It changes no NVRAM/boot/security settings and starts no daemon. The
 native probes load the selected RADV ICD directly and reject mock environments.
+
+The opt-in app boot path is separate from the reference WindowServer daemon:
+`install --hp-native` -> immutable root-owned package -> `hp_boot.py` -> guarded
+`hp_bringup.py --execute --claim` -> native RADV and strict HP Metal probes -> app
+allow list with an explicit WindowServer denial. Pending/disabled markers prevent
+retry after an interrupted or failed initialization. It does not change the
+framebuffer matching gates, display timing or NVRAM.

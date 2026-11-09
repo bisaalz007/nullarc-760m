@@ -42,30 +42,37 @@ fault instead of freeing pages potentially referenced by DMA. Firmware tools
 propagate transfer/status errors rather than reporting success after failure.
 MES timeouts and failed compute/graphics readback now stop before queue adoption.
 
-**HP hardware bring-up, GPU execution and Metal acceleration are not verified.**
-The exact HP device remains diagnostic-only. A live SSH capture confirms its
-identity on Sequoia 15.8.2, its firmware framebuffer and 1920×1200 panel. Historical
-Linux/Windows evidence corroborates the panel's 60 Hz mode. Live Linux capture now
-confirms all 39 IP instances, topology, memory inventory and firmware versions.
-The actual Metal translator's compute and graphics shaders pass fenced readback
-on this HP through **stock Linux RADV** (not the Darwin winsys or NullArc kext).
-Phoenix patch 0009 supplies measured HP chip revisions, counter frequency, clock
-caps and cache geometry without importing Linux VA ranges or readiness flags.
-Firmware preflight derives payload ranges from headers instead of fixed sizes.
-macOS memory reservations and staged PSP/MES/queue initialization remain required.
-Existing Firebat runtime claims below are retained as upstream reports.
+**Native GPU and Metal compute/render execution is now verified on this HP running
+Sequoia 15.8.2, with PhxBringup build 39 and the matching PhxAccel.** The local-admin
+hardware experiment successfully claimed measured VRAM leases, obtained the PSP's
+64 MiB TMR requirement, loaded all 17 engine-firmware payloads, acknowledged GART
+invalidation and MES commands, adopted compute/graphics queues after actual kernel
+fences, and started NMXAccel. The native Darwin RADV path returned 256/256 correct
+compute values, a translated Metal store returned 7, and translated offscreen
+rendering returned 256/256 matching pixels.
 
-A Sequoia deployment profile is now implemented with `--min-macos 15.0`. The plugin,
-translator, RADV and transitive dependencies are checked for actual Mach-O minimum
-versions. On the HP running Sequoia 15.8.2, the port passed immediate plugin loading,
-three-stage Metal/AIR translation and real ACO pipeline compilation with explicit
-8/12-CU mocks. No native GPU command was submitted. Build headers still require
-SDK 26; the resulting binaries target macOS 15. PhxBringup build 34 now boots on
-the HP in diagnostic-only mode. Installed component hashes and actual installed
-plugin translation/RADV compiler tests also pass; these remain CPU-only tests.
-The rebuilt Sequoia accelerator's loaded UUID is now verified. Fresh installed
-translation tests and independent SPIR-V validation pass; GPU acceleration remains
-unverified. See the Sequoia-labelled development asset in this fork's Releases.
+The public Metal API also passed on the actual NVMTL device: 4096/4096 computed
+values, completed command buffers without errors, and a 256×256 offscreen
+triangle/clear render with 32,640 red pixels, 32,896 blue pixels and no other
+pixels. A repeated test using `mtlprobe --hp` verified all five PCI identity
+fields through the Metal device's registry ancestry and allowed no GPU fallback.
+The same probe rejects mock transport and refuses the development Mac's RX 5700 XT.
+See the [native execution report](hardware/dumps/hp_envy_760m/sequoia-build39-native-execution.json)
+and [Metal execution report](hardware/dumps/hp_envy_760m/sequoia-build39-metal-execution.json).
+
+These results establish basic compute and offscreen graphics acceleration through
+NullArc's kernel, Darwin RADV, translator and Metal plugin. **WindowServer/panel
+acceleration, cold-boot service execution, GPU reset, suspend/resume and
+application compatibility remain unverified or unimplemented.** The firmware
+framebuffer still drives the panel. HP boot remains diagnostic until the explicit
+administrator experiment or opt-in `--hp-native` app-only service; `install.sh --windowserver` remains refused. Do not
+rerun the bootstrap in a boot with initialized or lost queues.
+
+The Sequoia build uses `--min-macos 15.0`; build headers still require SDK 26.
+Earlier CPU-only translation/compiler validation and Linux stock-RADV results
+remain useful independent checks, but the reports above are the first native
+macOS hardware evidence. Existing Firebat runtime claims below are retained as
+upstream reports. Historical development milestones follow.
 
 Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects

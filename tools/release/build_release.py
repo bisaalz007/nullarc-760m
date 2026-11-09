@@ -75,7 +75,8 @@ def assemble(a):
         (p/'sources/mesa-darwin-phoenix.patch').write_bytes(git('diff','f5cb8ee032adabef599ae892ec4e42d796b84da9','HEAD',cwd=a.mesa))
         (p/'README.txt').write_text(f'NullArc Radeon 760M {a.version} development prerelease\n'
             f'Source commit: {commit}\nRead INSTALL.md before running install.sh.\n'
-            'HP: diagnostic boot; local-admin experimental bootstrap; acceleration unverified.\n'
+            'HP build 39 passed native and public Metal compute/render; WindowServer unverified.\n'
+            'Default diagnostic boot; explicit bootstrap or opt-in app-only boot service.\n'
             'Includes AMD firmware under LICENSES/LICENSE.amdgpu.txt; no automatic activation.\n')
         metadata={k:v for k,v in stack.items() if k not in ('files','format','policy','acceleration_verified')}
         metadata.update(release_version=a.version,firmware_included=True,
@@ -96,7 +97,7 @@ the binary installer. Matching driver source is inside the binary ZIP under
 `sources/nullarc-source.tar.gz`; translator source is also attached separately.
 
 The ZIP includes the source-built kexts, Metal plugin, translator, patched RADV,
-four command-line tools, AMD firmware, installer/uninstaller, checksums and licenses.
+seven command-line tools, AMD firmware, installer/uninstaller, checksums and licenses.
 Use `INSTALL.md` from the extracted ZIP. Noncommercial terms apply to components
 derived from NullMoth; see the included license notices.
 

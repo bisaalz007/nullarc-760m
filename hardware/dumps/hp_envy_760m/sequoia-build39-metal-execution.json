@@ -1,0 +1,25 @@
+{
+  "stages": [
+    {
+      "stage": "identity",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x1000007ed lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "compute",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x1000007ed lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\ncommand buffer status 4 error none\nresults: 4096/4096 correct (out[1]=0x9e3779b8, expected 0x9e3779b8)\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "render",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x1000007ed lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\nrender command buffer status 4 error none\npixels: red 32640 blue 32896 other 0 (expect ~32896 red, ~32640 blue); corners: TL 0xff0000ff BL 0xffff0000 BR 0xff0000ff\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    }
+  ],
+  "hp_pci_identity_required": true,
+  "gpu_fallback_allowed": false,
+  "metal_verified": true
+}

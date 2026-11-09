@@ -2,7 +2,8 @@
 
 This workflow builds the fork's kexts, Metal plugin, pinned AIR translator and
 patched RADV. It assembles the binaries actually built, without copying installed
-reference-machine driver binaries. **The HP remains diagnostic-only.** A successful
+reference-machine driver binaries. **HP cold boot defaults to diagnostics; explicit
+bootstrap and opt-in app-only boot initialization are available.** A successful
 build/package/offline translation test does not establish GPU execution.
 
 ## Inputs
@@ -168,3 +169,10 @@ an absolute `PHX_RADV_DRIVER` path and refuse mock transport. The Metal stack te
 writes a shader-fixture receipt; experimental release assembly checks it against
 the exact packaged plugin/translator/RADV and includes the validated SPIR-V.
 This is preparation for hardware testing, not an acceleration success claim.
+
+The build also compiles and fingerprints `mtlprobe`, links its public Metal/IOKit
+interfaces for the selected deployment target, and packages the HP boot service.
+Basic HP build-39 native and Metal compute/render readbacks are now confirmed in
+`hardware/dumps/hp_envy_760m/sequoia-build39-*-execution.json`. The build receipt
+itself is still not hardware evidence. WindowServer and cold-boot service execution
+remain separate runtime requirements.

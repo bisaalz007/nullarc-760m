@@ -545,3 +545,63 @@ sudo /usr/bin/kmutil load --bundle-path /Library/Extensions/PhxAccel.kext --load
 
 No OS update approval, new loaded UUID, reboot, GPU initialization, native shader
 execution or acceleration success is inferred from the installation report.
+
+### Build-39 modules now loaded
+
+SSH verification after the user update confirmed both matching build-39 UUIDs
+listed above are actually loaded. The live registry reports `phx-build=39` and
+`phx-stage=profile-diagnostic-only`; installed binary hashes match the package.
+The read-only hardware harness preflight passed package hashes, firmware plan,
+firmware entry points and the running kernel UUID. No GPU command was issued.
+The explicit local administrator experiment is prepared as
+`/Users/Shared/nullarc-760m-sequoia-test/hp39-test.sh`, writing its report to
+`/Users/Shared/nullarc-760m-sequoia-test/hp39-execution/result.json`. Native shader
+readbacks, accelerator claim, Metal and display acceleration remain unverified.
+
+## Native GPU and public Metal execution confirmed on HP
+
+The actual build-39 hardware experiment completed all 40 stages successfully on
+Sequoia 15.8.2. Evidence is committed under
+`hardware/dumps/hp_envy_760m/sequoia-build39-native-execution.json`; the full loaded
+module list was removed to avoid publishing unrelated kernel addresses.
+
+Confirmed: exclusive HP VRAM bootstrap, PSP ring, TOC-reported 64 MiB TMR and
+successful TMR setup, all 17 engine firmware acknowledgements, RLC autoload, SMU
+responses, GART acknowledgement, MES resource/status/queue commands, real compute
+and graphics packet readbacks, kernel queue adoption, native Darwin RADV GLSL
+compute (256/256), translated Metal store (7), translated offscreen rendering
+(256/256 pixels), and accelerator claim. Live registry reports
+`native-queues-ready` and an active NMXAccel. This is native macOS hardware
+execution, not Linux RADV, compiler simulation or immediate software retirement.
+
+Public Metal tests also passed twice, including the new strict HP probe:
+4096/4096 computed values; command-buffer status Completed with no error; a
+256x256 offscreen render with 32,640 red pixels, 32,896 blue pixels and zero
+other pixels. `sequoia-build39-metal-execution.json` records the strict run.
+`mtlprobe --hp` verifies the actual accelerator PCI ancestry and all five HP
+identity fields, rejects mocks, and permits no default-device fallback. The
+probe refused the development Mac's RX 5700 XT without GPU submissions.
+
+Changed components this stage: `mtlprobe.m` now requires completed/error-free
+command buffers and checked allocations; build receipts fingerprint/package the
+probe; `hp_bringup.py --claim` verifies installed runtime hashes and performs
+public Metal tests after the native probes. `hp_boot.py` and
+`install_hp_boot.py` add an explicit `install.sh --hp-native` service that keeps
+WindowServer denied, repeats hardware/Metal checks each boot, and disables retries
+after interrupted/failed initialization. The installer checks matching installed
+binaries/loaded UUIDs and makes no kext, EFI, security or NVRAM changes.
+
+Validation: full Sequoia stack build passed, ten C++ binaries and 45 Python methods
+passed during that build; the added stale-boot-status test brings boot tests to
+six. The prior offline shader receipt still matches all rebuilt plugin,
+translator and RADV binaries. Both rebuilt kext binary hashes exactly match the
+HP's running tested binaries; no kernel reinstall is needed for this stage.
+
+Still pending: first cold-boot test of the new app service, real application
+coverage, WindowServer/panel acceleration, reset/recovery and suspend/resume.
+The old reference WindowServer script cannot simply be enabled: it exits on the
+HP diagnostic boot, while PhxAMDFB's HP gate requires a native claim that occurs
+later in user space. Correct framebuffer/boot ordering and a dedicated display
+experiment remain necessary. Current successful tests are compute/offscreen
+rendering; the firmware framebuffer still drives the panel. No new display gate
+was removed or NVRAM arming performed.

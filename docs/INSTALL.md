@@ -16,18 +16,17 @@ do not establish HP compatibility.
 | Target | Available operation |
 |---|---|
 | HP Envy x360 16-ad0013dx, Radeon 760M | Diagnostic PhxBringup kext in an explicitly selected OpenCore directory |
-| HP with Sequoia 15 | Diagnostic kext boot and installed plugin translation verified; backed-up `--components` replacement available; acceleration unverified |
+| HP with Sequoia 15 | Build-39 native RADV and public Metal compute/render verified; manual bootstrap and opt-in app boot service |
 | HP with Tahoe | Same diagnostic gate; GPU acceleration is not enabled |
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
-Linux tests executed translated compute and graphics shaders on the HP. The
-diagnostic macOS kext boots, but native queues, Metal device and WindowServer remain unverified.
+Linux tests executed translated compute and graphics shaders on the HP. Build 39 now also passes native macOS GPU and public Metal compute/render readbacks. WindowServer remains unverified.
 Running `sudo ./install.sh --windowserver` on the HP returns an error **before
 installing acceleration or changing boot settings**. There is no bypass option.
 
 Choose the Sequoia-labelled ZIP for macOS 15. Its native deployment target is 15.0;
 the older Tahoe-only ZIP remains a different build. CPU loading/translation is
-verified on Sequoia 15.8.2, not full Metal-device or WindowServer operation.
+verified on Sequoia 15.8.2. Basic native Metal compute/render are also verified; full application compatibility and WindowServer are not.
 
 You need Python 3, a working OpenCore configuration and a backup of your EFI.
 Keep a separate way to boot if a diagnostic kext cannot load. These commands
@@ -60,6 +59,50 @@ python3 collect_macos_evidence.py --output "$HOME/Desktop/hp-760m-diagnostics"
 The expected HP stage is `profile-diagnostic-only`. A loaded service, successful
 copy or firmware framebuffer does not prove GPU acceleration. If the kext is
 absent, keep the boot log and collector report for the next engineering stage.
+
+## HP: opt-in app acceleration after reboot
+
+Build 39 passed actual PSP/MES/queue, native shader and public Metal readbacks on
+the HP. New packages include `gpu/phxctl/mtlprobe --hp`, which requires the exact
+HP PCI ancestry, refuses mocks and allows no device fallback. The explicit
+`hp_bringup.py --execute --claim` sequence now requires these Metal checks too.
+Never repeat initialization in an already initialized or failed boot.
+
+After a successful manual bootstrap, with the matching kexts installed and the
+confirmed USB EFI mounted at `/Volumes/EFI`, the app-only boot service can be
+checked and installed:
+
+```sh
+./install.sh --hp-native --check
+sudo ./install.sh --hp-native
+```
+
+This mode verifies the actual installed binaries and running kernel UUIDs,
+repeats public Metal readbacks before making persistent changes, copies this
+package into a root-owned directory under `/Library/Application Support/NullArc760M`,
+and installs `local.nullarc.hp-native.plist`. It replaces no kext, plugin or EFI
+file, starts no service immediately and changes no security or NVRAM setting.
+Do not install it alongside the reference `local.phxboot` service.
+
+At the next manual reboot, the service runs the guarded bootstrap and native
+Metal tests once. Only complete success enables app access; WindowServer is
+explicitly denied. Interrupted or failed initialization disables subsequent
+automatic attempts and retains evidence under `/var/db/nullarc-760m`. A compact
+status is readable at `/Users/Shared/nullarc-hp-native-status.json`; raw root-only
+reports retain the detailed diagnostics. Automatic reboot, reset and resume are
+not implemented. The boot service has host tests but still needs its first HP
+cold-boot test; the existing manual initialization is the verified path.
+
+Disable future automatic initialization with:
+
+```sh
+sudo mkdir -p /var/db/nullarc-760m
+sudo touch /var/db/nullarc-760m/disabled
+```
+
+This does not reset an active or lost GPU. After a failure, preserve reports and
+use a fresh reboot; do not clear markers and retry hardware initialization in the
+same boot. The panel remains on the firmware framebuffer throughout this mode.
 
 ## What `--windowserver` does
 

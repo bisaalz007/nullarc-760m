@@ -16,24 +16,29 @@ H=/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/PhxGPU
 L=/Library/GPUBundles
 TS=$(date +%Y%m%d-%H%M%S)
 
-WS=0; CHECK=0; DIAG=0; COMPONENTS=0; OC=""
+WS=0; CHECK=0; DIAG=0; COMPONENTS=0; HP_NATIVE=0; OC=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --windowserver) WS=1 ;;
         --check) CHECK=1 ;;
         --diagnostics) DIAG=1 ;;
         --components) COMPONENTS=1 ;;
+        --hp-native) HP_NATIVE=1 ;;
         --oc) [ "$#" -ge 2 ] || { echo "--oc needs an EFI/OC directory" >&2; exit 2; }; OC=$2; shift ;;
         -h|--help)
             echo 'Usage: ./install.sh --check [--windowserver]'
             echo '       sudo ./install.sh --windowserver  (reference acceleration path; HP refused)'
             echo '       sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC [--check]'
             echo '       sudo ./install.sh --components  (HP files only; no automatic activation)'
+            echo '       sudo ./install.sh --hp-native [--check] (verified HP app-only boot service)'
             exit 0 ;;
         *) echo "unknown option $1 (see --help)"; exit 2 ;;
     esac
     shift
 done
+if [ "$HP_NATIVE" = 1 ] && { [ "$COMPONENTS" = 1 ] || [ "$DIAG" = 1 ] || [ "$WS" = 1 ] || [ -n "$OC" ]; }; then
+    echo '--hp-native cannot be combined with component, diagnostic or WindowServer modes' >&2; exit 2
+fi
 if [ "$COMPONENTS" = 1 ] && { [ "$DIAG" = 1 ] || [ "$WS" = 1 ] || [ -n "$OC" ]; }; then
     echo '--components cannot be combined with --diagnostics, --oc or --windowserver' >&2; exit 2
 fi
@@ -43,6 +48,10 @@ fi
 if [ "$DIAG" = 0 ] && [ -n "$OC" ]; then echo "--oc requires --diagnostics" >&2; exit 2; fi
 command -v python3 >/dev/null || { echo "Python 3 is required; see INSTALL.md" >&2; exit 1; }
 python3 -B "$SRC/package_manifest.py" "$SRC"
+if [ "$HP_NATIVE" = 1 ]; then
+    if [ "$CHECK" = 1 ]; then exec python3 -B "$SRC/install_hp_boot.py" --package "$SRC"; fi
+    exec python3 -B "$SRC/install_hp_boot.py" --package "$SRC" --install
+fi
 if [ "$COMPONENTS" = 1 ]; then
     MODE=--install; [ "$CHECK" = 0 ] || MODE=--check
     exec python3 -B "$SRC/install_components.py" --package "$SRC" "$MODE"
@@ -57,7 +66,8 @@ if [ "$DIAG" = 1 ]; then
 fi
 POLICY=$(python3 -B "$SRC/collect_macos_evidence.py" --target-policy)
 if [ "$POLICY" = hp-diagnostic-only ]; then
-    echo 'HP Radeon 760M: macOS acceleration and --windowserver are not implemented/verified.' >&2
+    echo 'HP Radeon 760M: WindowServer acceleration is not verified; the reference boot path is unavailable.' >&2
+    echo 'After native bootstrap and Metal tests, use --hp-native for app-only automatic initialization.' >&2
     echo 'Use sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC instead.' >&2
     exit 1
 fi
