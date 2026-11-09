@@ -1,0 +1,14 @@
+{
+  "automatic_initialization_attempted": true,
+  "desktop_armed": false,
+  "returncode": 1,
+  "native_compute_verified": true,
+  "native_render_verified": true,
+  "metal_verified": false,
+  "last_stage": "metal-hp-device",
+  "failed_stage": "metal-hp-device",
+  "bootstrap_error": "HP Metal device publication timed out",
+  "error": "bootstrap failed; no application allow list enabled",
+  "recorded_at": "2026-11-09T01:48:29.748265+00:00",
+  "boot_session_uuid": "D33E3ACC-D5BD-44FD-8F43-74CB6CF40F55"
+}

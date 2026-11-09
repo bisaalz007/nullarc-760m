@@ -84,8 +84,9 @@ and installs `local.nullarc.hp-native.plist`. It replaces no kext, plugin or EFI
 file, starts no service immediately and changes no security or NVRAM setting.
 Do not install it alongside the reference `local.phxboot` service.
 
-At the next manual reboot, the service runs the guarded bootstrap and native
-Metal tests once. Only complete success enables app access; WindowServer is
+At the next manual reboot, the system service runs the guarded native bootstrap,
+then waits for the logged-in console GUI session and runs Metal tests under that
+user’s bootstrap and credentials. Only complete success enables app access; WindowServer is
 explicitly denied. Interrupted or failed initialization disables subsequent
 automatic attempts and retains evidence under `/var/db/nullarc-760m`. A compact
 status is readable at `/Users/Shared/nullarc-hp-native-status.json`; raw root-only
@@ -224,3 +225,14 @@ other failure classes or changed native components and rolls back if marker
 migration fails. It submits no GPU commands, starts no service and changes no
 kext, EFI or NVRAM setting. Only after successful staging, reboot manually with
 the same USB. A failed/lost boot is never used for another initialization attempt.
+
+The bounded system-context enumeration wait also failed on the second boot,
+while native GPU tests passed. The latest boot service therefore separates the
+privileged native stage from public Metal verification in the real console-user
+GUI session. `launchctl asuser` supplies its Mach/audit context and `sudo -n -H -u`
+supplies the user credentials/home. Private user-owned caches avoid root-owned
+shader caches in the login user's home. This path still needs HP runtime proof.
+A missing session/catalogue does not itself mark healthy native queues lost;
+app access remains disabled. GPU shader-test failures retain the abort policy.
+The recovery tool also accepts the captured all-empty-catalogue timeout when
+native tests passed; it still refuses unrelated errors or changed native bytes.

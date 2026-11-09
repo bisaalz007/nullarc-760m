@@ -53,6 +53,14 @@ class RecoveryTests(unittest.TestCase):
         self.evidence['stages'][-1]['stderr']='GPU failed'
         with self.assertRaises(ValueError):r.validate_failure(self.evidence)
 
+    def test_empty_catalogue_deadline_is_reviewed_but_probe_errors_are_not(self):
+        self.evidence['error']='HP Metal device publication timed out'
+        last=self.evidence['stages'][-1];last['returncode']=None
+        last['attempts']=[{'returncode':75,'stdout':'devices: 0\nno Metal device\n','stderr':''}]
+        r.validate_failure(self.evidence)
+        last['attempts'][0]['stderr']='native transport failure'
+        with self.assertRaises(ValueError):r.validate_failure(self.evidence)
+
     def test_marker_move_failure_rolls_back_configuration_and_marker(self):
         rename=Path.rename
         def fail(path,target):

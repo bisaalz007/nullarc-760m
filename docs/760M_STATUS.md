@@ -647,3 +647,34 @@ No kext, EFI, NVRAM or security change is needed. The current boot remains lost;
 the corrected publication sequence requires a new boot and is not yet confirmed.
 Only the Metal diagnostic executable was recompiled; all other compiled inputs
 and artifacts matched the prior full-build receipt before updating that receipt.
+
+### Second automatic boot: system-context Metal enumeration remained empty
+
+Boot `D33E3ACC-D5BD-44FD-8F43-74CB6CF40F55` again confirmed native compute and
+translated graphics, but Metal enumeration timed out after the bounded wait.
+The public stage report is committed as `sequoia-build39-system-metal-timeout.json`.
+The original race-only hypothesis was insufficient. Current queues were marked
+lost by the old all-stages abort policy; no GPU commands were retried in this boot.
+
+The HP currently has console UID 501 and a GUI launchd domain. Its installed
+`launchctl(1)` manual confirms `asuser` adopts the target bootstrap namespace,
+exception server and audit session, but does not change credentials or user
+environment. The new boot path uses `launchctl asuser` together with `sudo -n -H
+-u` for the actual console user. This is a context correction candidate, not a
+claim that the second failure's underlying framework cause is fully established.
+
+`hp_bringup.py --execute --claim --defer-metal` now returns verified native
+execution and accelerator claim to the boot supervisor. The supervisor waits
+for a real console GUI session, then runs strict HP Metal device/compute/render
+checks with that user's credentials, bootstrap and private shader caches. Only
+successful readbacks enable app access. A missing GUI session or empty Metal
+catalogue keeps app access restricted and retains healthy native queues; actual
+shader-test failures still request conservative abort. No GPU register values,
+firmware, kernel, translator or RADV binaries change.
+
+Fifteen boot/supervisor tests, four publication tests and five recovery tests
+pass. They cover session credential/bootstrap selection, missing session/device
+without GPU abort, shader failure with abort, exact native-proof requirements,
+public report filtering, reviewed timeout recovery and rollback. These host
+fixtures do not claim GPU execution. The GUI-session startup path requires a
+fresh HP boot because the current boot was already marked lost by the old code.

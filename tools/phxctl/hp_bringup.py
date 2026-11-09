@@ -18,14 +18,14 @@ import sys
 import time
 import uuid
 
-def wait_for_metal(probe,environment,record,timeout=30):
+def wait_for_metal(probe,environment,record,timeout=30,prefix=None):
     """Retry only empty Metal catalogues, using a fresh process each time."""
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],timeout=5))
         if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
             raise ValueError('driver is no longer ready while waiting for Metal publication')
-        r=subprocess.run([str(probe),'--hp','list'],capture_output=True,text=True,timeout=5,env=environment)
+        r=subprocess.run(list(prefix or [])+[str(probe),'--hp','list'],capture_output=True,text=True,timeout=5,env=environment)
         record({'returncode':r.returncode,'stdout':r.stdout,'stderr':r.stderr})
         if r.returncode==0:return r
         if r.returncode!=75 or r.stderr.strip():raise ValueError('Metal device probe failed; not an empty-catalogue retry')
@@ -49,13 +49,15 @@ def main():
     ap.add_argument('--output',type=Path,required=True)
     ap.add_argument('--execute',action='store_true')
     ap.add_argument('--claim',action='store_true',help='claim accelerator only after both native shader probes pass')
+    ap.add_argument('--defer-metal',action='store_true',help='system boot job: leave public Metal validation to the console-user stage')
     a=ap.parse_args();root=a.package.resolve();tools=root/'gpu/phxctl';firmware=root/'gpu/fw'
     if a.claim and not a.execute:ap.error('--claim requires --execute')
+    if a.defer_metal and not (a.execute and a.claim):ap.error('--defer-metal requires --execute --claim')
     if a.execute and os.geteuid()!=0:ap.error('local administrator authentication is required')
     if any(k.startswith('RADV_DARWIN_MOCK') for k in os.environ):ap.error('mock transport is forbidden')
     a.output.mkdir(parents=True,exist_ok=False,mode=0o700)
     report={'stages':[],'executed':False,'native_compute_verified':False,'native_render_verified':False,
-            'metal_verified':False,'display_takeover_requested':False,'source_package':str(root)}
+            'metal_verified':False,'accelerator_claimed':False,'display_takeover_requested':False,'source_package':str(root)}
     began=False
     env={k:v for k,v in os.environ.items() if k in ('PATH','HOME','TMPDIR','LANG','LC_ALL')}
     env['PHX_RADV_DRIVER']=str(root/'PhxGPU/nvmtl/libvulkan_radeon.dylib')
@@ -135,6 +137,9 @@ def main():
         report['native_render_verified']=True;save()
         if a.claim:
             run('accelerator-claim',[tools/'mesboot','claim'])
+            report['accelerator_claimed']=True;save()
+            if a.defer_metal:
+                report['metal_deferred']=True;save();return
             cache=a.output/'metal-cache';cache.mkdir();air=a.output/'metal-aircache';air.mkdir()
             env.update(XDG_CACHE_HOME=str(cache),NVMTL_AIRCACHE=str(air),NVMTL_LOG_PATH=str(a.output/'metal-plugin.log'))
             publication={'stage':'metal-hp-device','returncode':None,'attempts':[]}

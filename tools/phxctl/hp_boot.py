@@ -10,6 +10,10 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
+import pwd
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from hp_bringup import wait_for_metal
 
 RESTRICTED='# NullArc: built-in test tools only; automatic initialization disabled\n'
 APPS='# NullArc: verified HP app acceleration; desktop remains on firmware framebuffer\n-WindowServer\n-mediaanalysisd\n-photoanalysisd\n-Spotlight\n*\n'
@@ -20,6 +24,63 @@ def atomic(path,text):
         with os.fdopen(fd,'w') as f:f.write(text);f.flush();os.fsync(f.fileno())
         os.chmod(name,0o644);os.replace(name,path)
     finally:Path(name).unlink(missing_ok=True)
+
+def publish(status,report):
+    if not status:return
+    public={k:v for k,v in report.items() if k not in ('stdout','stderr','metal_stages')}
+    if 'metal_stages' in report:
+        public['metal_stages']=[{k:v for k,v in stage.items() if k in ('stage','returncode')} for stage in report['metal_stages']]
+    public['recorded_at']=datetime.now(timezone.utc).isoformat()
+    atomic(status,json.dumps(public,indent=2)+'\n')
+
+def console_user(timeout=300):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        uid=os.stat('/dev/console').st_uid
+        if uid>0:
+            user=pwd.getpwuid(uid)
+            result=subprocess.run(['/bin/launchctl','print','gui/'+str(uid)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=5)
+            if result.returncode==0:return user
+        time.sleep(1)
+    raise ValueError('no active console-user GUI session before deadline; native GPU retained, app access restricted')
+
+def user_prefix(user,work):
+    # launchctl changes the Mach/audit context, not credentials (launchctl(1)).
+    # sudo supplies the target credentials/home and resets inherited variables.
+    return ['/bin/launchctl','asuser',str(user.pw_uid),'/usr/bin/sudo','-n','-H','-u',user.pw_name,'--',
+            '/usr/bin/env','XDG_CACHE_HOME='+str(work/'cache'),'NVMTL_AIRCACHE='+str(work/'aircache'),
+            'NVMTL_LOG_PATH='+str(work/'plugin.log'),'PHX_RADV_DRIVER=/Library/GPUBundles/nvmtl/libvulkan_radeon.dylib']
+
+def verify_console_metal(package,report,save):
+    report['verification_phase']='awaiting-console-session';save()
+    user=console_user()
+    work=Path(tempfile.mkdtemp(prefix='nullarc-user-metal-',dir='/Users/Shared'))
+    for p in (work,work/'cache',work/'aircache'):
+        if p!=work:p.mkdir()
+        p.chmod(0o700);os.chown(p,user.pw_uid,user.pw_gid)
+    report['metal_workdir']=str(work)
+    report['verification_phase']='console-user-metal';report['metal_stages']=[];save()
+    probe=package/'gpu/phxctl/mtlprobe';prefix=user_prefix(user,work)
+    environment={k:v for k,v in os.environ.items() if k in ('PATH','HOME','TMPDIR','LANG','LC_ALL')}
+    publication={'stage':'metal-hp-device','returncode':None,'attempts':[]}
+    report['metal_stages'].append(publication);save()
+    def record(attempt):publication['attempts'].append(attempt);save()
+    r=wait_for_metal(probe,environment,record,prefix=prefix)
+    publication.update(returncode=0,stdout=r.stdout,stderr=r.stderr);save()
+    submitted=False
+    try:
+        for stage,args in [('metal-compute-readback',[]),('metal-render-readback',['render'])]:
+            submitted=True
+            entry={'stage':stage,'returncode':None};report['metal_stages'].append(entry);save()
+            r=subprocess.run(prefix+[str(probe),'--hp']+args,capture_output=True,text=True,timeout=90,env=environment)
+            entry.update(returncode=r.returncode,stdout=r.stdout,stderr=r.stderr);save()
+            if r.returncode:raise ValueError(stage+' failed in console-user session')
+    except (OSError,ValueError,subprocess.SubprocessError):
+        if submitted:
+            subprocess.run([str(package/'gpu/phxctl/phxctl'),'abort'],capture_output=True,timeout=5)
+        raise
+    if os.stat('/dev/console').st_uid!=user.pw_uid:raise ValueError('console user changed during validation; app access remains restricted')
+    report['metal_verified']=True;report['verification_phase']='complete';save()
 
 def boot(package,state,allow,status=None):
     state.mkdir(parents=True,exist_ok=True,mode=0o700)
@@ -36,8 +97,11 @@ def boot(package,state,allow,status=None):
     fd=os.open(pending,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
     folder=Path(tempfile.mkdtemp(prefix='boot-',dir=state))
     command=[sys.executable,'-B',str(package/'gpu/phxctl/hp_bringup.py'),
-             '--package',str(package),'--output',str(folder/'execution'),'--execute','--claim']
+             '--package',str(package),'--output',str(folder/'execution'),'--execute','--claim','--defer-metal']
     report={'automatic_initialization_attempted':True,'desktop_armed':False}
+    def save():
+        (folder/'boot-result.json').write_text(json.dumps(report,indent=2)+'\n')
+        publish(status,report)
     try:
         p=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
         try:stdout,stderr=p.communicate(timeout=300)
@@ -55,20 +119,19 @@ def boot(package,state,allow,status=None):
             if failures:report['failed_stage']=failures[-1].get('stage')
         if evidence.get('error'):report['bootstrap_error']=evidence['error']
         if p.returncode:raise ValueError('bootstrap failed; no application allow list enabled')
-        if not all(evidence.get(k) is True for k in ('executed','native_compute_verified','native_render_verified','metal_verified')):
-            raise ValueError('bootstrap did not prove native compute, render and Metal execution')
+        if not all(evidence.get(k) is True for k in ('executed','native_compute_verified','native_render_verified','accelerator_claimed')):
+            raise ValueError('bootstrap did not prove native compute, render and accelerator claim')
+        report['native_initialization_verified']=True;save()
+        verify_console_metal(package,report,save)
+        if report.get('metal_verified') is not True:raise ValueError('console-user Metal verification missing')
         if (state/'disabled').exists():raise ValueError('service disabled during initialization; app access remains restricted')
         atomic(allow,APPS)
         pending.unlink()
         report['apps_enabled']=True
     except (OSError,ValueError,subprocess.SubprocessError) as e:
-        report['error']=str(e);(state/'disabled').touch();raise
+        report['error']=str(e);(state/'disabled').touch();atomic(allow,RESTRICTED);raise
     finally:
-        (folder/'boot-result.json').write_text(json.dumps(report,indent=2)+'\n')
-        if status:
-            public={k:v for k,v in report.items() if k not in ('stdout','stderr')}
-            public['recorded_at']=datetime.now(timezone.utc).isoformat()
-            atomic(status,json.dumps(public,indent=2)+'\n')
+        save()
     return 0
 
 if __name__=='__main__':

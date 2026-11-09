@@ -74,9 +74,11 @@ remain useful independent checks, but the reports above are the first native
 macOS hardware evidence. Existing Firebat runtime claims below are retained as
 upstream reports. Historical development milestones follow. The first automatic
 boot also passed native PSP/MES and compute/render tests, then failed an immediate
-Metal-device enumeration with an empty catalogue. A bounded publication-wait fix
-and backed-up next-boot updater are implemented; their HP runtime test is pending.
-App boot access remains disabled after that failed attempt.
+Metal-device enumeration with an empty catalogue. The bounded system-context wait also timed out on a second boot, with native
+GPU tests still passing. The latest service verifies Metal in the logged-in
+console user’s GUI context after privileged native initialization; that corrected
+startup path awaits runtime proof. App boot access remains disabled after the
+failed attempts.
 
 Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects

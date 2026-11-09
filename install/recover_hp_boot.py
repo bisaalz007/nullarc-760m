@@ -28,10 +28,14 @@ def validate_failure(evidence):
     stages=evidence.get('stages',[])
     if not stages:raise ValueError('missing cold-boot stage evidence')
     last=stages[-1]
+    empty=lambda s:s.get('stdout','').strip()=='devices: 0\nno Metal device' and not s.get('stderr','').strip()
+    immediate=last.get('returncode') in (1,75) and empty(last)
+    attempts=last.get('attempts',[])
+    deadline=(last.get('returncode') is None and evidence.get('error')=='HP Metal device publication timed out'
+              and bool(attempts) and all(s.get('returncode')==75 and empty(s) for s in attempts))
     if (evidence.get('native_compute_verified') is not True or evidence.get('native_render_verified') is not True
             or evidence.get('metal_verified') is not False or last.get('stage')!='metal-hp-device'
-            or last.get('returncode') not in (1,75) or last.get('stdout','').strip()!='devices: 0\nno Metal device'
-            or last.get('stderr','').strip()):
+            or not (immediate or deadline)):
         raise ValueError('failure differs from reviewed empty Metal catalogue case; investigate before updating')
 
 def recover(package,daemon,state,parent):
