@@ -77,8 +77,12 @@ boot also passed native PSP/MES and compute/render tests, then failed an immedia
 Metal-device enumeration with an empty catalogue. The bounded system-context wait also timed out on a second boot, with native
 GPU tests still passing. The latest service verifies Metal in the logged-in
 console user’s GUI context after privileged native initialization; that corrected
-startup path awaits runtime proof. App boot access remains disabled after the
-failed attempts.
+startup path awaits runtime proof. The third boot kept healthy native queues and passed subsequent SSH Metal
+compute/render tests without reinitialization. PhxAccel's 60-second withholding
+of `MetalPluginName` was then identified; startup now waits for the actual
+property before entering Metal. A verification-only continuation can finish app
+activation without another reboot. Automatic app activation remains unverified
+until that continuation passes.
 
 Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects

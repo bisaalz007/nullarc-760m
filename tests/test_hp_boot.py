@@ -137,4 +137,23 @@ class BootTests(unittest.TestCase):
         self.assertIsNotNone(error);self.assertNotIn('metal_verified',report)
         self.assertEqual(run.call_args.args[0],[str(self.root/'gpu/phxctl/phxctl'),'abort'])
 
+    def test_existing_queue_verification_never_launches_native_initialization(self):
+        self.state.mkdir();status=self.root/'status.json'
+        with patch.object(b,'verify_existing_native'),patch.object(b.subprocess,'Popen') as spawn:
+            b.resume_existing(self.root,self.state,self.allow,status)
+        spawn.assert_not_called();report=json.loads(status.read_text())
+        self.assertFalse(report['native_initialization_retried']);self.assertTrue(report['metal_verified']);self.assertTrue(report['apps_enabled'])
+
+    def test_existing_queue_recovery_requires_reviewed_markers(self):
+        self.state.mkdir();(self.state/'disabled').touch()
+        with patch.object(b,'verify_existing_native') as validate,self.assertRaises(ValueError):b.resume_existing(self.root,self.state,self.allow)
+        validate.assert_not_called();self.metal.assert_not_called()
+
+    def test_lost_driver_refuses_existing_queue_verification(self):
+        import plistlib
+        lost=plistlib.dumps([{'phx-profile':'hp-760m','phx-stage':'device-lost'}])
+        with patch.object(b.subprocess,'run'),patch.object(b.subprocess,'check_output',return_value=lost),self.assertRaisesRegex(ValueError,'healthy native queues'):
+            b.verify_existing_native(self.root)
+        self.metal.assert_not_called()
+
 if __name__=='__main__':unittest.main()

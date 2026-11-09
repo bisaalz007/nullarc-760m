@@ -12,8 +12,10 @@ import sys
 import tempfile
 import time
 import pwd
+import hashlib
+import plistlib
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from hp_bringup import wait_for_metal
+from hp_bringup import wait_for_metal,macho_uuid,claimed_hp
 
 RESTRICTED='# NullArc: built-in test tools only; automatic initialization disabled\n'
 APPS='# NullArc: verified HP app acceleration; desktop remains on firmware framebuffer\n-WindowServer\n-mediaanalysisd\n-photoanalysisd\n-Spotlight\n*\n'
@@ -134,8 +136,47 @@ def boot(package,state,allow,status=None):
         save()
     return 0
 
+def verify_existing_native(package):
+    subprocess.run([sys.executable,'-B',str(package/'package_manifest.py'),str(package)],check=True,timeout=30)
+    nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup']))
+    if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
+        raise ValueError('healthy native queues required; no recovery or reinitialization attempted')
+    claimed_hp(plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','IOPCIDevice'])))
+    loaded=subprocess.check_output(['/usr/bin/kmutil','showloaded','--list-only'],text=True)
+    for name,path in [('org.drip.PhxBringup','EFI/OC/Kexts/PhxBringup.kext/Contents/MacOS/PhxBringup'),
+                      ('com.luuumi.PhxAccel','Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel')]:
+        expected=macho_uuid(package/path)
+        if not any(name in line and expected in line.upper() for line in loaded.splitlines()):raise ValueError('running module differs: '+name)
+    for source,target in [('PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver','/Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver'),
+                          ('PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib','/Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib'),
+                          ('PhxGPU/nvmtl/libvulkan_radeon.dylib','/Library/GPUBundles/nvmtl/libvulkan_radeon.dylib')]:
+        if hashlib.sha256((package/source).read_bytes()).digest()!=hashlib.sha256(Path(target).read_bytes()).digest():raise ValueError('installed runtime differs: '+target)
+
+def resume_existing(package,state,allow,status=None):
+    """Verify and enable apps on healthy existing queues; never initialize them."""
+    if any((state/name).exists() for name in ('pending','disabled')):
+        raise ValueError('review/back up the failed service and markers before verification-only recovery')
+    atomic(allow,RESTRICTED)
+    verify_existing_native(package)
+    folder=Path(tempfile.mkdtemp(prefix='verification-',dir=state))
+    report={'automatic_initialization_attempted':False,'native_initialization_retried':False,
+            'native_readiness_verified':True,'metal_verified':False,'desktop_armed':False,'apps_enabled':False}
+    def save():
+        (folder/'verification-result.json').write_text(json.dumps(report,indent=2)+'\n');publish(status,report)
+    try:
+        verify_console_metal(package,report,save)
+        if report.get('metal_verified') is not True:raise ValueError('Metal readbacks not verified')
+        if (state/'disabled').exists():raise ValueError('disabled during verification')
+        atomic(allow,APPS);report['apps_enabled']=True
+    except (OSError,ValueError,subprocess.SubprocessError) as e:
+        report['error']=str(e);(state/'disabled').touch();atomic(allow,RESTRICTED);raise
+    finally:save()
+    print('Existing native GPU verified; Metal compute/render passed; app access enabled. No reinitialization or reboot.')
+    return 0
+
 if __name__=='__main__':
-    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True);a=ap.parse_args()
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True)
+    ap.add_argument('--verify-existing',action='store_true');a=ap.parse_args()
     if os.geteuid()!=0:ap.error('administrator required')
-    try:raise SystemExit(boot(a.package.resolve(),Path('/var/db/nullarc-760m'),Path('/Library/GPUBundles/nvmtl-allow.txt'),Path('/Users/Shared/nullarc-hp-native-status.json')))
+    try:raise SystemExit((resume_existing if a.verify_existing else boot)(a.package.resolve(),Path('/var/db/nullarc-760m'),Path('/Library/GPUBundles/nvmtl-allow.txt'),Path('/Users/Shared/nullarc-hp-native-status.json')))
     except (OSError,ValueError,subprocess.SubprocessError) as e:ap.exit(1,str(e)+'\n')

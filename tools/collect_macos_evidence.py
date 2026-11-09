@@ -67,7 +67,7 @@ if __name__ == '__main__':
     mode.add_argument('--output', type=Path)
     mode.add_argument('--target-policy', action='store_true', help='print exact HP policy without writing files')
     a = ap.parse_args()
-    p = subprocess.run(['ioreg','-a','-r','-c','IOPCIDevice'], capture_output=True)
+    p = subprocess.run(['ioreg','-a','-l','-r','-c','IOPCIDevice'], capture_output=True)
     try:
         if p.returncode: raise ValueError('ioreg failed')
         devices = capture(plistlib.loads(p.stdout))

@@ -236,3 +236,19 @@ A missing session/catalogue does not itself mark healthy native queues lost;
 app access remains disabled. GPU shader-test failures retain the abort policy.
 The recovery tool also accepts the captured all-empty-catalogue timeout when
 native tests passed; it still refuses unrelated errors or changed native bytes.
+
+## Publication prerequisite and verification-only continuation
+
+PhxAccel's existing display fallback withholds `MetalPluginName` for 60 seconds
+when no custom framebuffer publishes. The latest helper waits explicitly for
+that property on the exact claimed HP PCI device before entering Metal; it does
+not arm or bypass a framebuffer. ioreg uses `-l` so child properties are present.
+
+For a reviewed enumeration-only failure with healthy queues,
+`recover_hp_boot.py --package PACKAGE --resume-metal` backs up and updates the
+future boot service, then validates the running module UUIDs/runtime hashes and
+repeats Metal device/compute/render tests on existing queues. This optional mode
+submits test shaders but never reinitializes PCI, firmware, GART or MES. No reboot
+is required. A lost driver or shader-failure class is refused. Only successful
+readbacks enable app access; WindowServer stays denied. The third HP boot already
+passed post-boot SSH Metal tests without repeating native initialization.

@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 """Backed-up next-boot update for the captured empty Metal catalogue failure.
 
-Never retries initialization, submits GPU commands or changes EFI/kexts/NVRAM.
+Default stages only; --resume-metal runs test shaders on existing healthy queues.
+Never retries initialization or changes EFI/kexts/NVRAM.
 """
 import argparse
 import os
@@ -12,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import json
+import subprocess
 
 sys.dont_write_bytecode=True
 HERE=Path(__file__).resolve().parent
@@ -24,10 +26,17 @@ NATIVE=('EFI/OC/Kexts/PhxBringup.kext','Library/Extensions/PhxAccel.kext',
         'gpu/phxctl/phxctl','gpu/phxctl/mesboot','gpu/phxctl/phxfw',
         'gpu/phxctl/vkprobe-native','gpu/phxctl/render-native','validation')
 
-def validate_failure(evidence):
+def validate_failure(evidence,supervisor=None):
     stages=evidence.get('stages',[])
     if not stages:raise ValueError('missing cold-boot stage evidence')
     last=stages[-1]
+    if (supervisor and evidence.get('accelerator_claimed') is True and evidence.get('metal_deferred') is True and evidence.get('metal_verified') is False
+            and evidence.get('native_compute_verified') is True and evidence.get('native_render_verified') is True
+            and last.get('stage')=='accelerator-claim' and last.get('returncode')==0):
+        checks=supervisor.get('metal_stages',[])
+        if (supervisor.get('native_initialization_verified') is True and supervisor.get('metal_verified') is False
+                and len(checks)==1 and checks[0].get('stage')=='metal-hp-device' and checks[0].get('returncode') is None
+                and 'timed out' in supervisor.get('error','')):return
     empty=lambda s:s.get('stdout','').strip()=='devices: 0\nno Metal device' and not s.get('stderr','').strip()
     immediate=last.get('returncode') in (1,75) and empty(last)
     attempts=last.get('attempts',[])
@@ -54,7 +63,9 @@ def recover(package,daemon,state,parent):
     folders=list(state.glob('boot-*'))
     if not folders:raise ValueError('no protected boot report')
     latest=max(folders,key=lambda p:p.stat().st_mtime)
-    evidence=json.loads((latest/'execution/result.json').read_text());validate_failure(evidence)
+    evidence=json.loads((latest/'execution/result.json').read_text())
+    supervisor=json.loads((latest/'boot-result.json').read_text()) if (latest/'boot-result.json').exists() else None
+    validate_failure(evidence,supervisor)
     if evidence.get('source_package')!=str(old):raise ValueError('boot report belongs to another package')
     for name in ('pending','disabled'):
         if not (state/name).is_file() or (state/name).is_symlink():raise ValueError('expected failed-boot markers missing')
@@ -82,9 +93,14 @@ def recover(package,daemon,state,parent):
     print('Next-boot update installed. No GPU initialization or service restart attempted.')
     print('Backup: '+str(backup))
     print('Package: '+str(destination))
+    return destination
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True);a=ap.parse_args()
+    ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True)
+    ap.add_argument('--resume-metal',action='store_true',help='after staging, verify Metal on existing healthy queues without reinitialization');a=ap.parse_args()
     if os.geteuid()!=0:ap.error('local administrator authentication required')
-    try:recover(a.package.resolve(),Path('/Library/LaunchDaemons/local.nullarc.hp-native.plist'),Path('/var/db/nullarc-760m'),Path('/Library/Application Support/NullArc760M'))
-    except (OSError,ValueError) as e:ap.exit(1,str(e)+'\n')
+    try:
+        destination=recover(a.package.resolve(),Path('/Library/LaunchDaemons/local.nullarc.hp-native.plist'),Path('/var/db/nullarc-760m'),Path('/Library/Application Support/NullArc760M'))
+        if a.resume_metal:
+            subprocess.run([sys.executable,'-B',str(destination/'gpu/phxctl/hp_boot.py'),'--package',str(destination),'--verify-existing'],check=True,timeout=600)
+    except (OSError,ValueError,subprocess.SubprocessError) as e:ap.exit(1,str(e)+'\n')

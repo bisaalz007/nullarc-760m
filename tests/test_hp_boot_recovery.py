@@ -61,6 +61,14 @@ class RecoveryTests(unittest.TestCase):
         last['attempts'][0]['stderr']='native transport failure'
         with self.assertRaises(ValueError):r.validate_failure(self.evidence)
 
+    def test_supervisor_enumeration_timeout_is_recoverable_but_shader_timeout_is_not(self):
+        self.evidence.update(accelerator_claimed=True,metal_deferred=True)
+        self.evidence['stages']=[{'stage':'accelerator-claim','returncode':0}]
+        supervisor={'native_initialization_verified':True,'metal_verified':False,'error':'device probe timed out','metal_stages':[{'stage':'metal-hp-device','returncode':None}]}
+        r.validate_failure(self.evidence,supervisor)
+        supervisor['metal_stages'][0]['stage']='metal-compute-readback'
+        with self.assertRaises(ValueError):r.validate_failure(self.evidence,supervisor)
+
     def test_marker_move_failure_rolls_back_configuration_and_marker(self):
         rename=Path.rename
         def fail(path,target):

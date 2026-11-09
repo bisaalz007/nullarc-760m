@@ -17,15 +17,34 @@ import subprocess
 import sys
 import time
 import uuid
+for directory in (Path(__file__).resolve().parent.parent,Path(__file__).resolve().parents[2]):
+    sys.path.insert(0,str(directory))
+from collect_macos_evidence import EXPECTED,pci_number,walk
 
-def wait_for_metal(probe,environment,record,timeout=30,prefix=None):
+def claimed_hp(nodes):
+    for node in walk(nodes):
+        if all(pci_number(node.get(k))==v for k,v in EXPECTED.items()):
+            if node.get('nmxgpu-claimed') is not True or node.get('phx-diagnostic-only') is not False:
+                raise ValueError('HP native accelerator claim is not active')
+            return node
+    raise ValueError('exact HP PCI identity not found')
+
+def wait_for_metal(probe,environment,record,timeout=90,prefix=None):
     """Retry only empty Metal catalogues, using a fresh process each time."""
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],timeout=5))
         if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
             raise ValueError('driver is no longer ready while waiting for Metal publication')
-        r=subprocess.run(list(prefix or [])+[str(probe),'--hp','list'],capture_output=True,text=True,timeout=5,env=environment)
+        # -l includes descendant properties, not just those of PCI match roots.
+        pci=claimed_hp(plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-alr','-c','IOPCIDevice'],timeout=5)))
+        # PhxAccel deliberately withholds this property for the 60-second
+        # framebuffer/headless fallback. Do not enter Metal before publication.
+        if not any((n.get('IOObjectClass')=='NMXAccel' or n.get('IOClass')=='NMXAccel') and
+                   isinstance(n.get('MetalPluginName'),str) and n['MetalPluginName'] for n in walk([pci])):
+            record({'returncode':75,'stdout':'','stderr':'','state':'awaiting-metal-plugin-property'})
+            time.sleep(0.5);continue
+        r=subprocess.run(list(prefix or [])+[str(probe),'--hp','list'],capture_output=True,text=True,timeout=30,env=environment)
         record({'returncode':r.returncode,'stdout':r.stdout,'stderr':r.stderr})
         if r.returncode==0:return r
         if r.returncode!=75 or r.stderr.strip():raise ValueError('Metal device probe failed; not an empty-catalogue retry')

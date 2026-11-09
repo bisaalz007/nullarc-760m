@@ -678,3 +678,35 @@ without GPU abort, shader failure with abort, exact native-proof requirements,
 public report filtering, reviewed timeout recovery and rollback. These host
 fixtures do not claim GPU execution. The GUI-session startup path requires a
 fresh HP boot because the current boot was already marked lost by the old code.
+
+### Third boot: automatic native initialization plus post-boot Metal confirmed
+
+Boot `3D411909-7D79-4A0F-9ABC-04366A28A0AE` completed automatic native
+initialization and retained `native-queues-ready`. The console-user enumeration
+command hit its five-second deadline; no Metal shader was submitted by the boot
+supervisor, which correctly retained healthy queues rather than marking them
+lost. Subsequent SSH tests, without reinitialization or reboot, verified exact HP
+PCI ancestry, Metal compute 4096/4096, completed/error-free command buffers and
+all 65,536 render pixels (32,640 red, 32,896 blue, zero other). The report is
+`sequoia-build39-automatic-native-postboot-metal.json`.
+
+A concrete publication prerequisite was found in PhxAccel: it removes
+`MetalPluginName` while awaiting PhxAMDFB and restores it through the existing
+60-second headless callback. Live NMXAccel now exposes the property and
+`NVAccelHeadless=true`, matching that path. The previous waits did not account
+for this deliberate driver policy. The helper now waits for that exact property
+under the exact claimed HP PCI device, within a 90-second software budget, before
+entering Metal. It does not bypass the display gate or shorten the kernel timer.
+The ioreg command must include `-l` to obtain descendant properties; that was
+verified against actual HP output and corrected in the evidence collector too.
+
+A verification-only continuation validates healthy queues, both loaded module
+UUIDs and installed runtime hashes, then repeats user-session Metal tests. It
+never calls PCI/PSP/SMU/GART/MES initialization. The reviewed updater can stage
+the new immutable service and invoke this continuation on the existing healthy
+GPU, avoiding another reboot. Shader-test failure still aborts; an absent Metal
+catalogue does not. App access remains restricted until real readbacks pass.
+Thirty targeted publication/boot/recovery tests and four collector tests pass.
+All compiled inputs and artifacts remain unchanged; only Python/control/docs
+assembly is needed. Future cold-boot publication handling and current-session
+app activation still require their actual runtime results.
