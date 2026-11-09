@@ -90,8 +90,9 @@ explicitly denied. Interrupted or failed initialization disables subsequent
 automatic attempts and retains evidence under `/var/db/nullarc-760m`. A compact
 status is readable at `/Users/Shared/nullarc-hp-native-status.json`; raw root-only
 reports retain the detailed diagnostics. Automatic reboot, reset and resume are
-not implemented. The boot service has host tests but still needs its first HP
-cold-boot test; the existing manual initialization is the verified path.
+not implemented. The first HP cold boot passed native GPU tests but checked Metal before any
+device appeared. The corrected publication wait has host tests and requires
+another boot; the existing manual Metal initialization is the verified path.
 
 Disable future automatic initialization with:
 
@@ -211,3 +212,15 @@ render tests; it can expose a kernel/firmware fault. It does not arm WindowServe
 set NVRAM, install a daemon or reboot. `--claim` additionally requires the matching
 PhxAccel UUID and requests accelerator attachment only after shader readbacks.
 Do not use `--claim` to infer Metal or display success. Keep the installer backup.
+
+## Updating the reviewed empty-catalogue boot failure
+
+For the exact captured failure (all native tests passed, then Metal enumeration
+returned zero devices without stderr), `recover_hp_boot.py --package PACKAGE`
+is an administrator-only next-boot updater. It compares native execution binaries,
+firmware and shader fixtures, backs up the daemon and failure markers, copies a
+new immutable package, and verifies the new service configuration. It refuses
+other failure classes or changed native components and rolls back if marker
+migration fails. It submits no GPU commands, starts no service and changes no
+kext, EFI or NVRAM setting. Only after successful staging, reboot manually with
+the same USB. A failed/lost boot is never used for another initialization attempt.

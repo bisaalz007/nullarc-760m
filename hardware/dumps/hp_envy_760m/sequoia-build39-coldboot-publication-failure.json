@@ -1,0 +1,300 @@
+{
+  "stages": [
+    {
+      "stage": "package-hashes",
+      "returncode": 0,
+      "seconds": 0.541252709,
+      "stdout": "verified 82 files; hp-experimental-bootstrap, acceleration unverified\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-plan",
+      "returncode": 0,
+      "seconds": 0.01889798399999998,
+      "stdout": "psp_13_0_4_toc.bin\t256\t2304\t0\t0\ngc_11_0_1_pfp.bin\t256\t263168\t2\t0\ngc_11_0_1_me.bin\t256\t263168\t1\t1048576\ngc_11_0_1_mec.bin\t256\t268384\t4\t2097152\nsdma_6_0_1.bin\t256\t17408\t71\t3670016\nsdma_6_0_1.bin\t17664\t16896\t72\t3932160\ngc_11_0_1_mes_2.bin\t256\t112688\t33\t4194304\ngc_11_0_1_mes_2.bin\t112944\t131072\t34\t4456448\ngc_11_0_1_mes1.bin\t256\t100112\t81\t4718592\ngc_11_0_1_mes1.bin\t100368\t131072\t82\t4980736\ngc_11_0_1_imu.bin\t256\t66048\t68\t5242880\ngc_11_0_1_imu.bin\t66304\t66048\t69\t6291456\ngc_11_0_1_rlc.bin\t25344\t2560\t20\t7340032\ngc_11_0_1_rlc.bin\t27904\t24656\t21\t7471104\ngc_11_0_1_rlc.bin\t52560\t66048\t26\t8388608\ngc_11_0_1_rlc.bin\t118608\t33280\t48\t8650752\ngc_11_0_1_rlc.bin\t151888\t8704\t25\t8912896\ngc_11_0_1_rlc.bin\t256\t25088\t8\t3145728\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-entry-points",
+      "returncode": 0,
+      "seconds": 0.004488291000000033,
+      "stdout": "0xfffffffff0005000 0xfffffffff0005000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "loaded-kernel-uuid",
+      "returncode": 0,
+      "seconds": 0.24582521499999987,
+      "stdout": "Loaded module list omitted; verified UUIDs in public boot evidence.",
+      "stderr": "No variant specified, falling back to release\n"
+    },
+    {
+      "stage": "exclusive-memory-claim",
+      "returncode": 0,
+      "seconds": 0.006505614999999798,
+      "stdout": "begin-hp -> kr 0x00000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "psp-ring",
+      "returncode": 0,
+      "seconds": 0.030709191999999996,
+      "stdout": "psp create -> kr 0x00000000  C2PMSG_64 0x80c20000  ring MC 0x8001100000  region-zero 0  wptr 0x0\n",
+      "stderr": ""
+    },
+    {
+      "stage": "toc-stage",
+      "returncode": 0,
+      "seconds": 0.007411443999999934,
+      "stdout": "staged /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/psp_13_0_4_toc.bin[0x100:+2304] @fwbuf+0x0\n",
+      "stderr": ""
+    },
+    {
+      "stage": "toc-required-tmr",
+      "returncode": 0,
+      "seconds": 0.009874385000000041,
+      "stdout": "toc (staged bytes 0x900) -> kr 0x00000000  status 0x00000000  3000 us  required TMR bytes 0x4000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "exclusive-tmr-setup",
+      "returncode": 0,
+      "seconds": 0.05775627399999994,
+      "stdout": "tmr (size 0x0) -> kr 0x00000000  status 0x00000000  46000 us\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-0-2",
+      "returncode": 0,
+      "seconds": 0.06134366499999988,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_pfp.bin[0x100:+263168] fwtype 2 @fwbuf+0x0 -> kr 0x00000000  status 0x00000000  46000 us  fw_addr 0x0000008009051000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-1-1",
+      "returncode": 0,
+      "seconds": 0.06899136299999986,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_me.bin[0x100:+263168] fwtype 1 @fwbuf+0x100000 -> kr 0x00000000  status 0x00000000  47000 us  fw_addr 0x0000008009092000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-2-4",
+      "returncode": 0,
+      "seconds": 0.06265855200000003,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_mec.bin[0x100:+268384] fwtype 4 @fwbuf+0x200000 -> kr 0x00000000  status 0x00000000  46000 us  fw_addr 0x00000080090d3000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-3-71",
+      "returncode": 0,
+      "seconds": 0.014083051000000069,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/sdma_6_0_1.bin[0x100:+17408] fwtype 71 @fwbuf+0x380000 -> kr 0x00000000  status 0x00000000  6000 us  fw_addr 0x0000008009047f00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-4-72",
+      "returncode": 0,
+      "seconds": 0.013973605999999972,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/sdma_6_0_1.bin[0x4500:+16896] fwtype 72 @fwbuf+0x3c0000 -> kr 0x00000000  status 0x00000000  6000 us  fw_addr 0x000000800904c100\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-5-33",
+      "returncode": 0,
+      "seconds": 0.038207188999999975,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_mes_2.bin[0x100:+112688] fwtype 33 @fwbuf+0x400000 -> kr 0x00000000  status 0x00000000  22000 us  fw_addr 0x0000008009120000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-6-34",
+      "returncode": 0,
+      "seconds": 0.030938212999999992,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_mes_2.bin[0x1b930:+131072] fwtype 34 @fwbuf+0x440000 -> kr 0x00000000  status 0x00000000  14000 us  fw_addr 0x00000080093b0000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-7-81",
+      "returncode": 0,
+      "seconds": 0.0336813789999999,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_mes1.bin[0x100:+100112] fwtype 81 @fwbuf+0x480000 -> kr 0x00000000  status 0x00000000  20000 us  fw_addr 0x00000080091a0000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-8-82",
+      "returncode": 0,
+      "seconds": 0.03625728099999992,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_mes1.bin[0x18810:+131072] fwtype 82 @fwbuf+0x4c0000 -> kr 0x00000000  status 0x00000000  17000 us  fw_addr 0x0000008009430000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-9-68",
+      "returncode": 0,
+      "seconds": 0.03511902599999983,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_imu.bin[0x100:+66048] fwtype 68 @fwbuf+0x500000 -> kr 0x00000000  status 0x00000000  15000 us  fw_addr 0x0000000000000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-10-69",
+      "returncode": 0,
+      "seconds": 0.028600447000000084,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_imu.bin[0x10300:+66048] fwtype 69 @fwbuf+0x600000 -> kr 0x00000000  status 0x00000000  14000 us  fw_addr 0x0000000000000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-11-20",
+      "returncode": 0,
+      "seconds": 0.009897990000000023,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0x6300:+2560] fwtype 20 @fwbuf+0x700000 -> kr 0x00000000  status 0x00000000  4000 us  fw_addr 0x0000008009026700\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-12-21",
+      "returncode": 0,
+      "seconds": 0.012786708000000147,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0x6d00:+24656] fwtype 21 @fwbuf+0x720000 -> kr 0x00000000  status 0x00000000  7000 us  fw_addr 0x0000008009026f00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-13-26",
+      "returncode": 0,
+      "seconds": 0.021826778000000102,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0xcd50:+66048] fwtype 26 @fwbuf+0x800000 -> kr 0x00000000  status 0x00000000  13000 us  fw_addr 0x000000800902ff00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-14-48",
+      "returncode": 0,
+      "seconds": 0.013901720999999867,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0x1cf50:+33280] fwtype 48 @fwbuf+0x840000 -> kr 0x00000000  status 0x00000000  8000 us  fw_addr 0x000000800903ff00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-15-25",
+      "returncode": 0,
+      "seconds": 0.009772184000000017,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0x25150:+8704] fwtype 25 @fwbuf+0x880000 -> kr 0x00000000  status 0x00000000  5000 us  fw_addr 0x000000800902df00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-16-8",
+      "returncode": 0,
+      "seconds": 0.013380241999999987,
+      "stdout": "loadfw /Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6/gpu/fw/gc_11_0_1_rlc.bin[0x100:+25088] fwtype 8 @fwbuf+0x300000 -> kr 0x00000000  status 0x00000000  7000 us  fw_addr 0x0000008009020000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "firmware-autoload",
+      "returncode": 0,
+      "seconds": 0.004638260999999977,
+      "stdout": "autoload -> kr 0x00000000  status 0x00000000  1000 us\n",
+      "stderr": ""
+    },
+    {
+      "stage": "smu-0x3",
+      "returncode": 0,
+      "seconds": 0.004423357999999933,
+      "stdout": "smu                        msg 0x03 arg 0x00000000 -> kr 0x00000000 resp 0x01 (OK) out 0x00000008\n",
+      "stderr": ""
+    },
+    {
+      "stage": "smu-0x2",
+      "returncode": 0,
+      "seconds": 0.004563090999999853,
+      "stdout": "smu                        msg 0x02 arg 0x00000000 -> kr 0x00000000 resp 0x01 (OK) out 0x004c5d00\n",
+      "stderr": ""
+    },
+    {
+      "stage": "smu-0x16",
+      "returncode": 0,
+      "seconds": 0.033341450999999855,
+      "stdout": "smu                        msg 0x16 arg 0x00000001 -> kr 0x00000000 resp 0x01 (OK) out 0x00000001\n",
+      "stderr": ""
+    },
+    {
+      "stage": "cp-0xde0",
+      "returncode": 0,
+      "seconds": 0.010826681000000171,
+      "stdout": "wreg 0xde0 = 0x1 -> kr 0x00000000  readback 0x00000001\n",
+      "stderr": ""
+    },
+    {
+      "stage": "cp-0xa802",
+      "returncode": 0,
+      "seconds": 0.012180019999999736,
+      "stdout": "wreg 0xa802 = 0x0 -> kr 0x00000000  readback 0x00000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "cp-0xa803",
+      "returncode": 0,
+      "seconds": 0.04562018699999992,
+      "stdout": "wreg 0xa803 = 0x1000000 -> kr 0x00000000  readback 0x01000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "owned-gart",
+      "returncode": 0,
+      "seconds": 0.18879330899999935,
+      "stdout": "gart: ack17=0x1 ctx0=0x1fffe01\n",
+      "stderr": ""
+    },
+    {
+      "stage": "mes-firmware-start",
+      "returncode": 0,
+      "seconds": 0.012648218999999905,
+      "stdout": "mes: CP_MES_CNTL=0xc000000\n",
+      "stderr": ""
+    },
+    {
+      "stage": "mes-queues-and-command-readbacks",
+      "returncode": 0,
+      "seconds": 0.12782426800000035,
+      "stdout": "kiq init: RLC_CP_SCHEDULERS=0x30e8\nsched: hqd active=1 pq_base=0x80025100\n  sched hqd: rptr=128 wptr_lo=0 dbctl=0xc0000058 active=1\nmes SET_HW_RESOURCES: fence=1 (want 1) status=1 -> OK\n  sched hqd: rptr=256 wptr_lo=0 dbctl=0xc0000058 active=1\nmes QUERY_SCHED_STATUS: fence=2 (want 2) status=2 -> OK\n  sched hqd: rptr=384 wptr_lo=0 dbctl=0xc0000058 active=1\nmes ADD_QUEUE(compute, map_legacy_kq): fence=3 (want 3) status=3 -> OK\ncompute: scratch0=0xdeadbeef (want deadbeef) testbuf=0xfeedf00d (want feedf00d) hqd_active=1 rptr=8\nadopt queue -> kr 0x0\n  sched hqd: rptr=512 wptr_lo=0 dbctl=0xc0000058 active=1\nmes ADD_QUEUE(gfx, map_legacy_kq): fence=4 (want 4) status=4 -> OK\ngfx hqd after map: active=1 base=0x80025700 cntl=0x20a0080a dbctl=0x40000458 rptr=0\ngfx: scratch1=0xdeadbeef (want deadbeef) testbuf=0x6f7a6f7a (want 6f7a6f7a) rptr=0 rptr_wb=968 grbm=0xa800302c cp_stat=0x00000000\nadopt gfx queue -> kr 0x0\n",
+      "stderr": ""
+    },
+    {
+      "stage": "native-compute-readback",
+      "returncode": 0,
+      "seconds": 0.5159934499999999,
+      "stdout": "physical devices: 1\n[0] AMD Radeon 760M Graphics (RADV PHOENIX)  vendor 0x1002 device 0x1900  api 1.4.363\n    driver: radv (Mesa 26.3.0-devel (git-4b0795b504))\n    heap 0: 256 MiB flags 0x0\n    heap 1: 512 MiB flags 0x1\n    queue family 0: flags 0x1f count 1\n    queue family 1: flags 0xe count 4\n    queue family 2: flags 0x8 count 1\nselected physical device 0 (HP device ID; subsystem verified by companion capture)\nusing queue family 1\ndevice created\ncompute pipeline compiled\ndispatch submitted and fence signalled\nresults: 256/256 correct (GLSL fill, data[0]=0x00000000)\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "native-translated-compute-readback",
+      "returncode": 0,
+      "seconds": 0.30275058099999974,
+      "stdout": "physical devices: 1\n[0] AMD Radeon 760M Graphics (RADV PHOENIX)  vendor 0x1002 device 0x1900  api 1.4.363\n    driver: radv (Mesa 26.3.0-devel (git-4b0795b504))\n    heap 0: 256 MiB flags 0x0\n    heap 1: 512 MiB flags 0x1\n    queue family 0: flags 0x1f count 1\n    queue family 1: flags 0xe count 4\n    queue family 2: flags 0x8 count 1\nselected physical device 0 (HP device ID; subsystem verified by companion capture)\nusing queue family 1\ndevice created\ncompute pipeline compiled\ndispatch submitted and fence signalled\nresults: 1/1 correct (translated MSL store_value, data[0]=0x00000007)\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "native-translated-render-readback",
+      "returncode": 0,
+      "seconds": 0.33276690400000053,
+      "stdout": "selected AMD Radeon 760M Graphics (RADV PHOENIX) (Mesa 26.3.0-devel (git-4b0795b504))\ntranslated MSL draw + fence + image readback: 256/256 pixels; first RGBA=64,128,191,255\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "accelerator-claim",
+      "returncode": 0,
+      "seconds": 0.0068881620000000865,
+      "stdout": "claim -> kr 0x0\n",
+      "stderr": ""
+    },
+    {
+      "stage": "metal-hp-device",
+      "returncode": 1,
+      "seconds": 0.009652048000000413,
+      "stdout": "devices: 0\nno Metal device\n",
+      "stderr": ""
+    }
+  ],
+  "executed": true,
+  "native_compute_verified": true,
+  "native_render_verified": true,
+  "metal_verified": false,
+  "display_takeover_requested": false,
+  "source_package": "/Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6",
+  "bringup_uuid": "014F7217-A726-3497-A963-604079AADD1F",
+  "error": "metal-hp-device failed; inspect result.json; no later stage attempted",
+  "cold_boot_session_uuid": "1E5E00C3-38CE-4D4F-86A7-8D09557D3F2C"
+}

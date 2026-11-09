@@ -122,7 +122,9 @@ int main(int argc, char **argv) {
             if (hp ? hpDevice(d) : [NSStringFromClass([d class]) hasPrefix:@"NVMTL"]) dev = d;
         }
         if (!dev && !hp) dev = MTLCreateSystemDefaultDevice();
-        if (!dev) { printf("no Metal device\n"); return 1; }
+        // EX_TEMPFAIL only for an empty catalogue; wrong-device and other errors
+        // remain fatal. Boot matching publishes the accelerator asynchronously.
+        if (!dev) { printf("no Metal device\n"); return hp && !all.count ? 75 : 1; }
         printf("using %s\n", dev.name.UTF8String);
         if (hp) printf("HP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\n");
         if (mode && !strcmp(mode, "list")) return 0;

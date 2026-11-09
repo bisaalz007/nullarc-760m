@@ -18,6 +18,20 @@ import sys
 import time
 import uuid
 
+def wait_for_metal(probe,environment,record,timeout=30):
+    """Retry only empty Metal catalogues, using a fresh process each time."""
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],timeout=5))
+        if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
+            raise ValueError('driver is no longer ready while waiting for Metal publication')
+        r=subprocess.run([str(probe),'--hp','list'],capture_output=True,text=True,timeout=5,env=environment)
+        record({'returncode':r.returncode,'stdout':r.stdout,'stderr':r.stderr})
+        if r.returncode==0:return r
+        if r.returncode!=75 or r.stderr.strip():raise ValueError('Metal device probe failed; not an empty-catalogue retry')
+        time.sleep(0.25)
+    raise ValueError('HP Metal device publication timed out')
+
 def macho_uuid(path):
     data=path.read_bytes()
     if data[:4]!=b'\xcf\xfa\xed\xfe':raise ValueError('expected x86_64 Mach-O')
@@ -50,7 +64,12 @@ def main():
         path.write_text(json.dumps(report,indent=2)+'\n');path.chmod(0o600)
     def run(stage,args,timeout=30,environment=env):
         start=time.monotonic()
-        r=subprocess.run([str(v) for v in args],capture_output=True,text=True,timeout=timeout,env=environment)
+        try:r=subprocess.run([str(v) for v in args],capture_output=True,text=True,timeout=timeout,env=environment)
+        except subprocess.TimeoutExpired as e:
+            decode=lambda v:v.decode('utf-8',errors='replace') if isinstance(v,bytes) else v or ''
+            report['stages'].append({'stage':stage,'returncode':None,'seconds':time.monotonic()-start,
+                'stdout':decode(e.stdout),'stderr':decode(e.stderr),'error':'timeout'})
+            save();raise
         report['stages'].append({'stage':stage,'returncode':r.returncode,'seconds':time.monotonic()-start,
                                  'stdout':r.stdout,'stderr':r.stderr})
         save()
@@ -118,7 +137,12 @@ def main():
             run('accelerator-claim',[tools/'mesboot','claim'])
             cache=a.output/'metal-cache';cache.mkdir();air=a.output/'metal-aircache';air.mkdir()
             env.update(XDG_CACHE_HOME=str(cache),NVMTL_AIRCACHE=str(air),NVMTL_LOG_PATH=str(a.output/'metal-plugin.log'))
-            run('metal-hp-device',[tools/'mtlprobe','--hp','list'])
+            publication={'stage':'metal-hp-device','returncode':None,'attempts':[]}
+            report['stages'].append(publication);save()
+            def record(attempt):publication['attempts'].append(attempt);save()
+            r=wait_for_metal(tools/'mtlprobe',env,record)
+            publication.update(returncode=0,stdout=r.stdout,stderr=r.stderr);save()
+            print('metal-hp-device: passed',flush=True)
             run('metal-compute-readback',[tools/'mtlprobe','--hp'],timeout=90)
             run('metal-render-readback',[tools/'mtlprobe','--hp','render'],timeout=90)
             report['metal_verified']=True;save()

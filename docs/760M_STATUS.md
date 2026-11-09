@@ -605,3 +605,45 @@ later in user space. Correct framebuffer/boot ordering and a dedicated display
 experiment remain necessary. Current successful tests are compute/offscreen
 rendering; the firmware framebuffer still drives the panel. No new display gate
 was removed or NVRAM arming performed.
+
+### HP app-only boot service installed
+
+The user ran the native boot installer. Independent SSH verification confirmed
+`/Library/LaunchDaemons/local.nullarc.hp-native.plist`, its exact launch arguments,
+and all 82 package files under
+`/Library/Application Support/NullArc760M/package-3d1c70d5e9d3e6d6`. The service
+and entire package are root-owned and not writable by group/others. No pending
+or disabled marker exists; the boot-status file is absent, consistent with no
+service execution yet. Current manually initialized queues remain ready. The
+next required step is a manual reboot with the same USB, followed by fresh boot
+status, running UUID and real Metal verification. Cold-boot success and
+WindowServer acceleration are not yet claimed.
+
+### First automatic boot: native execution passed, Metal publication check failed
+
+Boot session `1E5E00C3-38CE-4D4F-86A7-8D09557D3F2C` differs from the previous
+manual test. Its protected report confirms all PSP/MES/queue stages, native
+compute, translated compute/render and accelerator claim passed. The immediate
+`metal-hp-device` check exited 1 after 9.65 ms with `devices: 0`, `no Metal device`
+and empty stderr. NMXAccel was published by the later SSH inspection. The
+harness conservatively marked the driver lost; the boot service retained pending/
+disabled markers and did not enable app access. No GPU command was retried.
+The redacted cold-boot report is committed beside the successful manual reports.
+
+`claimAccel` requests asynchronous IOKit matching. The fix candidate therefore
+waits for Metal publication using fresh enumeration-only processes, bounded by
+a 30-second budget and individual command timeouts. Only an empty catalogue
+has the new explicit temporary exit 75; a wrong device, probe error or lost
+kernel stops immediately. Four publication tests and eight boot-control tests
+pass. Public boot status now includes exact stage/verification results without
+raw module lists, and timed-out stages are retained in the detailed report.
+
+`recover_hp_boot.py` stages a future-boot-only update after independently
+validating this precise failure and identical kernel, driver, native execution,
+firmware and shader-fixture bytes. It backs up the old daemon and markers, checks
+configuration readback and rolls back on failure. Four recovery tests cover
+success, changed native code refusal, unrelated failure refusal and rollback.
+No kext, EFI, NVRAM or security change is needed. The current boot remains lost;
+the corrected publication sequence requires a new boot and is not yet confirmed.
+Only the Metal diagnostic executable was recompiled; all other compiled inputs
+and artifacts matched the prior full-build receipt before updating that receipt.

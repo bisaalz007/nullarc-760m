@@ -13,10 +13,12 @@ class BootTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);self.state=self.root/'state';self.allow=self.root/'allow'
 
-    def process(self,code=0,metal=True):
+    def process(self,code=0,metal=True,extra=None):
         def spawn(command,**kwargs):
             folder=Path(command[command.index('--output')+1]);folder.mkdir()
-            (folder/'result.json').write_text(json.dumps(dict(executed=True,native_compute_verified=True,native_render_verified=True,metal_verified=metal)))
+            evidence=dict(executed=True,native_compute_verified=True,native_render_verified=True,metal_verified=metal)
+            evidence.update(extra or {})
+            (folder/'result.json').write_text(json.dumps(evidence))
             class Process:
                 returncode=code
                 def communicate(self,**kwargs):return ('bootstrap log','')
@@ -55,5 +57,22 @@ class BootTests(unittest.TestCase):
         status=self.root/'status.json';status.write_text('{"apps_enabled":true}')
         with patch.object(b.subprocess,'Popen'),self.assertRaises(ValueError):b.boot(self.root,self.state,self.allow,status)
         self.assertFalse(json.loads(status.read_text())['apps_enabled'])
+
+    def test_failed_stage_is_public_without_raw_process_output(self):
+        status=self.root/'status.json'
+        extra={'error':'metal-compute-readback failed','stages':[{'stage':'native-compute-readback','returncode':0},{'stage':'metal-compute-readback','returncode':1}]}
+        with patch.object(b.subprocess,'Popen',side_effect=self.process(code=1,metal=False,extra=extra)),self.assertRaises(ValueError):b.boot(self.root,self.state,self.allow,status)
+        report=json.loads(status.read_text())
+        self.assertEqual(report['failed_stage'],'metal-compute-readback')
+        self.assertTrue(report['native_compute_verified']);self.assertFalse(report['metal_verified'])
+        self.assertNotIn('stdout',report);self.assertNotIn('stderr',report)
+
+    def test_disable_during_initialization_prevents_app_enable(self):
+        spawn=self.process()
+        def disable(*args,**kwargs):
+            (self.state/'disabled').touch()
+            return spawn(*args,**kwargs)
+        with patch.object(b.subprocess,'Popen',side_effect=disable),self.assertRaises(ValueError):b.boot(self.root,self.state,self.allow)
+        self.assertNotIn('*',self.allow.read_text())
 
 if __name__=='__main__':unittest.main()

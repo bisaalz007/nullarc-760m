@@ -44,10 +44,20 @@ def boot(package,state,allow,status=None):
         except subprocess.TimeoutExpired:
             os.killpg(p.pid,signal.SIGKILL);p.communicate();raise ValueError('bootstrap timeout; reboot and review evidence')
         report.update(returncode=p.returncode,stdout=stdout,stderr=stderr)
+        evidence_path=folder/'execution/result.json'
+        evidence=json.loads(evidence_path.read_text()) if evidence_path.exists() else {}
+        for key in ('native_compute_verified','native_render_verified','metal_verified'):
+            report[key]=evidence.get(key) is True
+        stages=evidence.get('stages',[])
+        if stages:
+            report['last_stage']=stages[-1].get('stage')
+            failures=[s for s in stages if s.get('returncode')!=0]
+            if failures:report['failed_stage']=failures[-1].get('stage')
+        if evidence.get('error'):report['bootstrap_error']=evidence['error']
         if p.returncode:raise ValueError('bootstrap failed; no application allow list enabled')
-        evidence=json.loads((folder/'execution/result.json').read_text())
         if not all(evidence.get(k) is True for k in ('executed','native_compute_verified','native_render_verified','metal_verified')):
             raise ValueError('bootstrap did not prove native compute, render and Metal execution')
+        if (state/'disabled').exists():raise ValueError('service disabled during initialization; app access remains restricted')
         atomic(allow,APPS)
         pending.unlink()
         report['apps_enabled']=True
