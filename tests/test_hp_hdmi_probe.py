@@ -51,7 +51,8 @@ class HdmiProbeTest(unittest.TestCase):
                 (path / "edid").write_bytes(example_edid() if status == "connected" else b"")
             before = probe.collect_linux(root)
             self.assertEqual(len(before["connectors"]), 2)
-            self.assertEqual(before["connectors"][1]["status"], "disconnected")
+            before_hdmi = next(c for c in before["connectors"] if c["id"] == "card0-HDMI-A-1")
+            self.assertEqual(before_hdmi["status"], "disconnected")
             (root / "card0-HDMI-A-1/status").write_text("connected\n")
             (root / "card0-HDMI-A-1/edid").write_bytes(example_edid())
             after = probe.collect_linux(root)
@@ -59,7 +60,8 @@ class HdmiProbeTest(unittest.TestCase):
             self.assertEqual(diff["status_changes"], [
                 {"id": "card0-HDMI-A-1", "before": "disconnected", "after": "connected"}
             ])
-            self.assertEqual(after["connectors"][1]["gpu_device"], "0x1900")
+            after_hdmi = next(c for c in after["connectors"] if c["id"] == "card0-HDMI-A-1")
+            self.assertEqual(after_hdmi["gpu_device"], "0x1900")
 
     def test_macos_only_whitelisted_metadata(self):
         nodes = [{"IOClass": "PhxAMDFB", "PhxFBWidth": 1920,
