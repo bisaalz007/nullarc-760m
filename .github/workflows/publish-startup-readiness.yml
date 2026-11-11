@@ -1,4 +1,4 @@
-name: Publish bounded HP startup readiness hotfix
+name: Publish current HP 760M Sequoia beta and retire superseded ZIP assets
 
 on:
   push:
@@ -7,66 +7,120 @@ on:
       - '.github/workflows/publish-startup-readiness.yml'
       - 'tools/phxctl/hp_bringup.py'
       - 'install/recover_hp_boot.py'
+      - 'tools/release/publish_startup_readiness.py'
+      - 'README.md'
       - 'tests/test_hp_metal_publication.py'
       - 'tests/test_hp_boot_recovery.py'
-      - 'tools/release/publish_startup_readiness.py'
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: nullarc760m-current-release
+  cancel-in-progress: false
+
 jobs:
-  package-hotfix:
+  publish-current:
     if: github.repository == 'yt42c2mvn2-cmd/nullarc-760m'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Verify registry readiness and guarded recovery tests
+
+      - name: Validate bounded boot startup, recovery and packaging
         run: |
+          set -euo pipefail
           python3 -B tests/test_hp_metal_publication.py
           python3 -B tests/test_hp_boot_recovery.py
           python3 -B tests/test_release_install.py
           python3 -m py_compile tools/phxctl/hp_bringup.py install/recover_hp_boot.py tools/release/publish_startup_readiness.py
-      - name: Retrieve the published fresh-files beta
+
+      - name: Download original pinned compiled stack and its SHA256
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           mkdir -p dist/base
           gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
             --pattern 'nullarc-760m-0.2.0-sequoia-beta-fresh-files.zip' --dir dist/base
           gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
             --pattern 'SHA256SUMS-fresh-files' --dir dist/base
-      - name: Assemble and hash-check startup-only repair
+          (cd dist/base && sha256sum -c SHA256SUMS-fresh-files)
+
+      - name: Assemble current verified-source package
         run: |
+          set -euo pipefail
           python3 -B tools/release/publish_startup_readiness.py \
             --original dist/base/nullarc-760m-0.2.0-sequoia-beta-fresh-files.zip \
             --checksums dist/base/SHA256SUMS-fresh-files \
-            --output dist/startup-hotfix
-      - name: Append separate hotfix assets without modifying original beta downloads
+            --output dist/current
+          (cd dist/current && sha256sum -c SHA256SUMS-startup-readiness)
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+          pkg=Path('dist/current/nullarc-760m-0.2.0-sequoia-beta-startup-readiness.zip')
+          root='nullarc-760m-0.2.0-sequoia-beta/'
+          with zipfile.ZipFile(pkg) as f:
+              if f.testzip(): raise SystemExit('ZIP CRC mismatch')
+              for name in ['README.md','INSTALL.md','package-manifest.json','install.sh','recover_hp_boot.py',
+                           'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel',
+                           'PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver']:
+                  if root+name not in f.namelist(): raise SystemExit('missing '+name)
+          print('Current ZIP includes README and signed-off native build')
+          PY
+
+      - name: Upload only current ZIP, checksum and release notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag=v0.2.0-sequoia-beta
-          for asset in dist/startup-hotfix/*; do
-            name="$(basename "$asset")"
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
-              echo "Already published: $name"
-            else
-              gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY"
-            fi
+          for asset in dist/current/*; do
+            gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
           done
-          body="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq '.body')"
-          if [[ "$body" != *'## Add-on: startup registry readiness fix'* ]]; then
-            notes="$(cat dist/startup-hotfix/RELEASE_NOTES-startup-readiness.md)"
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --notes "$body
 
-          ---
+      - name: Download and verify the published ZIP before removing any previous assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=v0.2.0-sequoia-beta
+          zip=nullarc-760m-0.2.0-sequoia-beta-startup-readiness.zip
+          mkdir -p dist/verified-remote
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$zip" --dir dist/verified-remote
+          cp dist/current/SHA256SUMS-startup-readiness dist/verified-remote/
+          (cd dist/verified-remote && sha256sum -c SHA256SUMS-startup-readiness)
+          cmp -s "dist/current/$zip" "dist/verified-remote/$zip"
+          echo 'Remote release matches local verified ZIP byte-for-byte.'
 
-          ## Add-on: startup registry readiness fix
+      - name: Replace outdated beta release description
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --title "NullArc-760M 0.2.0 — HP Sequoia verified beta" \
+            --notes-file dist/current/RELEASE_NOTES-startup-readiness.md
 
-          $notes"
-          fi
+      - name: Delete previous ZIP release assets, retain current ZIP and non-ZIP source assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current=nullarc-760m-0.2.0-sequoia-beta-startup-readiness.zip
+          # Only uploaded assets are removed; GitHub's automatic source ZIPs cannot be deleted.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | .assets[]? | select(.name | endswith(".zip")) | [.id, .name] | @tsv' \
+            > dist/old-zip-assets.tsv
+          while IFS=$'\t' read -r id name; do
+            [[ -n "$id" ]] || continue
+            if [[ "$name" == "$current" ]]; then
+              echo "Keep current: $name (asset $id)"
+            else
+              echo "Remove superseded: $name (asset $id)"
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id" >/dev/null
+            fi
+          done < dist/old-zip-assets.tsv
+          echo 'Superseded ZIP asset removal completed.'
