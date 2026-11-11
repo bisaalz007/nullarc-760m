@@ -1,0 +1,71 @@
+name: Append WindowServer persistence installer to existing beta release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-persistent-windowserver.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  append-addon:
+    if: github.repository == 'yt42c2mvn2-cmd/nullarc-760m'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run focused WindowServer tests
+        run: |
+          python3 tests/test_hp_boot.py
+          python3 tests/test_hp_windowserver.py
+          python3 tests/test_hp_display_install.py
+      - name: Download the original compiled 0.2.0 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/original
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern 'nullarc-760m-0.2.0-sequoia-beta.zip' --dir dist/original
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS --dir dist/original
+      - name: Produce verified startup-only add-on ZIP
+        run: |
+          python3 tools/release/publish_persistent_windowserver.py \
+            --original dist/original/nullarc-760m-0.2.0-sequoia-beta.zip \
+            --checksums dist/original/SHA256SUMS \
+            --output dist/persistent
+      - name: Append assets to the EXISTING release (retain all original assets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=v0.2.0-sequoia-beta
+          for asset in dist/persistent/*; do
+            name="$(basename "$asset")"
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              echo "Already attached: $name"
+            else
+              gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+          current="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          if [[ "$current" != *'## Add-on: persistent WindowServer arming'* ]]; then
+            {
+              printf '%s\n\n' "$current"
+              cat <<'NOTES'
+          ---
+
+          ## Add-on: persistent WindowServer arming
+
+          The **original 0.2.0 beta ZIP remains unchanged** and retains its original one-boot behavior. For guarded permanent arming, use the additional **nullarc-760m-0.2.0-sequoia-beta-persistent-windowserver.zip**, and verify it with **SHA256SUMS-persistent-windowserver**. See **RELEASE_NOTES-persistent-windowserver.md** for source provenance and caveats.
+
+          The add-on updates the HP startup scripts from commit 5de9ab4221a5af7af20723b9c2bc1faf5ffa4b64, preserving the original compiled driver stack. After each successful startup and validated WindowServer desktop, it schedules another accelerated boot. Failures cancel persistence and retain the firmware framebuffer fallback. The updated behavior has not yet been tested on the HP.
+          NOTES
+            } > dist/persistent/new-release-body.md
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/441206998" \
+              -f body="$(cat dist/persistent/new-release-body.md)" >/dev/null
+          fi
