@@ -54,6 +54,13 @@ def install(package,root=Path('/'),check=True,fresh=False):
         for i,(src,dst) in enumerate(zip(TARGETS,DESTINATIONS)):
             staged=backup/('new-'+str(i));shutil.copytree(package/src,staged)
             if src=='gpu':(staged/'phxboot-off').touch()
+            if root==Path('/'):
+                # ZIP extraction may leave user-owned files; system kexts and
+                # plugins must be root-owned and non-writable by others.
+                for node in [staged]+list(staged.rglob('*')):
+                    if node.is_symlink():raise ValueError('symlinked release component: '+str(node))
+                    os.chown(node,0,0)
+                    node.chmod(node.stat().st_mode&~0o022)
             target=root/dst;target.parent.mkdir(parents=True,exist_ok=True)
             old=backup/('original-'+str(i));had=target.exists()
             original_files=inventory(target) if had else {}

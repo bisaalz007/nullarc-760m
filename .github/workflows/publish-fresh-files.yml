@@ -1,0 +1,77 @@
+name: Append backed-up fresh-file installer to existing Sequoia beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-fresh-files.yml'
+      - 'tools/release/publish_fresh_files.py'
+      - 'install/install_components.py'
+      - 'install/install.sh'
+      - 'docs/INSTALL.md'
+      - 'tests/test_component_install.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-fresh-files:
+    if: github.repository == 'yt42c2mvn2-cmd/nullarc-760m'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate component install, rollback, and release scripts
+        run: |
+          python3 tests/test_component_install.py
+          python3 tests/test_release_install.py
+          python3 tests/test_hp_display_install.py
+          python3 tests/test_hp_windowserver.py
+      - name: Fetch existing verified persistence release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/base
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern 'nullarc-760m-0.2.0-sequoia-beta-persistent-windowserver.zip' --dir dist/base
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern SHA256SUMS-persistent-windowserver --dir dist/base
+      - name: Create file-installation package, retaining the compiled binaries
+        run: |
+          python3 tools/release/publish_fresh_files.py \
+            --original dist/base/nullarc-760m-0.2.0-sequoia-beta-persistent-windowserver.zip \
+            --checksums dist/base/SHA256SUMS-persistent-windowserver \
+            --output dist/fresh
+      - name: Append ZIP, checksum, and release notes without replacing original assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=v0.2.0-sequoia-beta
+          for asset in dist/fresh/*; do
+            name="$(basename "$asset")"
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              echo "Already published: $name"
+            else
+              gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          if [[ "$body" != *'## Add-on: fresh native file installation'* ]]; then
+            {
+              printf '%s\n\n' "$body"
+              cat <<'NOTES'
+          ---
+
+          ## Add-on: fresh native file installation
+
+          Download **nullarc-760m-0.2.0-sequoia-beta-fresh-files.zip** and verify **SHA256SUMS-fresh-files**. This package includes the persistent WindowServer startup update **and** a new --fresh-files installation mode. It stages the release's native drivers from an idle HP diagnostic boot while archiving the previous boot service and driver files for rollback.
+
+          The fresh-files command does **not** activate a GPU or arm WindowServer. Follow the included INSTALL.md to validate the new binaries and install an app boot service before requesting persistent display. The compiled GPU binaries are unchanged from the original 0.2.0 beta; the original downloads are retained. This fresh-file mode has not been validated on the actual HP.
+          NOTES
+            } > dist/fresh/release-body.md
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/441206998" \
+              -f body="$(cat dist/fresh/release-body.md)" >/dev/null
+          fi
