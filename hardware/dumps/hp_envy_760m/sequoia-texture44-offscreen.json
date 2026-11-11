@@ -1,0 +1,60 @@
+{
+  "hardware": {
+    "model": "HP Envy x360 16-ad0013dx",
+    "pci_identity": "1002:1900 ca 103c:8c6a",
+    "compute_units": 8,
+    "macos": "15.8.2 (24H232)",
+    "bringup_build": 39,
+    "native_abi": "1.12",
+    "local_heap_bytes": 536870912
+  },
+  "method": {
+    "mock_transport": false,
+    "candidate_loaded_only_in_probe": true,
+    "exact_pci_identity_verified": true,
+    "device_fallback_allowed": false,
+    "firmware_framebuffer_active": true,
+    "candidate_installed": false,
+    "windowserver_tested": false
+  },
+  "candidate": {
+    "nvmtl_uuid": "5A33E0D4-8944-3E15-8E71-D0300DA2E163",
+    "nvmtl_sha256": "ffa5c3368d69a0f28e13095c594852cdcf14d551a8f9e92ce8cbd032207483c2",
+    "radv_uuid": "A59F0416-4FC9-327F-BCEE-CE8BF1BD4B31",
+    "radv_sha256": "051447e4cb2b3c7248eb228299482fbd260217d3383371038d91a59db959e0e8",
+    "mesa_commit": "61dc6db"
+  },
+  "texture_readback": {
+    "revisions_per_case": 2,
+    "successful_readbacks": 8,
+    "cases": [
+      {"width": 17, "height": 23, "format": "BGRA8Unorm", "pitch": 128, "offset": 0, "type": "private tiled"},
+      {"width": 84, "height": 103, "format": "R16Float", "pitch": 192, "offset": 0, "type": "private tiled"},
+      {"width": 234, "height": 18, "format": "BGRA8Unorm", "pitch": 960, "offset": 256, "type": "private tiled"},
+      {"width": 17, "height": 23, "format": "BGRA8Unorm", "pitch": 256, "offset": 0, "type": "public buffer alias"}
+    ],
+    "public_alias_verified_by_post_creation_write": true
+  },
+  "framebuffer_fetch": {
+    "expected_pixels_per_case": 4096,
+    "matching_pixels": {"two_draws": 4096, "overlapping_triangles": 4096, "missing_attachment": 4096},
+    "first_pixel_bgra8": "0xff802040"
+  },
+  "triangle_clear": {"red": 32640, "blue": 32896, "other": 0},
+  "allocation_pressure": {
+    "textures": 80,
+    "bytes_of_pixels": 335544320,
+    "candidate_tracked_bytes": 336855040,
+    "candidate_recommended_working_set_bytes": 432173496,
+    "installed_recommended_working_set_bytes": 1073741824,
+    "both_allocated_all_textures": true,
+    "windowserver_oom_reproduced": false,
+    "gpu_draws_submitted": 0
+  },
+  "native_heap_accounting": {
+    "test_allocation_bytes": 1048576,
+    "installed_usage_before_allocated_freed": [0, 0, 0],
+    "candidate_usage_before_allocated_freed": [0, 1048576, 0],
+    "gpu_commands_submitted": 0
+  }
+}

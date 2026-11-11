@@ -10,7 +10,7 @@ build/package/offline translation test does not establish GPU execution.
 
 - macOS Tahoe, Xcode/CLT with SDK 26+, Python 3, Clang, Cargo/Rust >=1.87 and Ninja.
 - MacKernelSDK path; Vulkan-Headers checkout; configured Mesa at the documented
-  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0009.
+  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0010.
 - Clean NullMoth source checkout at `76df0f6af5c64c2af9a22090da8b3fe14616023e`
   (v2.4.1). Only its LGPL `translator/` is compiled/archived.
 - Compatible LLVM/Zstd AIR-reader runtime bundle, including
@@ -48,9 +48,26 @@ all resulting files. The direct RADV ICD path does not require a Vulkan loader.
 The Metal test compiles authored storage-buffer compute, vertex and fragment MSL shaders, opens the actual
 plugin, indexes its metallib, reads AIR bitcode with LLVM, translates with the
 pinned library, independently validates SPIR-V, and compiles compute and graphics ACO pipelines using
-8-CU HP and 12-CU legacy mocks. It constructs no Metal device and dispatches no GPU
+8-CU HP and 12-CU legacy mocks, also checking that a 1 MiB allocation and release
+are visible in the Darwin heap budget. It constructs no Metal device and dispatches no GPU
 commands. Metal API coverage, WindowServer, rendering and display behavior still
 require target runtime tests. Upstream plugin protocol warnings remain visible.
+
+To check the sparse framebuffer-fetch rewrite independently of the GPU:
+
+```sh
+mkdir -p build/fetch-test
+glslang -V --target-env vulkan1.2 tests/shaders/fetch_missing.frag -o build/fetch-test/input.spv
+cc -std=c11 -Wall -Wextra -Werror -Isrc tests/test_nvmtl_fetch.c -o build/fetch-test/filter
+build/fetch-test/filter build/fetch-test/input.spv build/fetch-test/filtered.spv
+spirv-val --target-env vulkan1.2 build/fetch-test/filtered.spv
+```
+
+With an initialized HP accelerator, `mtlprobe --hp textures`, `--hp fetch`
+and `--hp alloc-pressure` run bounded tests. To test an extracted candidate in
+the probe process, set `NULLARC_PROBE_PLUGIN` to the verified NVMTL executable
+and `NVMTL_ICD_LIB` to that package's verified RADV dylib. The probe selects
+only the exact HP device and does not replace installed drivers or arm the display.
 
 ## Diagnostic installation and rollback
 

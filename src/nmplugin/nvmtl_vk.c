@@ -64,9 +64,12 @@ static inline const char *nvmtl_pick_vk(const char *staged, const char *dev) {
  * accelerator), RADV for AMD and ANV for Intel (NMXAccel, the accelerator for the GPUs NMXGPU drives).
  */
 #include <IOKit/IOKitLib.h>
+#include "../amd/phx_hp_760m.h"
+#include "nvmtl_fetch_spirv.h"
 static uint16_t g_vendor;
 static int g_integrated_device;
-static uint16_t nvmtl_pci_vendor_of(io_service_t accel)
+static int g_hp760m;
+static uint16_t nvmtl_pci_vendor_of(io_service_t accel,int *hp)
 {
     io_registry_entry_t pci = 0; uint16_t v = 0;
     if (IORegistryEntryGetParentEntry(accel, kIOServicePlane, &pci) != KERN_SUCCESS) return 0;
@@ -75,16 +78,30 @@ static uint16_t nvmtl_pci_vendor_of(io_service_t accel)
         const UInt8 *b = CFDataGetBytePtr((CFDataRef)d); v = (uint16_t)(b[0] | (b[1] << 8));
     }
     if (d) CFRelease(d);
+    *hp=0;
+    if (v==phx_hp_760m.vendor) {
+        const CFStringRef keys[]={CFSTR("vendor-id"),CFSTR("device-id"),CFSTR("revision-id"),CFSTR("subsystem-vendor-id"),CFSTR("subsystem-id")};
+        const uint32_t expected[]={phx_hp_760m.vendor,phx_hp_760m.device,phx_hp_760m.revision,phx_hp_760m.subvendor,phx_hp_760m.subdevice};
+        *hp=1;
+        for (unsigned i=0;i<5;++i) {
+            CFTypeRef value=IORegistryEntryCreateCFProperty(pci,keys[i],kCFAllocatorDefault,0);
+            uint32_t actual=0;
+            if (!value || CFGetTypeID(value)!=CFDataGetTypeID() || CFDataGetLength((CFDataRef)value)!=4) *hp=0;
+            else {memcpy(&actual,CFDataGetBytePtr((CFDataRef)value),4);if(actual!=expected[i]) *hp=0;}
+            if (value) CFRelease(value);
+            if (!*hp) break;
+        }
+    }
     IOObjectRelease(pci);
     return v;
 }
 /* the vendor of the accelerator a Metal device was made on (0 if the port is neither of ours); the first one wins */
 uint16_t nvmtl_vk_set_accelerator(mach_port_t accel)
 {
-    uint16_t v = 0;
-    if (accel && IOObjectConformsTo(accel, "NMXAccel")) { v = nvmtl_pci_vendor_of(accel); if (v != 0x1002 && v != 0x8086) v = 0; }
+    uint16_t v = 0;int hp=0;
+    if (accel && IOObjectConformsTo(accel, "NMXAccel")) { v = nvmtl_pci_vendor_of(accel,&hp); if (v != 0x1002 && v != 0x8086) v = 0; }
     else if (accel && IOObjectConformsTo(accel, "NVAccel")) v = 0x10de;
-    if (v && !g_vendor) g_vendor = v;
+    if (v && !g_vendor) {g_hp760m=hp;g_vendor=v;}
     return v;
 }
 /* a process that starts Vulkan before Metal makes a device: NVIDIA when its accelerator runs, else the AMD/Intel one */
@@ -94,9 +111,9 @@ uint16_t nvmtl_vk_vendor(void)
     io_service_t s = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("NVAccel"));
     if (s) { IOObjectRelease(s); g_vendor = 0x10de; return g_vendor; }
     s = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("NMXAccel"));
-    uint16_t v = s ? nvmtl_pci_vendor_of(s) : 0;
+    int hp=0;uint16_t v = s ? nvmtl_pci_vendor_of(s,&hp) : 0;
     if (s) IOObjectRelease(s);
-    g_vendor = (v == 0x1002 || v == 0x8086) ? v : 0x10de;
+    g_hp760m=hp;g_vendor = (v == 0x1002 || v == 0x8086) ? v : 0x10de;
     return g_vendor;
 }
 static const char *nvmtl_vk_icd_json(void) {
@@ -156,8 +173,9 @@ static uint64_t g_buf_made, g_buf_gone, g_img_made, g_img_gone;
 static uint64_t g_pool_blocks, g_pool_live, g_pool_bytes;
 static uint64_t g_img_align, g_sys_align;
 void (*nvmtl_purge_report_hook)(const char *why);
-static uint64_t g_budget_delta;
-static int g_budget_stale;
+static _Atomic uint64_t g_budget_delta;
+static _Atomic int g_budget_stale;
+static pthread_mutex_t g_budget_lock = PTHREAD_MUTEX_INITIALIZER;
 static void nvmtl_vk_budget_charge(uint64_t bytes)
 {
     g_budget_delta += (bytes + 65535ull) & ~65535ull;
@@ -175,6 +193,7 @@ static PFN_vkCmdCopyAccelerationStructureKHR pvkCmdCopyAccelerationStructureKHR;
 #define NVMTL_VRAM_NONIMAGE (2655ull << 20)
 #define NVMTL_VRAM_HEADROOM_DEFAULT (1024ull << 20)
 #include "nvmtl_memory_policy.h"
+#include "nvmtl_texture_layout.h"
 uint64_t nvmtl_vk_reserve_default(uint64_t legacy)
 {
     uint64_t heap = 0;
@@ -1611,9 +1630,11 @@ void nvmtl_vk_mem_split(uint64_t *vram, uint64_t *sys) { if (vram) *vram = g_vra
 static int nvmtl_vk_vram_budget(uint64_t *budget, uint64_t *used)
 {
     static uint64_t cb, cu, when; static int measured;
+    pthread_mutex_lock(&g_budget_lock);
     uint64_t now = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
-    if (!when || g_budget_stale || now - when > 50000000ull) {
-        g_budget_stale = 0;
+    const int stale=atomic_exchange(&g_budget_stale,0);
+    if (!when || stale || now - when > 50000000ull) {
+        const uint64_t sampled_delta=atomic_load(&g_budget_delta);
         uint32_t heap = 0; uint64_t best = 0;
         for (uint32_t i = 0; i < g_memp.memoryHeapCount; i++)
             if ((g_memp.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) && g_memp.memoryHeaps[i].size > best) { best = g_memp.memoryHeaps[i].size; heap = i; }
@@ -1622,12 +1643,14 @@ static int nvmtl_vk_vram_budget(uint64_t *budget, uint64_t *used)
             VkPhysicalDeviceMemoryBudgetPropertiesEXT b = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT, NULL, { 0 }, { 0 } };
             VkPhysicalDeviceMemoryProperties2 mp = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, &b, { 0 } };
             pvkGetPhysicalDeviceMemoryProperties2(g_pdev, &mp);
-            if (b.heapBudget[heap]) { cb = b.heapBudget[heap]; cu = b.heapUsage[heap]; measured = 1; }
+            if (best && (g_integrated_device || b.heapBudget[heap])) { cb = b.heapBudget[heap]; cu = b.heapUsage[heap]; measured = 1; }
         }
         when = now;
-        g_budget_delta = 0;
+        atomic_fetch_sub(&g_budget_delta,sampled_delta);
     }
-    *budget = cb; *used = cu; return measured;
+    *budget = cb; *used = cu; const int result=measured;
+    pthread_mutex_unlock(&g_budget_lock);
+    return result;
 }
 static int nvmtl_vk_vram_wall0(uint64_t want, uint64_t *freev_out, uint64_t *bud_out, uint64_t *used_out, int *measured_out);
 uint64_t (*nvmtl_reclaim_hook)(uint64_t need);
@@ -1694,7 +1717,12 @@ static int nvmtl_vk_vram_wall0(uint64_t want, uint64_t *freev_out, uint64_t *bud
     uint64_t freev = card;
     uint64_t head = NVMTL_VRAM_HEADROOM;
     int gate;
-    if (!measured || !bud) gate = (used + g_budget_delta + want + head > bud);
+    if (g_integrated_device && card) {
+        // heapBudget already includes current allocations. Do not inflate it by
+        // inverting a discrete NVK heuristic or ignore heapUsage at full budget.
+        freev=nvmtl_integrated_free(card,bud,used,atomic_load(&g_budget_delta));
+        gate=want>freev || head>freev-want;
+    } else if (!measured || !bud) gate = (used + g_budget_delta + want + head > bud);
     else if (inv >= card) gate = 0;
     else { freev = inv > used ? inv - used : 0;
 
@@ -1742,27 +1770,43 @@ static void nvmtl_vk_image_census(void)
               (unsigned long long)(nvmtl_vk_vram_bytes() >> 20), (unsigned long long)(bud >> 20), (unsigned long long)(used >> 20), m ? "measured" : "estimated",
               nvmtl_tex_objs_live(), nvmtl_tex_objs_released()); }
 }
+static VkResult nvmtl_try_image_types(VkMemoryAllocateInfo *info, uint32_t bits, int local, VkDeviceMemory *mem, int *last)
+{
+    VkResult r=VK_ERROR_OUT_OF_DEVICE_MEMORY; *last=-1;
+    for (uint32_t i=0;i<g_memp.memoryTypeCount;++i) {
+        const VkMemoryPropertyFlags f=g_memp.memoryTypes[i].propertyFlags;
+        if (!(bits & (1u<<i)) || !!(f & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)!=local) continue;
+        if (f & (VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT | VK_MEMORY_PROPERTY_PROTECTED_BIT |
+                 VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD | VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD)) continue;
+        info->memoryTypeIndex=i; *last=(int)i;
+        r=pvkAllocateMemory(g_dev,info,NULL,mem);
+        if (r!=VK_ERROR_OUT_OF_DEVICE_MEMORY) break;
+    }
+    return r;
+}
 static VkResult nvmtl_vk_alloc_image_mem(const VkMemoryRequirements *mr, VkDeviceMemory *mem, uint32_t *sysmem, const char *what)
 {
     *sysmem = 0;
     int mt = memtype(mr->memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    if (mt < 0) { nvlog("vk: no device-local memory type for the %s image", what); return VK_ERROR_OUT_OF_DEVICE_MEMORY; }
-    VkMemoryAllocateInfo mai = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, NULL, mr->size, (uint32_t)mt };
+    const int integrated=g_integrated_device && nvmtl_vk_vendor()==0x1002;
+    if (mt < 0 && !integrated) { nvlog("vk: no device-local memory type for the %s image", what); return VK_ERROR_OUT_OF_DEVICE_MEMORY; }
+    VkMemoryAllocateInfo mai = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, NULL, mr->size, mt>=0 ? (uint32_t)mt : 0 };
     uint64_t bud = 0, used = 0, freev = 0; int measured = 0;
     int gate = nvmtl_vk_vram_wall(mr->size, &freev, &bud, &used, &measured);
     VkResult r = VK_ERROR_OUT_OF_DEVICE_MEMORY;
-    if (!gate) r = pvkAllocateMemory(g_dev, &mai, NULL, mem);
-    else nvlog("vk: soft VRAM gate: %llu MB free on the card, this %s image wants %llu MB + %llu MB headroom -> SYSTEM MEMORY (heapUsage %llu of budget %llu MB, %s)",
+    int tried=-1;
+    if (!gate && mt>=0) r = integrated ? nvmtl_try_image_types(&mai,mr->memoryTypeBits,1,mem,&tried) : pvkAllocateMemory(g_dev, &mai, NULL, mem);
+    else if (gate && mt>=0) nvlog("vk: soft VRAM gate: %llu MB free on the card, this %s image wants %llu MB + %llu MB headroom -> SYSTEM MEMORY (heapUsage %llu of budget %llu MB, %s)",
                (unsigned long long)(freev >> 20), what, (unsigned long long)(mr->size >> 20),
                (unsigned long long)(NVMTL_VRAM_HEADROOM >> 20), (unsigned long long)(used >> 20),
                (unsigned long long)(bud >> 20), measured ? "measured" : "estimated");
-    if (r == VK_ERROR_OUT_OF_DEVICE_MEMORY && nvmtl_res2_evict_hook && !t_in_reclaim && !nvmtl_res2_evict_off()) {
+    if (r == VK_ERROR_OUT_OF_DEVICE_MEMORY && mt>=0 && nvmtl_res2_evict_hook && !t_in_reclaim && !nvmtl_res2_evict_off()) {
         t_in_reclaim = 1;
         const uint64_t freed = nvmtl_res2_evict_hook(mr->size | (1ull << 63));
         t_in_reclaim = 0;
         if (freed) {
             mai.memoryTypeIndex = (uint32_t)mt;
-            r = pvkAllocateMemory(g_dev, &mai, NULL, mem);
+            r = integrated ? nvmtl_try_image_types(&mai,mr->memoryTypeBits,1,mem,&tried) : pvkAllocateMemory(g_dev, &mai, NULL, mem);
             g_res2_evict_calls++; if (r == VK_SUCCESS) g_res2_evict_won++;
             { static unsigned said; if (said++ < 8 || said % 4096 == 0)
                 nvlog("residency (res2): evicted %llu MB on the allocating thread for a %llu MB %s image -> %s "
@@ -1774,9 +1818,13 @@ static VkResult nvmtl_vk_alloc_image_mem(const VkMemoryRequirements *mr, VkDevic
     }
     if (r == VK_ERROR_OUT_OF_DEVICE_MEMORY) {
         int mt2 = -1;
-        for (uint32_t i = 0; i < g_memp.memoryTypeCount; i++)
-            if ((mr->memoryTypeBits & (1u << i)) && !(g_memp.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) { mt2 = (int)i; break; }
-        if (mt2 >= 0) { mai.memoryTypeIndex = (uint32_t)mt2; r = pvkAllocateMemory(g_dev, &mai, NULL, mem); if (r == VK_SUCCESS) *sysmem = 1; }
+        if (integrated) r=nvmtl_try_image_types(&mai,mr->memoryTypeBits,0,mem,&mt2);
+        else {
+            for (uint32_t i = 0; i < g_memp.memoryTypeCount; i++)
+                if ((mr->memoryTypeBits & (1u << i)) && !(g_memp.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) { mt2 = (int)i; break; }
+            if (mt2 >= 0) { mai.memoryTypeIndex = (uint32_t)mt2; r = pvkAllocateMemory(g_dev, &mai, NULL, mem); }
+        }
+        if (r==VK_SUCCESS) *sysmem=1;
         if (r == VK_SUCCESS) { g_spilled++;
             if (nvmtl_purge_report_hook) nvmtl_purge_report_hook(what);
             nvlog("vk: %s image SPILLED to system memory (%s): images hold %llu MB VRAM + %llu MB system, heapUsage %llu MB, %llu MB free, %llu spilled so far",
@@ -3130,7 +3178,9 @@ static int nvmtl_fbfetch_on(void)
     if (on < 0) {
         const char *off = getenv("NVMTL_NO_FBFETCH"), *ws = getenv("NVMTL_FBFETCH_WS");
         const int is_ws = getprogname() && !strcmp(getprogname(), "WindowServer");
-        on = !(off && off[0] == '1') && (!is_ws || (ws && ws[0] == '1'));
+        // Offscreen input-attachment readbacks passed on this exact HP. Its
+        // compositor uses the same path; other GPUs retain their WS default.
+        on = !(off && off[0] == '1') && (!is_ws || g_hp760m || (ws && ws[0] == '1'));
         nvlog("vk: framebuffer fetch %s", on ? "ON - render passes declare their colour attachments as input attachments"
                                            : is_ws ? "off in WindowServer (NVMTL_FBFETCH_WS=1 opts in)" : "OFF (NVMTL_NO_FBFETCH=1)");
     }
@@ -3184,6 +3234,9 @@ static void nvmtl_fetch_barrier(nvk_cmdbuf *c)
 }
 static VkDescriptorSet nvmtl_fetch_set(nvk_cmdbuf *c, uint32_t mask)
 {
+    if (c->fetch_set && !(mask & ~c->fetch_set_mask)) return (VkDescriptorSet)c->fetch_set;
+    if (g_hp760m) for (uint32_t i=0;i<NVMTL_NCOL;++i)
+        if ((mask&(1u<<i)) && !c->fetchview[i]) return VK_NULL_HANDLE;
     VkDescriptorSet set = VK_NULL_HANDLE; VkDescriptorPool pool = VK_NULL_HANDLE;
     pthread_mutex_lock(&g_desc_lock);
     VkResult r = VK_ERROR_OUT_OF_POOL_MEMORY;
@@ -3225,6 +3278,7 @@ static VkDescriptorSet nvmtl_fetch_set(nvk_cmdbuf *c, uint32_t mask)
         nw++;
     }
     if (nw) pvkUpdateDescriptorSets(g_dev, nw, w, 0, NULL);
+    c->fetch_set=(void *)set;c->fetch_set_mask=mask;
     return set;
 }
 
@@ -4122,7 +4176,18 @@ static int nvmtl_vk_pipeline_create_impl_lifetime_body(const void *vs, size_t vn
     if (!g_heapSet && (nvmtl_spirv_uses_set(vs, vn / 4, 2) || nvmtl_spirv_uses_set(fs, fn / 4, 2))) {
         free(fcopy); nvlog("vk: render pipeline REFUSED - a shader indexes the bindless heap (set 2) and this device has none"); return -1; }
     nvmtl_spirv_retarget_set(fcopy, fn / 4, 1);
-    VkShaderModuleCreateInfo fsm = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, fn, fcopy };
+    const int fetch_enabled=nvmtl_fbfetch_on();
+    uint32_t fetch_mask=nvmtl_spirv_fetch_mask(fs,fn);
+    size_t fwords=fn/4;
+    if (g_hp760m && fetch_mask) {
+        uint32_t available=0,*filtered=NULL;
+        if (fetch_enabled) for (uint32_t i=0;i<rt->ncol;++i) if (rt->cfmt[i]) available|=1u<<i;
+        if (nvmtl_prepare_fetch(fcopy,fwords,available,&fetch_mask,&filtered,&fwords)) {
+            free(fcopy);nvlog("vk: unsupported framebuffer-fetch SPIR-V use; pipeline refused");return -1;
+        }
+        if (filtered) {free(fcopy);fcopy=filtered;}
+    }
+    VkShaderModuleCreateInfo fsm = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, fwords*4, fcopy };
     VkShaderModule vmod = VK_NULL_HANDLE, fmod = VK_NULL_HANDLE, tvm = VK_NULL_HANDLE, tcm = VK_NULL_HANDLE;
     NVMTL_PIPELINE_STAGE(pvkCreateShaderModule(g_dev, &vsm, NULL, &vmod), "vkCreateShaderModule(vertex)");
     NVMTL_PIPELINE_STAGE(pvkCreateShaderModule(g_dev, &fsm, NULL, &fmod), "vkCreateShaderModule(fragment)");
@@ -4142,8 +4207,8 @@ static int nvmtl_vk_pipeline_create_impl_lifetime_body(const void *vs, size_t vn
     if (ensure_descriptors()) goto pipeline_failed;
     VkDescriptorSetLayout sl2[4] = { g_setLayout, g_setLayout, g_heapLayout, VK_NULL_HANDLE };
     uint32_t nsl = g_heapSet ? 3 : 2;
-    out->fetch_mask = nvmtl_fbfetch_on() ? nvmtl_spirv_fetch_mask(fs, fn) : 0;
-    out->fetch_zero = nvmtl_fbfetch_on() ? 0 : nvmtl_spirv_fetch_mask(fs, fn);
+    out->fetch_mask = fetch_enabled ? fetch_mask : 0;
+    out->fetch_zero = fetch_enabled || g_hp760m ? 0 : fetch_mask;
     if (out->fetch_mask || out->fetch_zero) {
         pthread_mutex_lock(&g_desc_lock); const int fl = nvmtl_fetch_layouts_locked(); pthread_mutex_unlock(&g_desc_lock);
         if (fl) { nvlog("vk: framebuffer fetch layouts could not be made - pipeline refused"); return -1; }
@@ -4975,6 +5040,7 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
     pvkCmdBeginRenderPass(c->cb, &rbi, VK_SUBPASS_CONTENTS_INLINE);
     c->in_rp = 1;
     for (uint32_t i = 0; i < NVMTL_NCOL; i++) c->fetchview[i] = (i < ncol && cf[i]) ? ps->colview[i] : NULL;
+    c->fetch_set=NULL;c->fetch_set_mask=0;
     if (p->pipe) nvmtl_vk_cmd_bind_pipeline(c, p);
     VkViewport vp = { 0, (float)ps->h, (float)ps->w, -(float)ps->h, 0, 1 }; VkRect2D sc = { { 0, 0 }, { ps->w, ps->h } };
     pvkCmdSetViewport(c->cb, 0, 1, &vp); pvkCmdSetScissor(c->cb, 0, 1, &sc);
@@ -7406,7 +7472,7 @@ static int nvmtl_vk_image_create_buffer_alias_lifetime_body(uint32_t w, uint32_t
         nvlog("buffer texture: bytesPerRow %zu cannot hold %u texels of %u B", row_pitch, w, bpp); return -1; }
     if (g_linmod && row_pitch % 32) {
         nvlog("buffer texture: bytesPerRow %zu is not a multiple of 32 B (the texture header's linear pitch unit)", row_pitch); return -1; }
-    if (offset > b->size || (size_t)row_pitch * (h - 1) + (size_t)w * bpp > b->size - offset) {
+    if (!nvmtl_rows_fit(b->size,offset,row_pitch,h,(size_t)w*bpp)) {
         nvlog("buffer texture: %ux%u at offset %zu pitch %zu overruns the %zu-byte buffer", w, h, offset, row_pitch, b->size); return -1; }
     PFN_vkGetPhysicalDeviceFormatProperties gfp = (PFN_vkGetPhysicalDeviceFormatProperties)pvkGetInstanceProcAddr(g_inst, "vkGetPhysicalDeviceFormatProperties");
     VkFormatProperties fp; memset(&fp, 0, sizeof fp);

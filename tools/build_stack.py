@@ -77,7 +77,7 @@ def source_inputs():
                if f.is_file() and f.suffix in ('.c','.cpp','.h')]
     native += [f for f in (REPO / 'tools/vkprobe').rglob('*')
                if f.is_file() and f.suffix in ('.c','.h','.comp')]
-    native.append(REPO/'tools/mtlprobe/mtlprobe.m')
+    native += [f for f in (REPO/'tools/mtlprobe').rglob('*') if f.is_file() and f.suffix in ('.m','.h')]
     return {str(f.relative_to(REPO)):digest(f) for f in native}
 
 

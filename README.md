@@ -90,6 +90,16 @@ See the [partial-display report](hardware/dumps/hp_envy_760m/sequoia-display42-p
 The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
 
+The texture44 candidate passed isolated tests on the same HP. The private tiled
+conversion preserves the three observed layouts (128, 192 and 960 byte row
+pitches), and an aligned public buffer texture still aliases its buffer. Native
+RADV now reports a 1 MiB allocation and its release; previously both read as zero.
+The candidate held 80 textures (320 MiB) and matched all 4096 pixels in each of
+three framebuffer-fetch cases. Fetch is enabled for WindowServer on the exact HP
+PCI profile in this build. These tests used the firmware framebuffer; the
+candidate has not yet run inside WindowServer. See the
+[texture44 report](hardware/dumps/hp_envy_760m/sequoia-texture44-offscreen.json).
+
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
 runtime family sizes/versions, captured console plan and current-boot app tests
@@ -162,7 +172,7 @@ or accelerated display success is claimed by this build.
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.
-Mesa uses Phoenix patches 0001..0009; generator scripts are alternatives to applying
+Mesa uses Phoenix patches 0001..0010; generator scripts are alternatives to applying
 the corresponding patches, not additional steps.
 
 ## Status

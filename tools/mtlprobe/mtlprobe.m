@@ -4,11 +4,12 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <IOKit/IOKitLib.h>
+#import <objc/runtime.h>
+#include <dlfcn.h>
+#include <limits.h>
 
 // Match the accelerator's PCI ancestor, rather than choosing a device by name.
-static BOOL hpDevice(id<MTLDevice> dev) {
-    if (![NSStringFromClass([dev class]) hasPrefix:@"NVMTL"]) return NO;
-    io_registry_entry_t node = IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(dev.registryID));
+static BOOL hpNode(io_registry_entry_t node) {
     for (unsigned depth = 0; node && depth < 16; depth++) {
         if (IOObjectConformsTo(node, "IOPCIDevice")) {
             const char *keys[] = {"vendor-id", "device-id", "revision-id", "subsystem-vendor-id", "subsystem-id"};
@@ -33,6 +34,35 @@ static BOOL hpDevice(id<MTLDevice> dev) {
     }
     if (node) IOObjectRelease(node);
     return NO;
+}
+static BOOL hpDevice(id<MTLDevice> dev) {
+    return [NSStringFromClass([dev class]) hasPrefix:@"NVMTL"] &&
+        hpNode(IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(dev.registryID)));
+}
+
+@protocol NullArcProbeDevice
+- (instancetype)initWithAcceleratorPort:(mach_port_t)port;
+@end
+static NSArray<id<MTLDevice>> *isolatedDevices(const char *path) {
+    // Test the candidate's own constructor without installing it or invoking
+    // the Metal catalogue (which would also load the installed class).
+    if (path[0]!='/' || objc_lookUpClass("NVMTLDevice")) return nil;
+    if (!dlopen(path,RTLD_NOW|RTLD_LOCAL)) {fprintf(stderr,"candidate dlopen: %s\n",dlerror());return nil;}
+    Class cls=objc_lookUpClass("NVMTLDevice");char requested[PATH_MAX],actual[PATH_MAX];
+    const char *image=cls ? class_getImageName(cls) : NULL;
+    if (!image || !realpath(path,requested) || !realpath(image,actual) || strcmp(requested,actual)) return nil;
+    io_iterator_t it=IO_OBJECT_NULL;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault,IOServiceMatching("NMXAccel"),&it)!=KERN_SUCCESS) return nil;
+    io_service_t service=IOIteratorNext(it),extra=IOIteratorNext(it);IOObjectRelease(it);
+    if (extra) {IOObjectRelease(extra);if(service)IOObjectRelease(service);return nil;}
+    if (!service) return nil;
+    IOObjectRetain(service);
+    if (!hpNode(service)) {IOObjectRelease(service);return nil;}
+    // Keep the service and image alive until this single-device probe exits.
+    id<MTLDevice> dev=(id<MTLDevice>)[(id<NullArcProbeDevice>)[cls alloc] initWithAcceleratorPort:service];
+    if (!dev) {IOObjectRelease(service);return nil;}
+    printf("isolated NVMTL candidate: %s\n",actual);
+    return @[dev];
 }
 
 static NSString *const kSrc =
@@ -103,17 +133,21 @@ static int renderTest(id<MTLDevice> dev) {
             red > 30000 && blue > 30000 && !other && red + blue == W * H) ? 0 : 14;
 }
 
+#include "regressions.h"
 int main(int argc, char **argv) {
     @autoreleasepool {
         BOOL hp = argc > 1 && !strcmp(argv[1], "--hp");
         const char *mode = argc > 1 + hp ? argv[1 + hp] : NULL;
-        if (argc > 2 + hp || (mode && strcmp(mode, "list") && strcmp(mode, "render"))) {
-            fprintf(stderr, "usage: mtlprobe [--hp] [list|render]\n"); return 2;
+        if (argc > 2 + hp || (mode && strcmp(mode, "list") && strcmp(mode, "render") && strcmp(mode,"textures") && strcmp(mode,"fetch") && strcmp(mode,"alloc") && strcmp(mode,"alloc-pressure"))) {
+            fprintf(stderr, "usage: mtlprobe [--hp] [list|render|textures|fetch|alloc|alloc-pressure]\n"); return 2;
         }
-        if (hp && (getenv("RADV_DARWIN_MOCK") || getenv("RADV_DARWIN_MOCK_PROFILE"))) {
-            fprintf(stderr, "HP runtime test refuses mock transport\n"); return 2;
+        if (hp && (getenv("RADV_DARWIN_MOCK") || getenv("RADV_DARWIN_MOCK_PROFILE") || getenv("RADV_DARWIN_HOST_BO"))) {
+            fprintf(stderr, "HP runtime test refuses mock and host-only transports\n"); return 2;
         }
-        NSArray<id<MTLDevice>> *all = MTLCopyAllDevices();
+        const char *candidate=getenv("NULLARC_PROBE_PLUGIN");
+        if (candidate && !hp) return 2;
+        NSArray<id<MTLDevice>> *all = candidate ? isolatedDevices(candidate) : MTLCopyAllDevices();
+        if (candidate && !all) {fputs("candidate device creation failed; no installed-driver fallback\n",stderr);return 3;}
         printf("devices: %lu\n", (unsigned long)all.count);
         id<MTLDevice> dev = nil;
         for (id<MTLDevice> d in all) {
@@ -130,6 +164,10 @@ int main(int argc, char **argv) {
         if (mode && !strcmp(mode, "list")) return 0;
 
         if (mode && !strcmp(mode, "render")) return renderTest(dev);
+        if (mode && !strcmp(mode,"textures")) return textureLayoutTest(dev);
+        if (mode && !strcmp(mode,"fetch")) return fetchTest(dev);
+        if (mode && !strcmp(mode,"alloc")) return allocationTest(dev,32);
+        if (mode && !strcmp(mode,"alloc-pressure")) return hp ? allocationTest(dev,80) : 2;
         NSError *err = nil;
         id<MTLLibrary> lib = [dev newLibraryWithSource:kSrc options:nil error:&err];
         if (!lib) { printf("library: %s\n", err.localizedDescription.UTF8String); return 2; }

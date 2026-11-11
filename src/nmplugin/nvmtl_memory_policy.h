@@ -16,4 +16,10 @@ static inline uint64_t nvmtl_working_set_limit(uint64_t room, uint64_t heap, int
     if (integrated && heap && heap < legacy_floor) return room < heap ? room : heap;
     return room > legacy_floor ? room : legacy_floor;
 }
+static inline uint64_t nvmtl_integrated_free(uint64_t heap, uint64_t budget, uint64_t used, uint64_t pending)
+{
+    const uint64_t capacity = budget < heap ? budget : heap;
+    const uint64_t room = used < capacity ? capacity - used : 0;
+    return pending < room ? room - pending : 0;
+}
 #endif

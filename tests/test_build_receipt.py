@@ -23,6 +23,7 @@ class BuildReceiptTests(unittest.TestCase):
             source.parent.mkdir(parents=True);source.write_text('source fixture')
             tool=root/'tools/phxctl/phxfw.cpp';tool.parent.mkdir(parents=True);tool.write_text('tool fixture')
             metal=root/'tools/mtlprobe/mtlprobe.m';metal.parent.mkdir(parents=True);metal.write_text('Metal fixture')
+            probe_header=metal.parent/'regressions.h';probe_header.write_text('test fixture')
             for path in build_stack.required_artifacts(mesa):
                 path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'compiled-artifact fixture')
             receipt={'source_inputs':build_stack.source_inputs(),'minimum_macos':'26.0',
@@ -47,6 +48,10 @@ class BuildReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'stale'):
                 build_stack.verify_build_receipt(mesa)
             metal.write_text('Metal fixture')
+            probe_header.write_text('changed probe header')
+            with self.assertRaisesRegex(ValueError,'stale'):
+                build_stack.verify_build_receipt(mesa)
+            probe_header.write_text('test fixture')
             (root/'build/translator/nvmtl-translator-source.tar.gz').write_bytes(b'wrong corresponding source')
             with self.assertRaisesRegex(ValueError,'artifact differs'):
                 build_stack.verify_build_receipt(mesa)

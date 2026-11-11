@@ -13,6 +13,7 @@ void nvlog(const char *fmt, ...);
 #import "NVMTLObjects.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#include "nvmtl_texture_layout.h"
 static int nvmtl_trace_on(void);
 static void nvtrace_emit(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // Guard the call site: converting NSString arguments on every draw is expensive
@@ -773,29 +774,42 @@ static NVMTLTexture *nvmtl_texbuf_make(NVMTLBuffer *b, MTLTextureDescriptor *d, 
 @implementation NVMTLBuffer
 - (IOSurfaceRef)iosurface { return NULL; }
 - (id<MTLTexture>)newTiledTextureWithDescriptor:(MTLTextureDescriptor *)d offset:(NSUInteger)offset bytesPerRow:(NSUInteger)bpr {
-    id<MTLTexture> t = [self newTextureWithDescriptor:d offset:offset bytesPerRow:bpr];
-    if (t || !d) return t;
+    if (!d) return nil;
+    // This private conversion API can return a copy. A public buffer-backed
+    // texture cannot: keep its alias semantics and reject incompatible layouts.
+    const NSUInteger align = nvmtl_vk_vendor()==0x1002 ? [[self device] minimumLinearTextureAlignmentForPixelFormat:d.pixelFormat] : 0;
+    if (!align || bpr % align == 0) {
+        id<MTLTexture> t = [self newTextureWithDescriptor:d offset:offset bytesPerRow:bpr];
+        if (t) return t;
+    }
     void *base = [self contents];
-    // the last row ends after its own pixels, not a whole bytesPerRow on: CoreAnimation hands over 16x16 images at the
-    // end of 8 KB buffers whose padded last row would run 16 bytes past it (offset 2576, bytesPerRow 352, 2026-10-21)
     extern int nvmtl_pixfmt_public(MTLPixelFormat f, uint32_t *vk, uint32_t *bpp, int *a8);
     uint32_t vkf = 0, bpp = 0; int a8 = 0;
-    const size_t lastRow = (!nvmtl_pixfmt_public(d.pixelFormat, &vkf, &bpp, &a8) && bpp && !a8) ? (size_t)d.width * bpp : bpr;
-    if (!base || d.textureType != MTLTextureType2D || !d.height || offset + bpr * (d.height - 1) + lastRow > _b.size) {
+    if (!base || d.textureType != MTLTextureType2D || !d.width || !d.height || d.width>UINT32_MAX || d.height>UINT32_MAX || bpr>UINT32_MAX ||
+        nvmtl_pixfmt_public(d.pixelFormat,&vkf,&bpp,&a8) || !bpp) return nil;
+    uint32_t bw=1,bh=1,bb=bpp;
+    if (!nvmtl_vk_format_block(vkf,&bw,&bh,&bb)) {bw=bh=1;bb=bpp;}
+    const size_t cols=(d.width-1)/bw+1,rows=(d.height-1)/bh+1;
+    if (cols>SIZE_MAX/bb || !nvmtl_rows_fit(_b.size,offset,bpr,rows,cols*bb)) {
         nvlog("newTiledTextureWithDescriptor: %lux%lu bpr %lu off %lu: no linear view and no CPU copy (buffer %lu B) -> nil",
               (unsigned long)d.width, (unsigned long)d.height, (unsigned long)bpr, (unsigned long)offset, (unsigned long)_b.size);
         return nil; }
     MTLTextureDescriptor *cd = [d copy]; cd.storageMode = MTLStorageModeShared;
-    id<MTLTexture> c = [[self device] newTextureWithDescriptor:cd];
-    if (c) [c replaceRegion:MTLRegionMake2D(0, 0, d.width, d.height) mipmapLevel:0 withBytes:(char *)base + offset bytesPerRow:bpr];
+    NVMTLTexture *c = (NVMTLTexture *)[[self device] newTextureWithDescriptor:cd];
+    if (!c || nvmtl_vk_image_write_region_level_layer(c->_q,[c nvi],(const uint8_t *)base+offset,bpr,0,0,(uint32_t)d.width,(uint32_t)d.height,0,0)) {
+        nvlog("newTiledTextureWithDescriptor: conversion allocation/upload FAILED (%lux%lu pitch %lu)",
+              (unsigned long)d.width,(unsigned long)d.height,(unsigned long)bpr);return nil;
+    }
     // CoreAnimation asks for mipmapped images this way (54x54 with 6 levels, 256x256 with 9, for layers drawn smaller than
     // their contents) and lays the smaller levels out for the GPU it knows; only level 0 is linear, so the rest are made
     // from it here rather than left unwritten (2026-10-21)
-    if (c && d.mipmapLevelCount > 1) {
+    if (d.mipmapLevelCount > 1) {
         static id<MTLCommandQueue> q; static dispatch_once_t once;
         dispatch_once(&once, ^{ q = [[self device] newCommandQueue]; });
         id<MTLCommandBuffer> cb = [q commandBuffer]; id<MTLBlitCommandEncoder> bl = [cb blitCommandEncoder];
+        if (!bl) return nil;
         [bl generateMipmapsForTexture:c]; [bl endEncoding]; [cb commit]; [cb waitUntilCompleted];
+        if (cb.status != MTLCommandBufferStatusCompleted || cb.error) return nil;
     }
     { static int said; if (!said++) nvlog("newTiledTextureWithDescriptor: linear view refused -> copied texture (%lux%lu bpr %lu mips %lu; said once)",
                                           (unsigned long)d.width, (unsigned long)d.height, (unsigned long)bpr, (unsigned long)d.mipmapLevelCount); }

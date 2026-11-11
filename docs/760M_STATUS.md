@@ -147,7 +147,7 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK
 sh src/phxaccel/build.sh /path/to/MacKernelSDK
 ```
 
-Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0009 to Mesa
+Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0010 to Mesa
 `f5cb8ee032adabef599ae892ec4e42d796b84da9`. Each generator is an alternative to its corresponding patch, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
 
 ```sh
@@ -1093,3 +1093,43 @@ only then did ZIP assembly pass. This candidate is NOT installed or runtime-test
 on the HP and has not been published as a working-acceleration release. Current HP
 stays on the firmware framebuffer with failure markers retained and early display
 metadata removed. No reboot or additional root command is requested at this checkpoint.
+
+### Texture44: native heap accounting, texture conversion and framebuffer fetch
+
+The installed policy42 baseline on Sequoia 15.8.2 passed bounded offscreen
+readbacks for the three recorded private tiled layouts and a public aligned alias.
+Its private fallback copied the data after failed Vulkan aliases. Both the
+installed build and candidate held 80 concurrent 1024x1024 BGRA8 textures
+(320 MiB of pixels), so the test did not reproduce WindowServer's OOM.
+
+- `NVMTLObjects.m`, `nvmtl_texture_layout.h` and `nvmtl_vk.c`: check row
+  bounds without overflow and skip unsupported AMD aliases for private tiled
+  conversion. Check upload and mip generation before returning the result.
+  Public buffer textures retain alias semantics; unsupported pitches still
+  cannot be represented as public aliases.
+- Phoenix Mesa patch 0010 fixes different heap accounting keys between logical
+  allocations and physical-device queries. On the same HP with native transport,
+  old heap usage stayed 0 -> 0 -> 0 across a 1 MiB allocate/free; the candidate
+  reported 0 -> 1048576 -> 0. No GPU commands were submitted by this test.
+  `nvmtl_memory_policy.h` and `nvmtl_vk.c` use measured integrated budget/usage,
+  preserve pending charges, and try compatible memory types on device OOM.
+  Candidate working set was 432173496 bytes on the measured 512 MiB heap;
+  the installed build recommended 1073741824 bytes.
+- `nvmtl_vk.c`, `nvmtl_vk.h` and `nvmtl_fetch_spirv.h`: enable real framebuffer
+  inputs by default for WindowServer on the exact HP PCI profile, retain the
+  explicit disable override, and reuse immutable input descriptor sets per pass.
+  An absent color attachment is removed from the shader's input reads and
+  replaced with typed zero; unfamiliar forms are refused. Other GPUs retain
+  their WindowServer default. No framebuffer or kernel register changes.
+- `tools/mtlprobe` isolates an extracted plugin/RADV pair on the exact 760M
+  without replacing the installed driver. All eight texture readbacks passed,
+  including writes through the aligned alias. Two draws, overlapping triangles,
+  and a sparse missing input each returned 4096/4096 matching pixels. Ordinary
+  triangle/clear rendering also matched. See
+  `hardware/dumps/hp_envy_760m/sequoia-texture44-offscreen.json`.
+
+The x86_64 macOS 15.0 plugin, RADV and probe build, `make test`, SPIR-V validation
+of the sparse shader, and packaged AIR translation and ACO compilation with 8-CU
+and 12-CU mocks passed. The live tests used the existing native queues with the
+firmware framebuffer. The candidate was not installed; WindowServer's original
+OOM and the login/display path still require a guarded target retest.
