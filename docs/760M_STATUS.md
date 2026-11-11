@@ -809,3 +809,31 @@ and invokes the guarded aux updater bound to the original protected failure.
 Failed linking restores metadata when the collection is unchanged. Four added
 metadata/rollback tests and ten aux tests pass. Candidate linking, new module load
 and WindowServer remain pending actual HP root/runtime tests.
+
+
+### New display module loaded; native, Metal and console/ABI checks pass
+
+Boot 3CC21820-1F63-4633-A62B-CB3A9A917E96 loads PhxAccel UUID 633BB085 and
+unchanged PhxBringup build 39. The repaired auxiliary collection published the new
+module and preserved its three unrelated extensions. Automatic native compute,
+render and claim passed; current stage is native-queues-ready. Runtime/header
+sizes match: IOFramebuffer 464, IOAccelDisplayMachine 376, IOAccelDisplayPipe 792.
+The captured 104-byte HP console plan validates on the live new module. Exact
+family-version/display preflight passes. PhxAMDFB remains absent and WindowServer
+has not been armed.
+
+The boot supervisor stopped before any Metal shader because its all-PCI ioreg
+snapshot exceeded five seconds. Subsequent real HP Metal tests on the same queues
+passed: strict exact-PCI device identity, compute 4096/4096 and render 32640 red,
+32896 blue, zero other pixels, both command buffers completed without error.
+Report: `sequoia-display40-metal-execution.json`. No GPU reinitialization occurred.
+
+Registry snapshots now get up to 15 seconds within the publication budget and
+retry only snapshot timeouts; Metal probe/shader errors are not retried. Display
+snapshot reads also use 15 seconds. Verification-only recovery now records the
+current boot identity; the display installer accepts verified native readiness
+plus current-boot Metal/app checks, without claiming an initialization retry.
+Publication/boot/recovery/display tests pass. Next action is backed-up service
+update, GUI-session Metal verification on the existing healthy queues, then one-shot
+WindowServer arming in the same root operation. No kext, firmware, translator,
+RADV, EFI or security changes are needed for this control-only update.

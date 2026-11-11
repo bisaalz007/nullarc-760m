@@ -168,7 +168,8 @@ def resume_existing(package,state,allow,status=None):
     verify_existing_native(package)
     folder=Path(tempfile.mkdtemp(prefix='verification-',dir=state))
     report={'automatic_initialization_attempted':False,'native_initialization_retried':False,
-            'native_readiness_verified':True,'metal_verified':False,'desktop_armed':False,'apps_enabled':False}
+            'native_readiness_verified':True,'metal_verified':False,'desktop_armed':False,'apps_enabled':False,
+            'boot_session_uuid':desktop.boot_uuid()}
     def save():
         (folder/'verification-result.json').write_text(json.dumps(report,indent=2)+'\n');publish(status,report)
     try:

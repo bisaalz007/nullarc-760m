@@ -16,7 +16,7 @@ DESKTOP='# NullArc: one-shot HP accelerated compositor; firmware scanout\n-media
 class DisplayOwnershipError(ValueError):pass
 
 def nodes(name):
-    raw=subprocess.check_output(['/usr/sbin/ioreg','-alr','-c',name],timeout=5)
+    raw=subprocess.check_output(['/usr/sbin/ioreg','-alr','-c',name],timeout=15)
     return plistlib.loads(raw) if raw.strip() else []
 
 def sysctl(name,value=None):

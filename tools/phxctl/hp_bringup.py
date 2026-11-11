@@ -30,14 +30,20 @@ def claimed_hp(nodes):
     raise ValueError('exact HP PCI identity not found')
 
 def wait_for_metal(probe,environment,record,timeout=90,prefix=None):
-    """Retry only empty Metal catalogues, using a fresh process each time."""
+    """Bound registry reads and empty-catalogue retries; never retry shader work."""
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
-        nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],timeout=5))
-        if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
-            raise ValueError('driver is no longer ready while waiting for Metal publication')
-        # -l includes descendant properties, not just those of PCI match roots.
-        pci=claimed_hp(plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-alr','-c','IOPCIDevice'],timeout=5)))
+        try:
+            nodes=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],
+                timeout=max(.01,min(15,deadline-time.monotonic()))))
+            if not any(n.get('phx-profile')=='hp-760m' and n.get('phx-stage')=='native-queues-ready' for n in nodes):
+                raise ValueError('driver is no longer ready while waiting for Metal publication')
+            # -l includes descendant properties, not just those of PCI roots.
+            pci=claimed_hp(plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-alr','-c','IOPCIDevice'],
+                timeout=max(.01,min(15,deadline-time.monotonic())))))
+        except subprocess.TimeoutExpired:
+            record({'returncode':75,'stdout':'','stderr':'','state':'awaiting-registry-snapshot'})
+            time.sleep(.25);continue
         # PhxAccel deliberately withholds this property for the 60-second
         # framebuffer/headless fallback. Do not enter Metal before publication.
         if not any((n.get('IOObjectClass')=='NMXAccel' or n.get('IOClass')=='NMXAccel') and

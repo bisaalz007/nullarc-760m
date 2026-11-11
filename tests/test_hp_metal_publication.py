@@ -29,6 +29,18 @@ class PublicationTests(unittest.TestCase):
                 h.wait_for_metal(Path('/mtlprobe'),{},lambda a:None)
             self.assertEqual(run.call_count,1)
 
+    def test_registry_timeout_retries_snapshot_without_submitting_work(self):
+        attempts=[];reads=[subprocess.TimeoutExpired(['ioreg'],15),READY,pci()]
+        with patch.object(h.subprocess,'check_output',side_effect=reads) as read,patch.object(h.subprocess,'run',return_value=subprocess.CompletedProcess([],0,'HP device','')) as run,patch.object(h.time,'sleep'):
+            h.wait_for_metal(Path('/mtlprobe'),{},attempts.append)
+        self.assertEqual(attempts[0]['state'],'awaiting-registry-snapshot');run.assert_called_once()
+        self.assertTrue(all(0<call.kwargs['timeout']<=15 for call in read.call_args_list))
+
+    def test_metal_probe_timeout_is_not_retried(self):
+        with patch.object(h.subprocess,'check_output',side_effect=registry),patch.object(h.subprocess,'run',side_effect=subprocess.TimeoutExpired(['mtlprobe'],30)) as run,self.assertRaises(subprocess.TimeoutExpired):
+            h.wait_for_metal(Path('/mtlprobe'),{},lambda a:None)
+        run.assert_called_once()
+
     def test_lost_driver_stops_before_metal(self):
         lost=plistlib.dumps([{'phx-profile':'hp-760m','phx-stage':'device-lost'}])
         with patch.object(h.subprocess,'check_output',return_value=lost),patch.object(h.subprocess,'run') as run,self.assertRaises(ValueError):

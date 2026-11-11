@@ -68,6 +68,11 @@ framebuffer still drives the panel. HP boot remains diagnostic until the explici
 administrator experiment or opt-in `--hp-native` app-only service. Automatic native
 initialization, GUI-session Metal readbacks and app activation passed a fresh boot;
 see the [cold-boot evidence](hardware/dumps/hp_envy_760m/sequoia-build39-automatic-app-activation.json).
+The new display module (633BB085) now also passes native/Metal execution and the
+HP console-plan/runtime ABI checks. WindowServer itself remains unverified; its
+next step is a one-shot boot test. The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
+records those actual GPU readbacks.
+
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
 runtime family sizes/versions, captured console plan and current-boot app tests

@@ -99,7 +99,8 @@ def main():
     if running:
         display.validated_accelerator()
         status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
-        if not all(status.get(k) is True for k in ('native_initialization_verified','metal_verified','apps_enabled')):
+        ready=status.get('native_initialization_verified') is True or status.get('native_readiness_verified') is True
+        if not ready or not all(status.get(k) is True for k in ('metal_verified','apps_enabled')):
             raise ValueError('new module must first pass automatic native and Metal app tests')
         if status.get('boot_session_uuid')!=display.boot_uuid():raise ValueError('app validation report is from another boot')
         if inventory(target)!=inventory(source):raise ValueError('installed module differs from running package')
