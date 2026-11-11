@@ -1,0 +1,206 @@
+{
+  "format": 1,
+  "purpose": "read-only existing firmware timing; no display programming",
+  "source_url": "https://github.com/torvalds/linux/blob/v6.14/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_offset.h",
+  "source_sha256": "b9f43d329ae6f1d697bfdb6570087fd984d8428b3f33926ca0d36893ecb6cb7a",
+  "mask_source_sha256": "b4a162a235c4cec50c9c1e1fe313600b04d80f356ef5d2ec93d3b5d5a94db28e",
+  "base_source": "hardware/dumps/hp_envy_760m/linux-2026-11-08.json; hw_id 271, DCN 3.1.4, segment 2",
+  "registers": [
+    {
+      "name": "regOTG0_OTG_H_TOTAL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6954,
+      "dword": 20458,
+      "fields": {
+        "OTG0_OTG_H_TOTAL__OTG_H_TOTAL__SHIFT": 0,
+        "OTG0_OTG_H_TOTAL__OTG_H_TOTAL_MASK": 32767
+      }
+    },
+    {
+      "name": "regOTG0_OTG_H_BLANK_START_END",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6955,
+      "dword": 20459,
+      "fields": {
+        "OTG0_OTG_H_BLANK_START_END__OTG_H_BLANK_START__SHIFT": 0,
+        "OTG0_OTG_H_BLANK_START_END__OTG_H_BLANK_END__SHIFT": 16,
+        "OTG0_OTG_H_BLANK_START_END__OTG_H_BLANK_START_MASK": 32767,
+        "OTG0_OTG_H_BLANK_START_END__OTG_H_BLANK_END_MASK": 2147418112
+      }
+    },
+    {
+      "name": "regOTG0_OTG_H_SYNC_A",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6956,
+      "dword": 20460,
+      "fields": {
+        "OTG0_OTG_H_SYNC_A__OTG_H_SYNC_A_START__SHIFT": 0,
+        "OTG0_OTG_H_SYNC_A__OTG_H_SYNC_A_END__SHIFT": 16,
+        "OTG0_OTG_H_SYNC_A__OTG_H_SYNC_A_START_MASK": 32767,
+        "OTG0_OTG_H_SYNC_A__OTG_H_SYNC_A_END_MASK": 2147418112
+      }
+    },
+    {
+      "name": "regOTG0_OTG_H_SYNC_A_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6957,
+      "dword": 20461,
+      "fields": {
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_H_SYNC_A_POL__SHIFT": 0,
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_COMP_SYNC_A_EN__SHIFT": 16,
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_H_SYNC_A_CUTOFF__SHIFT": 17,
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_H_SYNC_A_POL_MASK": 1,
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_COMP_SYNC_A_EN_MASK": 65536,
+        "OTG0_OTG_H_SYNC_A_CNTL__OTG_H_SYNC_A_CUTOFF_MASK": 131072
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_TOTAL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6959,
+      "dword": 20463,
+      "fields": {
+        "OTG0_OTG_V_TOTAL__OTG_V_TOTAL__SHIFT": 0,
+        "OTG0_OTG_V_TOTAL__OTG_V_TOTAL_MASK": 32767
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_TOTAL_MIN",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6960,
+      "dword": 20464,
+      "fields": {
+        "OTG0_OTG_V_TOTAL_MIN__OTG_V_TOTAL_MIN__SHIFT": 0,
+        "OTG0_OTG_V_TOTAL_MIN__OTG_V_TOTAL_MIN_MASK": 32767
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_TOTAL_MAX",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6961,
+      "dword": 20465,
+      "fields": {
+        "OTG0_OTG_V_TOTAL_MAX__OTG_V_TOTAL_MAX__SHIFT": 0,
+        "OTG0_OTG_V_TOTAL_MAX__OTG_V_TOTAL_MAX_MASK": 32767
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_TOTAL_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6963,
+      "dword": 20467,
+      "fields": {
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_V_TOTAL_MIN_SEL__SHIFT": 0,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_V_TOTAL_MAX_SEL__SHIFT": 1,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_REPLACING_MAX_EN__SHIFT": 2,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_REPLACING_MIN_EN__SHIFT": 3,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_FORCE_LOCK_ON_EVENT__SHIFT": 4,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_DRR_EVENT_ACTIVE_PERIOD__SHIFT": 5,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_FRAME_NUM__SHIFT": 8,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_SET_V_TOTAL_MIN_MASK__SHIFT": 16,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_V_TOTAL_MIN_SEL_MASK": 1,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_V_TOTAL_MAX_SEL_MASK": 2,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_REPLACING_MAX_EN_MASK": 4,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_REPLACING_MIN_EN_MASK": 8,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_FORCE_LOCK_ON_EVENT_MASK": 16,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_DRR_EVENT_ACTIVE_PERIOD_MASK": 32,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_VTOTAL_MID_FRAME_NUM_MASK": 65280,
+        "OTG0_OTG_V_TOTAL_CONTROL__OTG_SET_V_TOTAL_MIN_MASK_MASK": 4294901760
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_BLANK_START_END",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6966,
+      "dword": 20470,
+      "fields": {
+        "OTG0_OTG_V_BLANK_START_END__OTG_V_BLANK_START__SHIFT": 0,
+        "OTG0_OTG_V_BLANK_START_END__OTG_V_BLANK_END__SHIFT": 16,
+        "OTG0_OTG_V_BLANK_START_END__OTG_V_BLANK_START_MASK": 32767,
+        "OTG0_OTG_V_BLANK_START_END__OTG_V_BLANK_END_MASK": 2147418112
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_SYNC_A",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6967,
+      "dword": 20471,
+      "fields": {
+        "OTG0_OTG_V_SYNC_A__OTG_V_SYNC_A_START__SHIFT": 0,
+        "OTG0_OTG_V_SYNC_A__OTG_V_SYNC_A_END__SHIFT": 16,
+        "OTG0_OTG_V_SYNC_A__OTG_V_SYNC_A_START_MASK": 32767,
+        "OTG0_OTG_V_SYNC_A__OTG_V_SYNC_A_END_MASK": 2147418112
+      }
+    },
+    {
+      "name": "regOTG0_OTG_V_SYNC_A_CNTL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6968,
+      "dword": 20472,
+      "fields": {
+        "OTG0_OTG_V_SYNC_A_CNTL__OTG_V_SYNC_A_POL__SHIFT": 0,
+        "OTG0_OTG_V_SYNC_A_CNTL__OTG_V_SYNC_MODE__SHIFT": 8,
+        "OTG0_OTG_V_SYNC_A_CNTL__OTG_V_SYNC_A_POL_MASK": 1,
+        "OTG0_OTG_V_SYNC_A_CNTL__OTG_V_SYNC_MODE_MASK": 256
+      }
+    },
+    {
+      "name": "regOTG0_OTG_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6977,
+      "dword": 20481,
+      "fields": {
+        "OTG0_OTG_CONTROL__OTG_MASTER_EN__SHIFT": 0,
+        "OTG0_OTG_CONTROL__OTG_DISABLE_POINT_CNTL__SHIFT": 8,
+        "OTG0_OTG_CONTROL__OTG_START_POINT_CNTL__SHIFT": 12,
+        "OTG0_OTG_CONTROL__OTG_FIELD_NUMBER_CNTL__SHIFT": 13,
+        "OTG0_OTG_CONTROL__OTG_FIELD_NUMBER_POLARITY__SHIFT": 14,
+        "OTG0_OTG_CONTROL__OTG_CURRENT_MASTER_EN_STATE__SHIFT": 16,
+        "OTG0_OTG_CONTROL__OTG_OUT_MUX__SHIFT": 20,
+        "OTG0_OTG_CONTROL__OTG_MASTER_EN_MASK": 1,
+        "OTG0_OTG_CONTROL__OTG_DISABLE_POINT_CNTL_MASK": 768,
+        "OTG0_OTG_CONTROL__OTG_START_POINT_CNTL_MASK": 4096,
+        "OTG0_OTG_CONTROL__OTG_FIELD_NUMBER_CNTL_MASK": 8192,
+        "OTG0_OTG_CONTROL__OTG_FIELD_NUMBER_POLARITY_MASK": 16384,
+        "OTG0_OTG_CONTROL__OTG_CURRENT_MASTER_EN_STATE_MASK": 65536,
+        "OTG0_OTG_CONTROL__OTG_OUT_MUX_MASK": 3145728
+      }
+    },
+    {
+      "name": "regOTG0_OTG_INTERLACE_CONTROL",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6980,
+      "dword": 20484,
+      "fields": {
+        "OTG0_OTG_INTERLACE_CONTROL__OTG_INTERLACE_ENABLE__SHIFT": 0,
+        "OTG0_OTG_INTERLACE_CONTROL__OTG_INTERLACE_FORCE_NEXT_FIELD__SHIFT": 16,
+        "OTG0_OTG_INTERLACE_CONTROL__OTG_INTERLACE_ENABLE_MASK": 1,
+        "OTG0_OTG_INTERLACE_CONTROL__OTG_INTERLACE_FORCE_NEXT_FIELD_MASK": 196608
+      }
+    },
+    {
+      "name": "regOTG0_OTG_STATUS_FRAME_COUNT",
+      "base_index": 2,
+      "segment_base": 13504,
+      "offset": 6988,
+      "dword": 20492,
+      "fields": {
+        "OTG0_OTG_STATUS_FRAME_COUNT__OTG_FRAME_COUNT__SHIFT": 0,
+        "OTG0_OTG_STATUS_FRAME_COUNT__OTG_FRAME_COUNT_MASK": 16777215
+      }
+    }
+  ]
+}

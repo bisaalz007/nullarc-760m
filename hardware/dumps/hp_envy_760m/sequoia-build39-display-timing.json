@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "profile_sha256": "63193f98b8619f1367c12ebb3b53f68770f37d227bcdd49dd4f860865bfea2f4",
+  "register_writes": false,
+  "gpu_commands_submitted": false,
+  "samples": [
+    {
+      "timestamp_ns": 159233283,
+      "read_interval_ns": [
+        153058661,
+        165407905
+      ],
+      "registers": {
+        "regOTG0_OTG_H_TOTAL": 2259,
+        "regOTG0_OTG_H_BLANK_START_END": 19138724,
+        "regOTG0_OTG_H_SYNC_A": 2097152,
+        "regOTG0_OTG_H_SYNC_A_CNTL": 0,
+        "regOTG0_OTG_V_TOTAL": 1239,
+        "regOTG0_OTG_V_TOTAL_MIN": 0,
+        "regOTG0_OTG_V_TOTAL_MAX": 0,
+        "regOTG0_OTG_V_TOTAL_CONTROL": 0,
+        "regOTG0_OTG_V_BLANK_START_END": 2426069,
+        "regOTG0_OTG_V_SYNC_A": 393216,
+        "regOTG0_OTG_V_SYNC_A_CNTL": 1,
+        "regOTG0_OTG_CONTROL": 70145,
+        "regOTG0_OTG_INTERLACE_CONTROL": 0,
+        "regOTG0_OTG_STATUS_FRAME_COUNT": 83616
+      }
+    },
+    {
+      "timestamp_ns": 1173158739,
+      "read_interval_ns": [
+        1166806819,
+        1179510659
+      ],
+      "registers": {
+        "regOTG0_OTG_H_TOTAL": 2259,
+        "regOTG0_OTG_H_BLANK_START_END": 19138724,
+        "regOTG0_OTG_H_SYNC_A": 2097152,
+        "regOTG0_OTG_H_SYNC_A_CNTL": 0,
+        "regOTG0_OTG_V_TOTAL": 1239,
+        "regOTG0_OTG_V_TOTAL_MIN": 0,
+        "regOTG0_OTG_V_TOTAL_MAX": 0,
+        "regOTG0_OTG_V_TOTAL_CONTROL": 0,
+        "regOTG0_OTG_V_BLANK_START_END": 2426069,
+        "regOTG0_OTG_V_SYNC_A": 393216,
+        "regOTG0_OTG_V_SYNC_A_CNTL": 1,
+        "regOTG0_OTG_CONTROL": 70145,
+        "regOTG0_OTG_INTERLACE_CONTROL": 0,
+        "regOTG0_OTG_STATUS_FRAME_COUNT": 83677
+      }
+    }
+  ],
+  "timing": {
+    "h": {
+      "active": 1920,
+      "total": 2260,
+      "front_porch": 48,
+      "sync_width": 32,
+      "sync_start": 1968,
+      "sync_end": 2000,
+      "sync_positive": true
+    },
+    "v": {
+      "active": 1200,
+      "total": 1240,
+      "front_porch": 3,
+      "sync_width": 6,
+      "sync_start": 1203,
+      "sync_end": 1209,
+      "sync_positive": false
+    },
+    "frame_count_delta": 61,
+    "elapsed_ns": 1013925456,
+    "estimated_refresh_millihz": 60162,
+    "estimated_pixel_clock_hz": 168598587,
+    "pixel_clock_measured_directly": false
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "boot_session_uuid": "49800A69-CF26-4E40-91FC-F09883D6268F",
+  "status": {
+    "automatic_initialization_attempted": true,
+    "desktop_armed": false,
+    "returncode": 0,
+    "native_compute_verified": true,
+    "native_render_verified": true,
+    "metal_verified": true,
+    "last_stage": "accelerator-claim",
+    "native_initialization_verified": true,
+    "verification_phase": "complete",
+    "metal_workdir": "/Users/Shared/nullarc-user-metal-6xrizb9z",
+    "apps_enabled": true,
+    "metal_stages": [
+      {
+        "stage": "metal-hp-device",
+        "returncode": 0
+      },
+      {
+        "stage": "metal-compute-readback",
+        "returncode": 0
+      },
+      {
+        "stage": "metal-render-readback",
+        "returncode": 0
+      }
+    ],
+    "recorded_at": "2026-11-09T02:32:39.508757+00:00"
+  },
+  "allow_list": "# NullArc: verified HP app acceleration; desktop remains on firmware framebuffer\n-WindowServer\n-mediaanalysisd\n-photoanalysisd\n-Spotlight\n*\n"
+}
