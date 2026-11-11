@@ -36,10 +36,13 @@ def main():
         run([a.spirv_val,'--target-env','vulkan1.2',out/name])
     run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-std=c11','-Wall','-Wextra','-Werror','-I'+str(a.mesa/'include'),
          REPO/'tests/test_mesa_vulkan_profile.c','-o',out/'radv-test'])
+    run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-std=c11','-Wall','-Wextra','-Werror','-I'+str(a.mesa/'include'),
+         REPO/'tests/test_mesa_oom.c','-o',out/'oom-test'])
     for profile, count in [('hp-760m',8),('',12)]:
         env = dict(os.environ, RADV_DARWIN_MOCK='1', RADV_DARWIN_MOCK_PROFILE=profile,
                    RADV_DARWIN_CANNED='phoenix', MESA_SHADER_CACHE_DISABLE='true')
         run([out/'radv-test',a.package/'PhxGPU/nvmtl/libvulkan_radeon.dylib',str(count),out/'store.spv','main',out/'triangle_vertex.spv',out/'solid_fragment.spv'],env=env)
+        run([out/'oom-test',a.package/'PhxGPU/nvmtl/libvulkan_radeon.dylib'],env=env)
     digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     inputs=['PhxGPU/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver',
             'PhxGPU/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib','PhxGPU/nvmtl/libvulkan_radeon.dylib']

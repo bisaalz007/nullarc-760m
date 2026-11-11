@@ -102,6 +102,14 @@ stuttered, and fell back to the firmware framebuffer. Texture allocations
 continued to fail. See the [offscreen report](hardware/dumps/hp_envy_760m/sequoia-texture44-offscreen.json)
 and the [WindowServer retest](hardware/dumps/hp_envy_760m/sequoia-texture44-windowserver.json).
 
+The next audit reproduced allocation failure during asynchronous buffer churn
+on the deployed RADV. Corrections now synchronize native handle reuse and make
+failed command-buffer construction safe to clean up. The corrected RADV passed
+three churn runs, IOSurface sharing through 1920×1200, and framebuffer-fetch
+readbacks on the HP. A mock resource-exhaustion test reproduces the old cleanup
+crash and verifies the Vulkan OOM return with the fix. WindowServer still needs
+a guarded retest. See the [resource regression report](hardware/dumps/hp_envy_760m/sequoia-resource46-offscreen.json).
+
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
 runtime family sizes/versions, captured console plan and current-boot app tests
@@ -174,7 +182,7 @@ or accelerated display success is claimed by this build.
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.
-Mesa uses Phoenix patches 0001..0011; generator scripts are alternatives to applying
+Mesa uses Phoenix patches 0001..0013; generator scripts are alternatives to applying
 the corresponding patches, not additional steps.
 
 ## Status

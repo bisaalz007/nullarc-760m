@@ -238,7 +238,7 @@ def main():
                  REPO/'tools/vkprobe'/source,'-o',tools/name])
         run(['clang','-arch','x86_64','-mmacosx-version-min='+a.min_macos,'-fobjc-arc',
              '-Wall','-Wextra','-Werror','-framework','Foundation','-framework','Metal','-framework','IOKit',
-             REPO/'tools/mtlprobe/mtlprobe.m','-o',tools/'mtlprobe'])
+             '-framework','IOSurface',REPO/'tools/mtlprobe/mtlprobe.m','-o',tools/'mtlprobe'])
         build_receipt(a)
     assemble(a)
 

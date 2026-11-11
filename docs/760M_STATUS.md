@@ -147,7 +147,7 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK
 sh src/phxaccel/build.sh /path/to/MacKernelSDK
 ```
 
-Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0011 to Mesa
+Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0013 to Mesa
 `f5cb8ee032adabef599ae892ec4e42d796b84da9`. Each generator is an alternative to its corresponding patch, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
 
 ```sh
@@ -1163,3 +1163,50 @@ before reboot. The host suite (including all 18 display guard tests), Sequoia
 RADV build, and packaged Metal translation and ACO tests on both mocked profiles
 passed. The rebuilt RADV and supervisor are local candidates. Whether busy
 releases caused this specific login failure still requires native evidence.
+
+### Resource46 audit and hardware regressions
+
+The HP still had the texture44 plugin (SHA-256 ffa5c336...) and RADV
+(051447e4...), with build39 kernel modules. The active HP service is
+`hp_boot.py` and `hp_windowserver.py`. The reference `phxboot.sh` is a
+separate startup path. The observed reboot followed the protected supervisor's
+console-session failure and firmware-fallback request. The retained report
+contains successful native and GUI shader readbacks and 314 copied presents.
+It does not establish a correct desktop or a kernel/GPU fault.
+
+New probe modes check full IOSurface pixels in both directions, shared texture
+wrappers, in-flight source-resource retention, and destruction of unrelated
+allocations during queued work. The isolated retirement45 candidate passed
+IOSurface tests at 64x64, 161x161 and 1920x1200, all 128 lifetime submissions,
+the measured texture layouts and all three fetch cases. The deployed RADV
+failed the churn workload while logging 488 MiB free. The retirement45 candidate
+passed once, then a repeat logged a duplicate BO handle and crashed in
+`radv_destroy_cmd_buffer`.
+
+Two additional source defects were verified:
+
+- Native BO_FREE released a handle before taking the userspace table lock.
+  Another allocation could obtain that same handle while its old table entry
+  still existed. Patch 0012 serializes native release and table removal.
+- Command-stream OOM entered command-buffer destruction before descriptor
+  objects, the MSRTSS list and the acceleration-structure set were initialized.
+  Patch 0013 initializes cleanup state earlier and checks the optional set.
+  A focused Vulkan test exhausts mock BO handles through ordinary allocations.
+  The old build crashes with SIGSEGV. The corrected build returns OOM and cleans
+  up on both mocked profiles.
+
+On the actual HP, the final corrected RADV (UUID
+5743FB49-022D-3146-B4B0-5643F12BB5B5, SHA-256
+4cce36d8e14a300516b7d79b52c607a30e60deb56dba61fd94d35fb804e6edbb)
+passed three consecutive churn runs (384 submissions and unrelated allocations),
+then repeated the full IOSurface and framebuffer-fetch readbacks successfully.
+The plugin and kernel executables were unchanged. These tests used the existing
+healthy queues and a private RADV path, with the panel on the firmware framebuffer.
+Evidence is in `hardware/dumps/hp_envy_760m/sequoia-resource46-offscreen.json`.
+
+Changed fork files are the two Mesa patches, the bounded probe modes and their
+IOSurface build dependency, the OOM regression and compiler-test integration,
+and these documentation/evidence updates. The Sequoia RADV/probe build and
+packaged AIR/SPIR-V/ACO tests passed. The faults reproduce resource allocation
+and cleanup failures, but their correction still needs a WindowServer boot
+to establish whether the missing text/cursor and stutter are resolved.

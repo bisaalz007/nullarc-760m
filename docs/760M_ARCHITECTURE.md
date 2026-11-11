@@ -11,6 +11,16 @@ inventory/gap notes below describe the starting state; the build-39 continuation
 and captured execution reports supersede their execution blockers. WindowServer,
 cold-boot service execution, reset and suspend/resume still require work.
 
+The current display audit follows the Sequoia `hp_boot.py` service through
+native initialization, `hp_windowserver.py` display release and GUI validation.
+The separate reference `phxboot.sh` did not perform the HP's failed retest.
+Texture44 reached WindowServer, enabled framebuffer fetch and recorded 314
+presents before its console-session check requested firmware fallback.
+Resource46 reproduces native BO allocation/handle-reuse failures and an OOM
+cleanup crash in RADV. Phoenix patches 0011..0013 address those resource paths.
+The corrected backend passes bounded native IOSurface, churn and shader
+readbacks. Stable desktop compositing remains a target validation requirement.
+
 ```text
 App / WindowServer
   Metal -> src/nmplugin/NVMTLDevice.m (includes other plugin .m files)

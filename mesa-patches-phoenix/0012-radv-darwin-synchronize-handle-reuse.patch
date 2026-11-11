@@ -1,0 +1,31 @@
+From 95a271a33e8a3d3d94159a75f5f32107c9c3c6db Mon Sep 17 00:00:00 2001
+From: imnotsayingthatlol <norrisethan65@icloud.com>
+Date: Tue, 10 Nov 2026 21:36:28 -0500
+Subject: [PATCH] Serialize native BO release with handle-table removal
+
+---
+ src/amd/common/darwin/ac_darwin_drm.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+index 6b24b28..5fe86ec 100644
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -924,13 +924,16 @@ acd_bo_free(acd_device_handle dev, amdgpu_bo_handle bo)
+       return 0;
+    }
+    int r = 0;
++   /* BO_FREE makes the native handle immediately available to another thread's
++    * allocation/import. Hold the table lock until the previous entry is gone,
++    * or that thread can mistake a legitimate reused handle for a duplicate. */
++   pthread_mutex_lock(&dev->core->bo_lock);
+    /* the CPU mapping goes first (contract 3.4); the kext then frees the BO.  A userptr BO's cpu is the caller's own pointer: nothing to unmap. */
+    if (bo->cpu && !bo->userptr) {
+       r = acd_kext_bo_unmap(dev->core->kext, bo->handle, bo->cpu);
+       bo->cpu = NULL;
+    }
+    int r2 = acd_kext_bo_free(dev->core->kext, bo->handle);
+-   pthread_mutex_lock(&dev->core->bo_lock);
+    if (dev->core->bos[bo->handle] == bo)
+       dev->core->bos[bo->handle] = NULL;
+    pthread_mutex_unlock(&dev->core->bo_lock);

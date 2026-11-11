@@ -1,0 +1,58 @@
+{
+  "target": "HP Envy x360 16-ad0013dx, Radeon 760M",
+  "pci_identity": "1002:1900 ca 103c:8c6a",
+  "os": "macOS Sequoia 15.8.2",
+  "kernel": {"bringup_build": 39, "native_abi": "1.12"},
+  "method": {
+    "mock_transport": false,
+    "first_native_initialization_this_boot_verified": true,
+    "isolated_user_space_candidate": true,
+    "candidate_installed_for_windowserver": false,
+    "panel_on_firmware_framebuffer": true
+  },
+  "reproductions": {
+    "deployed_radv": {
+      "sha256": "051447e4cb2b3c7248eb228299482fbd260217d3383371038d91a59db959e0e8",
+      "churn_exit": 65,
+      "failure": "unrelated 8 MiB allocation failed during queued work",
+      "free_mib_logged": 488
+    },
+    "retirement45_radv": {
+      "first_churn_passed": true,
+      "repeat_exit": -11,
+      "duplicate_native_bo_handle_reported": true,
+      "crash_top_symbol": "radv_destroy_cmd_buffer",
+      "failure_cleanup_called_from": "radv_create_cmd_buffer"
+    },
+    "mock_oom_cleanup": {
+      "old_exit": -11,
+      "corrected_exit": 0,
+      "expected_vulkan_result": "VK_ERROR_OUT_OF_DEVICE_MEMORY",
+      "gpu_submissions": 0,
+      "profiles_tested_cu_counts": [8, 12]
+    }
+  },
+  "corrected_candidate": {
+    "radv_uuid": "5743FB49-022D-3146-B4B0-5643F12BB5B5",
+    "radv_sha256": "4cce36d8e14a300516b7d79b52c607a30e60deb56dba61fd94d35fb804e6edbb",
+    "mesa_commit": "8ae0bb5",
+    "churn_consecutive_passes": 3,
+    "asynchronous_submissions_per_run": 128,
+    "unrelated_8_mib_allocations_released_per_run": 128,
+    "all_submitted_fill_copy_bytes_matched": true,
+    "iosurface_cases": [
+      {"width": 64, "height": 64, "row_bytes": 256},
+      {"width": 161, "height": 161, "row_bytes": 704},
+      {"width": 1920, "height": 1200, "row_bytes": 7680}
+    ],
+    "gpu_to_cpu_and_alias_clear_revisions_per_surface": 3,
+    "iosurface_pixel_mismatches": 0,
+    "cpu_to_gpu_patterns_matched": true,
+    "framebuffer_fetch_matching_pixels": {
+      "two_draws": 4096,
+      "overlapping_triangles": 4096,
+      "missing_attachment": 4096
+    },
+    "windowserver_retest_completed": false
+  }
+}

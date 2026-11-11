@@ -10,7 +10,7 @@ build/package/offline translation test does not establish GPU execution.
 
 - macOS Tahoe, Xcode/CLT with SDK 26+, Python 3, Clang, Cargo/Rust >=1.87 and Ninja.
 - MacKernelSDK path; Vulkan-Headers checkout; configured Mesa at the documented
-  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0011.
+  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0013.
 - Clean NullMoth source checkout at `76df0f6af5c64c2af9a22090da8b3fe14616023e`
   (v2.4.1). Only its LGPL `translator/` is compiled/archived.
 - Compatible LLVM/Zstd AIR-reader runtime bundle, including
@@ -52,6 +52,8 @@ pinned library, independently validates SPIR-V, and compiles compute and graphic
 are visible in the Darwin heap budget. It constructs no Metal device and dispatches no GPU
 commands. Metal API coverage, WindowServer, rendering and display behavior still
 require target runtime tests. Upstream plugin protocol warnings remain visible.
+The same test also exhausts mock BO handles and verifies that command-buffer
+allocation returns OOM without crashing during cleanup.
 
 To check the sparse framebuffer-fetch rewrite independently of the GPU:
 
@@ -68,6 +70,11 @@ and `--hp alloc-pressure` run bounded tests. To test an extracted candidate in
 the probe process, set `NULLARC_PROBE_PLUGIN` to the verified NVMTL executable
 and `NVMTL_ICD_LIB` to that package's verified RADV dylib. The probe selects
 only the exact HP device and does not replace installed drivers or arm the display.
+The `--hp surface` probe checks IOSurface pixels in both directions and across
+two Metal wrappers. The `--hp lifetime` probe releases source wrappers while
+128 asynchronous fill/copy submissions execute. The `--hp churn` variant also
+destroys unrelated 8 MiB allocations during queued work, with buffer parking
+and sparse buffering disabled inside that probe process.
 
 ## Diagnostic installation and rollback
 

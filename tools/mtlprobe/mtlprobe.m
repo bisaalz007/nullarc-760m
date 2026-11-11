@@ -3,6 +3,7 @@
 //   -framework IOKit -o mtlprobe mtlprobe.m; --hp requires the exact captured HP PCI identity.
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <IOSurface/IOSurface.h>
 #import <IOKit/IOKitLib.h>
 #import <objc/runtime.h>
 #include <dlfcn.h>
@@ -134,18 +135,24 @@ static int renderTest(id<MTLDevice> dev) {
 }
 
 #include "regressions.h"
+#include "surface_regressions.h"
 int main(int argc, char **argv) {
     @autoreleasepool {
         BOOL hp = argc > 1 && !strcmp(argv[1], "--hp");
         const char *mode = argc > 1 + hp ? argv[1 + hp] : NULL;
-        if (argc > 2 + hp || (mode && strcmp(mode, "list") && strcmp(mode, "render") && strcmp(mode,"textures") && strcmp(mode,"fetch") && strcmp(mode,"alloc") && strcmp(mode,"alloc-pressure"))) {
-            fprintf(stderr, "usage: mtlprobe [--hp] [list|render|textures|fetch|alloc|alloc-pressure]\n"); return 2;
+        if (argc > 2 + hp || (mode && strcmp(mode, "list") && strcmp(mode, "render") && strcmp(mode,"textures") && strcmp(mode,"fetch") && strcmp(mode,"alloc") && strcmp(mode,"alloc-pressure") && strcmp(mode,"surface") && strcmp(mode,"lifetime") && strcmp(mode,"churn"))) {
+            fprintf(stderr, "usage: mtlprobe [--hp] [list|render|textures|fetch|alloc|alloc-pressure|surface|lifetime|churn]\n"); return 2;
         }
         if (hp && (getenv("RADV_DARWIN_MOCK") || getenv("RADV_DARWIN_MOCK_PROFILE") || getenv("RADV_DARWIN_HOST_BO"))) {
             fprintf(stderr, "HP runtime test refuses mock and host-only transports\n"); return 2;
         }
         const char *candidate=getenv("NULLARC_PROBE_PLUGIN");
         if (candidate && !hp) return 2;
+        if (mode && !strcmp(mode, "churn")) {
+            if (!hp) return 2;
+            setenv("NVMTL_NO_BUFREUSE", "1", 1);
+            setenv("NVMTL_NO_SPARSE_BUF", "1", 1);
+        }
         NSArray<id<MTLDevice>> *all = candidate ? isolatedDevices(candidate) : MTLCopyAllDevices();
         if (candidate && !all) {fputs("candidate device creation failed; no installed-driver fallback\n",stderr);return 3;}
         printf("devices: %lu\n", (unsigned long)all.count);
@@ -168,6 +175,9 @@ int main(int argc, char **argv) {
         if (mode && !strcmp(mode,"fetch")) return fetchTest(dev);
         if (mode && !strcmp(mode,"alloc")) return allocationTest(dev,32);
         if (mode && !strcmp(mode,"alloc-pressure")) return hp ? allocationTest(dev,80) : 2;
+        if (mode && !strcmp(mode,"surface")) return hp ? surfaceTest(dev) : 2;
+        if (mode && !strcmp(mode,"lifetime")) return hp ? lifetimeTest(dev, NO) : 2;
+        if (mode && !strcmp(mode,"churn")) return lifetimeTest(dev, YES);
         NSError *err = nil;
         id<MTLLibrary> lib = [dev newLibraryWithSource:kSrc options:nil error:&err];
         if (!lib) { printf("library: %s\n", err.localizedDescription.UTF8String); return 2; }
