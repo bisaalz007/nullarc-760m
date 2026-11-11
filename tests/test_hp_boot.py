@@ -189,4 +189,35 @@ class BootTests(unittest.TestCase):
             b.verify_existing_native(self.root)
         self.metal.assert_not_called()
 
+    def test_verified_display_rearms_after_presents_and_metal(self):
+        events=[]
+        def verify(*args):events.append('present')
+        def rearm(*args):events.append('rearm');return True
+        with patch.object(b.desktop,'begin',return_value=True),patch.object(b.desktop,'arm'),patch.object(b.desktop,'verify_present',side_effect=verify),patch.object(b.desktop,'rearm_if_permanent',side_effect=rearm) as schedule,patch.object(b.subprocess,'Popen',side_effect=self.process()):
+            b.boot(self.root,self.state,self.allow,self.root/'status.json')
+        self.assertEqual(events,['present','rearm'])
+        self.assertTrue(json.loads((self.root/'status.json').read_text())['desktop_persistent_rearmed'])
+        schedule.assert_called_once_with(self.root,self.state)
+
+    def test_failed_display_cancels_persistence_before_fallback(self):
+        self.state.mkdir()
+        (self.state/b.desktop.PERSISTENT).touch()
+        (self.state/b.desktop.REQUEST).touch()
+        events=[]
+        with patch.object(b.desktop,'begin',return_value=True),patch.object(b.desktop,'arm',side_effect=ValueError('bad panel')),patch.object(b.desktop,'cancel_persistence',side_effect=lambda *args:events.append('cancel')),patch.object(b.desktop,'fallback',side_effect=lambda *args:events.append('fallback')),patch.object(b.subprocess,'Popen',side_effect=self.process()):
+            with self.assertRaisesRegex(ValueError,'bad panel'):
+                b.boot(self.root,self.state,self.allow)
+        self.assertEqual(events,['cancel','fallback'])
+
+    def test_failed_persistence_cancel_prevents_unsafe_auto_reboot(self):
+        self.state.mkdir()
+        (self.state/b.desktop.PERSISTENT).touch()
+        (self.state/b.desktop.REQUEST).touch()
+        with patch.object(b.desktop,'begin',side_effect=ValueError('display check failed')),patch.object(b.desktop,'cancel_persistence',side_effect=ValueError('NVRAM still armed')),patch.object(b.desktop,'fallback') as fallback,patch.object(b.subprocess,'Popen') as spawn:
+            with self.assertRaisesRegex(ValueError,'display check failed'):
+                b.boot(self.root,self.state,self.allow,self.root/'status.json')
+        spawn.assert_not_called();fallback.assert_not_called()
+        status=json.loads((self.root/'status.json').read_text())
+        self.assertEqual(status['desktop_phase'],'manual-firmware-recovery-required')
+
 if __name__=='__main__':unittest.main()

@@ -21,8 +21,8 @@ do not establish HP compatibility.
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
 Linux tests executed translated compute and graphics shaders on the HP. Build 39 now also passes native macOS GPU and public Metal compute/render readbacks. The corrected resource46 stack also reached the accelerated desktop.
-The new Sequoia display-development package provides a staged one-shot
-`sudo ./install.sh --windowserver` experiment, described below. Older packages
+The Sequoia display-development package provides a staged, guarded persistent
+`sudo ./install.sh --windowserver` configuration, described below. Older packages
 still refuse this mode on HP. Safari latency, video performance and game tearing
 remain unresolved; this is not full device support.
 
@@ -76,10 +76,11 @@ sudo ./install.sh --windowserver
 
 For an existing healthy accelerated HP desktop with identical native binaries,
 the same command backs up the daemon and stages an immutable startup-only update;
-it applies the measured PCI-aperture/SSE copy selection and arms one next boot.
-It does not reload a kext or reinitialize GPU queues. These copy defaults persist
-in that installed startup package. The display request is still consumed once;
-run the command again to authorize a later display boot. `--oc /path/to/EFI/OC`
+it applies the measured PCI-aperture/SSE copy selection and enables persistent
+WindowServer arming. It does not reload a kext or reinitialize GPU queues. Each
+successful boot schedules the next one after native, Metal, and display-present
+validation. The NVRAM request is still consumed once per boot, so failure leaves
+the firmware framebuffer for recovery. `--oc /path/to/EFI/OC`
 selects the boot USB (default `/Volumes/EFI/EFI/OC`). Early framebuffer metadata
 is verified and backed up if replacement is needed; `config.plist` is unchanged.
 A verified HP native/app boot service is required; this is not a fresh-machine
@@ -112,8 +113,11 @@ AMFI, EFI or WindowServer arming.
 After those checks pass, run the same command again. It verifies the measured
 1920×1200 console, 2260×1240 timing totals, firmware reservations and display ABI,
 then writes a root-only next-boot request and `phxfb-boot=1`. Reboot with the same
-USB. The kext consumes/commits removal of that NVRAM flag before attachment. This
-is one display boot, never automatically rearmed. The console presenter changes
+USB. The kext consumes/commits removal of that NVRAM flag before attachment.
+After successful desktop validation, the root-owned supervisor automatically
+creates the next request and writes `phxfb-boot=1` again. If any step fails,
+persistent arming is canceled, and no additional display boot is scheduled.
+The console presenter changes
 no display registers; the existing GPU display pipe copies completed frames into
 the firmware scanout surface. Its 60 Hz clock is nominal, derived from captured
 totals and corroborated panel mode, not a measured/programmed PLL clock.
@@ -136,17 +140,19 @@ It then requires Metal readbacks and live framebuffer-client/present evidence.
 Before releasing the panel it snapshots WindowServer crash reports. A new
 same-boot report aborts the experiment while waiting for login or presents;
 historical, other-boot and incomplete reports do not trigger that check.
-Failure disables retries; if the custom framebuffer owns the panel, it requests
-one reboot into the firmware framebuffer. A kernel/GPU fault can still require
+Failure disables retries, removes the permanent authorization and any pending
+next-boot arming, and if the custom framebuffer owns the panel requests one reboot
+into the firmware framebuffer. If NVRAM cannot be cleared, automatic fallback
+reboot is withheld for manual recovery. A kernel/GPU fault can still require
 a manual power cycle. The consumed flag and failure markers prevent a repeated
 accelerated-display boot. No WindowServer compatibility is claimed until the HP
 runtime results and visible desktop have been checked.
 
-To cancel a staged display request before reboot (local administrator):
+To disable persistent WindowServer arming and cancel a staged reboot (local administrator):
 
 ```sh
 sudo nvram -d phxfb-boot
-sudo rm -f /var/db/nullarc-760m/windowserver-next-boot.json
+sudo rm -f /var/db/nullarc-760m/windowserver-next-boot.json /var/db/nullarc-760m/windowserver-persistent.json
 ```
 
 Keep the printed `/var/db/nullarc-760m/display-update-*` backup. Do not remove

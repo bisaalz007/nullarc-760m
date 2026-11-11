@@ -160,4 +160,56 @@ class DisplayTests(unittest.TestCase):
         run.assert_called_once();self.assertEqual(len(report['desktop_failure_counters']),4)
         self.assertIn('read_error',report['desktop_failure_timing'])
 
+    def test_refuses_to_overwrite_existing_permanent_authorization(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            existing=Path(tmp)/d.PERSISTENT
+            existing.write_text('prior authorization')
+            with self.assertRaises(FileExistsError):
+                d._write_root_record(existing,{'format':1})
+            self.assertEqual(existing.read_text(),'prior authorization')
+
+    def test_arm_next_boot_creates_private_request_and_checks_nvram(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(d,'boot_uuid',return_value='CURRENT'),patch.object(d,'_nvram',side_effect=[{}, {'phxfb-boot':b'1'}]),patch.object(d.subprocess,'run') as run:
+            state=Path(tmp);d.arm_next_boot(state,'ACCEL-UUID')
+            self.assertEqual(json.loads((state/d.REQUEST).read_text()),
+                             {'format':1,'armed_from_boot':'CURRENT','accelerator_uuid':'ACCEL-UUID'})
+            self.assertEqual((state/d.REQUEST).stat().st_mode&0o777,0o600)
+            run.assert_called_once_with(['/usr/sbin/nvram','phxfb-boot=1'],check=True,timeout=5)
+
+    def test_rearm_only_for_matching_permanent_authorization(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)
+            with patch.object(d,'arm_next_boot') as arm:
+                self.assertFalse(d.rearm_if_permanent(state,state))
+                arm.assert_not_called()
+            (state/d.PERSISTENT).write_text('{}')
+            with patch.object(d,'_read_root_record',return_value={'format':1,'accelerator_uuid':'MATCH'}),patch.object(d,'macho_uuid',return_value='MATCH'),patch.object(d,'arm_next_boot') as arm:
+                self.assertTrue(d.rearm_if_permanent(state,state))
+                arm.assert_called_once_with(state,'MATCH')
+            with patch.object(d,'_read_root_record',return_value={'format':1,'accelerator_uuid':'OTHER'}),patch.object(d,'macho_uuid',return_value='MATCH'),patch.object(d,'arm_next_boot') as arm,self.assertRaisesRegex(ValueError,'differs'):
+                d.rearm_if_permanent(state,state)
+            arm.assert_not_called()
+
+    def test_failed_nvram_arm_removes_request_and_preserves_error(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(d,'boot_uuid',return_value='CURRENT'),patch.object(d,'_nvram',side_effect=[{},{}]),patch.object(d.subprocess,'run',side_effect=ValueError('nvram write failed')):
+            state=Path(tmp)
+            with self.assertRaisesRegex(ValueError,'nvram write failed'):
+                d.arm_next_boot(state,'ACCEL-UUID')
+            self.assertFalse((state/d.REQUEST).exists())
+
+    def test_cancel_persistence_clears_next_boot_request_and_nvram(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(d,'_nvram',side_effect=[{'phxfb-boot':b'1'},{}]),patch.object(d.subprocess,'run') as run:
+            state=Path(tmp)
+            (state/d.PERSISTENT).write_text('{}');(state/d.REQUEST).write_text('{}')
+            d.cancel_persistence(state)
+            self.assertFalse((state/d.PERSISTENT).exists())
+            self.assertFalse((state/d.REQUEST).exists())
+            run.assert_called_once_with(['/usr/sbin/nvram','-d','phxfb-boot'],check=True,timeout=5)
+
+    def test_lost_rearm_request_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(d,'nodes',return_value=[]):
+            state=Path(tmp);(state/d.PERSISTENT).touch()
+            with self.assertRaisesRegex(d.DisplayOwnershipError,'lost its next-boot request'):
+                d.begin(state,state,state)
+
 if __name__=='__main__':unittest.main()

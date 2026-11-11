@@ -36,7 +36,7 @@ are not verified. Full device support is not yet established.
 Download the compiled ZIP from [Releases](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases),
 verify `SHA256SUMS`, extract it and read its `INSTALL.md`. For the already verified
 HP native/app installation, the original command now stages startup updates and
-authorizes one guarded display boot:
+enables guarded persistent display boots:
 
 ```sh
 sudo ./install.sh --windowserver --check
@@ -45,8 +45,10 @@ sudo ./install.sh --windowserver
 
 The startup package retains `debug.phxfb_alias=0` and enables the tested SSE4.1
 copy only on capable CPUs. The installer can update startup scripts from a
-healthy accelerated desktop when all native binaries match. It preserves the
-one-shot recovery policy; it does not enable automatic display rearming.
+healthy accelerated desktop when all native binaries match. After each verified
+WindowServer boot, the supervisor automatically arms the next boot. The kext
+still consumes its NVRAM flag before attachment; failures cancel persistence
+and fall back to firmware scanout instead of creating an endless boot loop.
 Fresh machines need the documented diagnostic, firmware and app-mode stages.
 The reference 780M/Tahoe path remains available, without a new runtime claim.
 

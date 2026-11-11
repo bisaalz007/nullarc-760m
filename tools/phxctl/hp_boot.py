@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""HP app acceleration, with a separately authorized one-shot display experiment."""
+"""HP app acceleration, with authorized display boots and guarded persistence."""
 import argparse
 from datetime import datetime,timezone
 import json
@@ -98,10 +98,15 @@ def boot(package,state,allow,status=None):
     if status:
         atomic(status,json.dumps({'automatic_initialization_attempted':False,'apps_enabled':False,
             'desktop_armed':False,'boot_session_uuid':desktop.boot_uuid(),'recorded_at':datetime.now(timezone.utc).isoformat()})+'\n')
-    if (state/'disabled').exists():return 0
+    if (state/'disabled').exists():
+        if (state/desktop.PERSISTENT).exists() or (state/desktop.PERSISTENT).is_symlink():
+            desktop.cancel_persistence(state)
+        return 0
     pending=state/'pending'
     if pending.exists():
         (state/'disabled').touch()
+        if (state/desktop.PERSISTENT).exists() or (state/desktop.PERSISTENT).is_symlink():
+            desktop.cancel_persistence(state)
         raise ValueError('previous initialization did not finish; disabled until local review')
     fd=os.open(pending,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.close(fd)
     folder=Path(tempfile.mkdtemp(prefix='boot-',dir=state))
@@ -143,9 +148,22 @@ def boot(package,state,allow,status=None):
         atomic(allow,desktop.DESKTOP if display else APPS)
         pending.unlink()
         report['apps_enabled']=True
+        if display:
+            # Only a proven desktop with successful console-user Metal tests may
+            # rearm the one-shot NVRAM flag for another reboot.
+            report['desktop_persistent_rearmed']=desktop.rearm_if_permanent(package,state)
     except (OSError,ValueError,subprocess.SubprocessError) as e:
-        report['error']=str(e);(state/'disabled').touch();atomic(allow,RESTRICTED)
-        if display_requested or isinstance(e,desktop.DisplayOwnershipError):desktop.fallback(report,save)
+        report['error']=str(e);report['apps_enabled']=False;(state/'disabled').touch();atomic(allow,RESTRICTED)
+        recovery_safe=True
+        if (state/desktop.PERSISTENT).exists() or (state/desktop.PERSISTENT).is_symlink():
+            try:desktop.cancel_persistence(state)
+            except (OSError,ValueError,subprocess.SubprocessError) as cleanup:
+                recovery_safe=False
+                report['desktop_persistence_cancel_error']=str(cleanup);save()
+        if display_requested or isinstance(e,desktop.DisplayOwnershipError):
+            if recovery_safe:desktop.fallback(report,save)
+            else:
+                report['desktop_phase']='manual-firmware-recovery-required';save()
         raise
     finally:
         save()

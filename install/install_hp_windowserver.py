@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Stage the HP display module, then authorize one display boot after runtime checks.
+"""Stage the HP display module, then enable guarded persistent WindowServer boots.
 
 First invocation replaces only PhxAccel and the immutable next-boot package, with
 NVRAM unchanged. After a successful app-mode reboot, the second invocation arms
-one framebuffer boot. Identical native binaries allow a startup-only update from
-a verified accelerated desktop. Early framebuffer metadata is backed up if needed;
-OpenCore configuration and signing policy are preserved. No automatic rearming.
+the initial framebuffer boot and opts in to future rearming after verified success.
+Identical native binaries permit a startup-only update from an accelerated desktop.
+Early framebuffer metadata is backed up if needed; OpenCore and signing policy stay
+unchanged. A failed display boot disables persistence and returns to firmware.
 """
 import argparse
 import json
@@ -114,7 +115,7 @@ def main():
     daemon=Path('/Library/LaunchDaemons/local.nullarc.hp-native.plist')
     if parent.is_symlink() or parent.stat().st_uid!=0 or parent.stat().st_mode&0o022:raise ValueError('unsafe immutable package directory')
     original,config,old=configured_package(daemon,parent)
-    for name in ('pending','disabled',display.REQUEST):
+    for name in ('pending','disabled',display.REQUEST,display.PERSISTENT):
         if (state/name).exists():raise ValueError('review existing boot/failure/request marker before changing display mode: '+name)
     if Path('/Library/LaunchDaemons/local.phxboot.plist').exists():raise ValueError('conflicting reference boot service')
     nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
@@ -154,7 +155,7 @@ def main():
         install_early(package,a.oc)
         if not a.install:
             print('HP runtime checks passed; startup update '+('needed' if update else 'already installed')+
-                  '. Install arms one guarded display boot.')
+                  '. Install enables guarded persistent display boots.')
             return
         if os.geteuid()!=0:raise ValueError('local administrator authentication required')
         if update:
@@ -165,20 +166,8 @@ def main():
         if early.get('backup'):print('EFI metadata backup: '+early['backup'])
         if active_display:
             print('Current copy settings: '+json.dumps(display.configure_copy()))
-        request={'format':1,'armed_from_boot':display.boot_uuid(),'accelerator_uuid':expected}
-        path=state/display.REQUEST
-        with path.open('x') as f:
-            os.fchmod(f.fileno(),0o600);json.dump(request,f);f.write('\n');f.flush();os.fsync(f.fileno())
-        try:
-            subprocess.run(['/usr/sbin/nvram','phxfb-boot=1'],check=True,timeout=5)
-            readback=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
-            if readback.get('phxfb-boot') not in (b'1','1'):raise ValueError('NVRAM one-shot readback mismatch')
-        except BaseException:
-            subprocess.run(['/usr/sbin/nvram','-d','phxfb-boot'],check=True,timeout=5)
-            cleared=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
-            if 'phxfb-boot' in cleared:raise ValueError('one-shot removal failed; keep request and review NVRAM before reboot')
-            path.unlink(missing_ok=True);raise
-        print('One WindowServer boot armed. Reboot with the same USB. It is not automatically rearmed; a failed display boot requests one firmware-fallback reboot.')
+        display.authorize_persistent(state,expected)
+        print('WindowServer persistence enabled. Reboot with the same USB. Each fully verified display boot arms the next; a failure cancels persistence and returns to firmware scanout.')
         return
     if active_display:raise ValueError('loaded accelerator update requires a firmware-framebuffer boot')
     if inventory(target)!=inventory(old/'Library/Extensions/PhxAccel.kext'):raise ValueError('installed module differs from verified app package')
