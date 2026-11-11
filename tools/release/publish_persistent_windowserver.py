@@ -37,7 +37,7 @@ def current_patch_contents(path):
 
 
 def verify_original_archive(archive, checksum_file):
-    records = dict(line.strip().split('  ', 1) for line in checksum_file.read_text().splitlines() if '  ' in line)
+    records = {name: sha for sha, name in (line.strip().split('  ', 1) for line in checksum_file.read_text().splitlines() if '  ' in line)}
     if records.get(archive.name) != digest(archive):
         raise ValueError('original release ZIP checksum does not match the published SHA256SUMS')
 
