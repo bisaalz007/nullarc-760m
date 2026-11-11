@@ -57,6 +57,48 @@ def wait_for_metal(probe,environment,record,timeout=90,prefix=None):
         time.sleep(0.25)
     raise ValueError('HP Metal device publication timed out')
 
+def wait_for_phxbringup(timeout=90):
+    """Wait for a usable HP registry snapshot before any GPU initialization.
+
+    Early launchd boots can return empty or incomplete ioreg plists. Retry
+    only the read; never submit GPU commands or restart the bootstrap here.
+    """
+    deadline=time.monotonic()+timeout
+    last_error='HP PhxBringup profile not registered'
+    while True:
+        remaining=deadline-time.monotonic()
+        if remaining<=0:
+            raise ValueError(f'PhxBringup registry unavailable after {timeout}s: {last_error}')
+        try:
+            raw=subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup'],
+                                        timeout=min(10,remaining))
+        except (subprocess.TimeoutExpired,subprocess.CalledProcessError) as exc:
+            last_error='ioreg '+type(exc).__name__
+        else:
+            try:
+                registry=plistlib.loads(raw)
+            except (plistlib.InvalidFileException,ValueError,TypeError):
+                last_error='ioreg returned an invalid plist'
+            else:
+                if not isinstance(registry,list):
+                    last_error='ioreg returned an unexpected plist root'
+                else:
+                    matches=[node for node in registry if isinstance(node,dict)
+                             and node.get('phx-profile')=='hp-760m']
+                    if len(matches)>1:
+                        raise ValueError('multiple HP PhxBringup services registered')
+                    if matches:
+                        service=matches[0]
+                        if not isinstance(service.get('phx-build'),int) or service['phx-build']<39:
+                            raise ValueError('running build 39+ required')
+                        if isinstance(service.get('phx-stage'),str) and service['phx-stage']:
+                            return service
+                        last_error='HP PhxBringup stage not yet published'
+                    else:
+                        last_error='HP PhxBringup profile not registered'
+        time.sleep(min(.5,max(0,deadline-time.monotonic())))
+
+
 def macho_uuid(path):
     data=path.read_bytes()
     if data[:4]!=b'\xcf\xfa\xed\xfe':raise ValueError('expected x86_64 Mach-O')
@@ -114,9 +156,14 @@ def main():
         pcs=run('firmware-entry-points',[tools/'phxfw','--mes-start-pcs',firmware]).split()
         if len(pcs)!=2:raise ValueError('missing scheduler/KIQ entry points')
         env.update(MESBOOT_SCHED_PC=pcs[0],MESBOOT_KIQ_PC=pcs[1])
-        registry=plistlib.loads(subprocess.check_output(['/usr/sbin/ioreg','-ar','-c','PhxBringup']))
-        service=next((p for p in registry if p.get('phx-profile')=='hp-760m'),None)
-        if not service or service.get('phx-build',0)<39:raise ValueError('running build 39+ required')
+        registry_stage={'stage':'phxbringup-registry','returncode':None}
+        report['stages'].append(registry_stage);save()
+        try:
+            service=wait_for_phxbringup()
+        except (OSError,ValueError,subprocess.SubprocessError) as exc:
+            registry_stage.update(returncode=1,error=str(exc));save()
+            raise
+        registry_stage['returncode']=0;save()
         expected=macho_uuid(root/'EFI/OC/Kexts/PhxBringup.kext/Contents/MacOS/PhxBringup')
         loaded=run('loaded-kernel-uuid',['/usr/bin/kmutil','showloaded','--list-only'])
         matching=[line for line in loaded.splitlines() if 'org.drip.PhxBringup' in line]
