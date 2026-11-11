@@ -1,6 +1,8 @@
 """Auxiliary collection identity and publication tests; no kernel operations."""
 from pathlib import Path
 import sys
+import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -38,6 +40,26 @@ class AuxTests(unittest.TestCase):
             root=Path(tmp);old=root/'old.kc';new=root/'new.kc';backup=root/'backup';backup.mkdir()
             old.write_bytes(b'old');new.write_bytes(b'new');u.publish(new,old,backup,u.digest(old))
             self.assertEqual(old.read_bytes(),b'new');self.assertEqual((backup/'AuxiliaryKernelExtensions.kc').read_bytes(),b'old')
+    def failure_report(self,state,name,executed=False):
+        folder=state/name;(folder/'execution').mkdir(parents=True)
+        status={'boot_session_uuid':name,'last_stage':'loaded-kernel-uuid','bootstrap_error':'new accelerator UUID must be loaded before --claim',
+                'native_compute_verified':False,'native_render_verified':False}
+        evidence={'source_package':'/package','executed':executed,'error':status['bootstrap_error'],
+                  'stages':[{'stage':'loaded-kernel-uuid','returncode':0}]}
+        path=folder/'boot-result.json';path.write_text(json.dumps(status));(folder/'execution/result.json').write_text(json.dumps(evidence))
+        return path
+    def test_last_protected_failure_can_survive_disabled_boots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp);path=self.failure_report(state,'boot-previous')
+            selected,status=u.last_failure(state,Path('/package'))
+            self.assertEqual(selected,path);self.assertEqual(status['boot_session_uuid'],'boot-previous')
+    def test_never_skip_a_newer_unsafe_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp);old=self.failure_report(state,'boot-old');new=self.failure_report(state,'boot-new',True)
+            os.utime(old,ns=(1,1));os.utime(new,ns=(2,2))
+            with self.assertRaises(ValueError):u.last_failure(state,Path('/package'))
+    def test_no_protected_history_cannot_clear_markers(self):
+        with tempfile.TemporaryDirectory() as tmp,self.assertRaises(ValueError):u.last_failure(Path(tmp),Path('/package'))
     def test_concurrent_collection_edit_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);old=root/'old.kc';new=root/'new.kc';old.write_bytes(b'edited');new.write_bytes(b'new')

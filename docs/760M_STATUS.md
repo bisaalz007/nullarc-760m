@@ -777,3 +777,16 @@ local administrator authentication. Do not blindly remove failure markers.
 The first preparation wrapper also pinned the pre-firmware assembly manifest;
 its guard correctly aborted without installing. The wrapper was corrected against
 the final ZIP, whose manifest and all 86 payload files were verified on the HP.
+
+
+2026-11-09 continuation: boot 244C6F83-6643-4738-972F-AFD31C541945 still loads
+535B5212 and is diagnostic-only. The auxiliary updater stopped before building
+because it required a protected report from the same boot; a disabled boot creates
+only a fresh public status. The updater now validates the latest protected
+initialization attempt across disabled boots, never skips a newer unsafe attempt,
+and independently verifies this boot's idle hardware, zero module references,
+stale collection identity and failure markers. Ten targeted tests pass. The root
+wrapper now saves filtered protected-report/candidate diagnostics on failures and
+independently verifies the published UUID before printing READY TO REBOOT. No new
+kernel build, GPU initialization, cache publication or WindowServer arming is yet
+verified for this continuation; the corrected root operation is pending.

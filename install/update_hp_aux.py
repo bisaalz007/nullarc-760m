@@ -66,6 +66,19 @@ def validate_failure(status,evidence,package,boot):
         raise ValueError('missing failed UUID stage')
     if any(s.get('returncode')!=0 for s in stages):raise ValueError('bootstrap command failed before UUID comparison')
 
+def last_failure(state,package):
+    reports=list(state.glob('boot-*/boot-result.json'))
+    if not reports:raise ValueError('no protected initialization report')
+    # A disabled service writes a fresh public status but intentionally creates
+    # no new initialization report. Validate the latest protected attempt, never
+    # search backwards past an unsafe/different failure for an older match.
+    path=max(reports,key=lambda p:p.stat().st_mtime_ns)
+    status=json.loads(path.read_text());boot=status.get('boot_session_uuid')
+    if not isinstance(boot,str) or not boot:raise ValueError('protected report lacks its boot identity')
+    evidence=json.loads((path.parent/'execution/result.json').read_text())
+    validate_failure(status,evidence,package,boot)
+    return path,status
+
 def publish(candidate,target,backup,original_hash):
     if digest(target)!=original_hash:raise ValueError('auxiliary collection changed during build')
     shutil.copy2(target,backup/'AuxiliaryKernelExtensions.kc')
@@ -93,10 +106,8 @@ def update(package,state,apply=False):
         raise ValueError('idle diagnostic HP required')
     if 'phxfb-boot' in plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'])):raise ValueError('framebuffer arming present')
     status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
-    reports=[p for p in state.glob('boot-*/boot-result.json') if json.loads(p.read_text()).get('boot_session_uuid')==boot]
-    if len(reports)!=1:raise ValueError('one protected current-boot report required')
-    evidence=json.loads((reports[0].parent/'execution/result.json').read_text())
-    validate_failure(status,evidence,package,boot)
+    if status.get('boot_session_uuid')!=boot:raise ValueError('public service status is not from this boot')
+    failed_report,failed_status=last_failure(state,package)
     for name in ('pending','disabled'):
         if not (state/name).is_file() or (state/name).is_symlink():raise ValueError('reviewed failure markers missing')
     before=inspect(KC);original_hash=digest(KC)
@@ -124,14 +135,16 @@ def update(package,state,apply=False):
     # that reference script, do NOT use -z/--no-authorization or replace boot/sys.
     for entry in before.values():command+=['--bundle-path',entry['path']]
     command+=['-A',str(candidate)]
-    report={'boot_session_uuid':boot,'expected_accelerator_uuid':expected,'command':command,'published':False,
+    report={'boot_session_uuid':boot,'failed_boot_session_uuid':failed_status['boot_session_uuid'],
+            'failed_report':str(failed_report),'previous_entries':before,'expected_accelerator_uuid':expected,'command':command,'published':False,
             'gpu_commands_submitted':False,'windowserver_armed':False,'backup':str(backup)}
     def save():(backup/'result.json').write_text(json.dumps(report,indent=2)+'\n')
     try:
         r=subprocess.run(command,capture_output=True,text=True,timeout=180)
         report.update(returncode=r.returncode,stdout=r.stdout,stderr=r.stderr);save()
         if r.returncode:raise ValueError('auxiliary candidate build failed; nothing published: '+r.stderr.strip())
-        after=inspect(candidate);validate_candidate(before,after,expected)
+        after=inspect(candidate);report['candidate_entries']=after;save()
+        validate_candidate(before,after,expected)
         if display.boot_uuid()!=boot:raise ValueError('boot changed during build')
         if any(inventory(Path(path))!=files for path,files in sources.items()):raise ValueError('source extensions changed during build')
         report['candidate_entries']=after;save()
