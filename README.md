@@ -50,7 +50,7 @@ WindowServer boot, the supervisor automatically arms the next boot. The kext
 still consumes its NVRAM flag before attachment; failures cancel persistence
 and fall back to firmware scanout instead of creating an endless boot loop.
 Fresh machines need the documented diagnostic, firmware and app-mode stages.
-The reference 780M/Tahoe path remains available, without a new runtime claim.
+The compiled ZIP now also offers `sudo ./install.sh --fresh-files` for backed-up replacement of its HP native files from an idle diagnostic boot. It retires the old startup service but does not activate the GPU or WindowServer; see `docs/INSTALL.md`. The reference 780M/Tahoe path remains available, without a new runtime claim.
 
 
 This fork adds the supplied HP Envy x360 16-ad0013dx capture (`1002:1900`, revision

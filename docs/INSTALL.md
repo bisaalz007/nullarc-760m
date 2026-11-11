@@ -198,6 +198,53 @@ The expected HP stage is `profile-diagnostic-only`. A loaded service, successful
 copy or firmware framebuffer does not prove GPU acceleration. If the kext is
 absent, keep the boot log and collector report for the next engineering stage.
 
+## HP: fresh file installation from the release ZIP
+
+The **compiled ZIP contains the drivers and dependencies**: PhxAccel.kext,
+NVMTLDriver.bundle, AIR translator, RADV, AMD firmware, and command-line tools.
+The `--windowserver` option does **not** install them from scratch: it verifies
+that the running native stack matches the extracted package and then authorizes
+the next guarded display boot. An older Codex-installed plugin may differ from
+the public release even if the installed Metal stack works.
+
+For a deliberate replacement of the **installed file components** from a
+verified release, use the new standalone staging mode **from an idle HP
+diagnostic-only firmware-framebuffer boot**:
+
+```sh
+./install.sh --fresh-files --check
+sudo ./install.sh --fresh-files
+```
+
+This mode verifies package integrity and the exact HP diagnostic profile;
+it refuses active NMXAccel/PhxAMDFB, a running supervisor, an armed display
+request, or a conflicting reference boot daemon. It creates a rollback backup
+under `/Users/Shared/nullarc-component-backups/`, archives the recognized
+`local.nullarc.hp-native.plist` boot service within the backup, and stages the
+ZIP's PhxAccel, NVMTLDriver, nvmtl/RADV, firmware and GPU tools.
+
+It does **not** replace the EFI's PhxBringup.kext, rebuild the auxiliary
+kernel collection, register a new launch daemon, initialize the GPU, or
+arm WindowServer. It does not delete `pending` / `disabled` safeguards or
+boot reports. Reboot and validate the matching kext and Metal stack using the
+separate documented stages before installing a new `--hp-native` service or
+requesting `--windowserver`. Do not replace a working modified NVMTLDriver
+unless you intend to switch to the packaged release build.
+
+To restore the previous component files and archived service (only if the
+staged components have not been changed since installing), use the printed
+backup directory:
+
+```sh
+sudo python3 -B install_components.py --restore /Users/Shared/nullarc-component-backups/backup-EXAMPLE
+```
+
+Fresh file staging is **not** a one-command fresh acceleration install. Start
+with the `--diagnostics --oc ...` stage if the matching diagnostic
+PhxBringup.kext is not already present, then follow the manual native bootstrap
+and app-mode validation stages below. The firmware fallback and failure
+safeguards remain in place.
+
 ## HP: opt-in app acceleration after reboot
 
 Build 39 passed actual PSP/MES/queue, native shader and public Metal readbacks on

@@ -1,5 +1,6 @@
 from pathlib import Path
 import importlib.util
+import plistlib
 import sys
 import tempfile
 import unittest
@@ -38,6 +39,50 @@ class ComponentTests(unittest.TestCase):
         with patch.object(c.shutil,'copytree',side_effect=copy),self.assertRaises(OSError):
             c.install(self.package,self.root,check=False)
         for dst in c.DESTINATIONS:self.assertEqual((self.root/dst/'file').read_text(),'original component')
+
+    def test_fresh_files_archives_existing_native_service_and_restores(self):
+        daemon=self.root/'Library/LaunchDaemons/local.nullarc.hp-native.plist'
+        daemon.parent.mkdir(parents=True)
+        old='/Library/Application Support/NullArc760M/package-old'
+        config={'Label':'local.nullarc.hp-native','ProgramArguments':
+            ['/usr/bin/python3','-B',old+'/gpu/phxctl/hp_boot.py','--package',old]}
+        daemon.write_bytes(plistlib.dumps(config))
+        with self.assertRaisesRegex(ValueError,'HP native boot service already exists'):
+            c.install(self.package,self.root,check=False)
+        preflight=c.install(self.package,self.root,check=True,fresh=True)
+        self.assertTrue(preflight['existing_native_service_will_be_archived'])
+        result=c.install(self.package,self.root,check=False,fresh=True)
+        self.assertFalse(daemon.exists())
+        self.assertTrue((Path(result['backup'])/'previous-hp-native.plist').exists())
+        self.assertEqual((self.root/c.DESTINATIONS[1]/'file').read_text(),'new component')
+        self.assertFalse(result['WindowServer_armed'])
+        restored=c.restore(Path(result['backup']),self.root)
+        self.assertTrue(restored['previous_boot_service_restored'])
+        self.assertEqual(daemon.read_bytes(),plistlib.dumps(config))
+        self.assertEqual((self.root/c.DESTINATIONS[1]/'file').read_text(),'original component')
+
+    def test_fresh_files_rejects_unknown_service(self):
+        daemon=self.root/'Library/LaunchDaemons/local.nullarc.hp-native.plist'
+        daemon.parent.mkdir(parents=True);daemon.write_bytes(plistlib.dumps({'Label':'other-service'}))
+        with self.assertRaisesRegex(ValueError,'unexpected HP native service'):
+            c.install(self.package,self.root,check=False,fresh=True)
+        self.assertEqual((self.root/c.DESTINATIONS[1]/'file').read_text(),'original component')
+
+    def test_fresh_files_restores_service_if_copy_fails(self):
+        daemon=self.root/'Library/LaunchDaemons/local.nullarc.hp-native.plist'
+        daemon.parent.mkdir(parents=True)
+        old='/Library/Application Support/NullArc760M/package-old'
+        daemon.write_bytes(plistlib.dumps({'Label':'local.nullarc.hp-native','ProgramArguments':
+            ['/usr/bin/python3','-B',old+'/gpu/phxctl/hp_boot.py','--package',old]}))
+        original=c.shutil.copytree
+        def fail(*args,**kwargs):
+            if args[0]==self.package/c.TARGETS[1]:raise OSError('injected fresh copy failure')
+            return original(*args,**kwargs)
+        with patch.object(c.shutil,'copytree',side_effect=fail),self.assertRaisesRegex(OSError,'injected fresh copy failure'):
+            c.install(self.package,self.root,check=False,fresh=True)
+        self.assertTrue(daemon.exists())
+        for dst in c.DESTINATIONS:
+            self.assertEqual((self.root/dst/'file').read_text(),'original component')
 
     def test_later_edits_and_existing_boot_daemon_refused(self):
         r=c.install(self.package,self.root,check=False)

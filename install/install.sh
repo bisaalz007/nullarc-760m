@@ -16,13 +16,14 @@ H=/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/PhxGPU
 L=/Library/GPUBundles
 TS=$(date +%Y%m%d-%H%M%S)
 
-WS=0; CHECK=0; DIAG=0; COMPONENTS=0; HP_NATIVE=0; OC=""
+WS=0; CHECK=0; DIAG=0; COMPONENTS=0; HP_NATIVE=0; FRESH=0; OC=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --windowserver) WS=1 ;;
         --check) CHECK=1 ;;
         --diagnostics) DIAG=1 ;;
         --components) COMPONENTS=1 ;;
+        --fresh-files) COMPONENTS=1; FRESH=1 ;;
         --hp-native) HP_NATIVE=1 ;;
         --oc) [ "$#" -ge 2 ] || { echo "--oc needs an EFI/OC directory" >&2; exit 2; }; OC=$2; shift ;;
         -h|--help)
@@ -30,6 +31,7 @@ while [ "$#" -gt 0 ]; do
             echo '       sudo ./install.sh --windowserver  (HP staged one-shot display experiment)'
             echo '       sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC [--check]'
             echo '       sudo ./install.sh --components  (HP files only; no automatic activation)'
+            echo '       sudo ./install.sh --fresh-files [--check]  (back up prior HP service and install ZIP files; no activation)'
             echo '       sudo ./install.sh --hp-native [--check] (verified HP app-only boot service)'
             exit 0 ;;
         *) echo "unknown option $1 (see --help)"; exit 2 ;;
@@ -54,7 +56,9 @@ if [ "$HP_NATIVE" = 1 ]; then
 fi
 if [ "$COMPONENTS" = 1 ]; then
     MODE=--install; [ "$CHECK" = 0 ] || MODE=--check
-    exec python3 -B "$SRC/install_components.py" --package "$SRC" "$MODE"
+    COMPONENT_ARGS=(--package "$SRC" "$MODE")
+    [ "$FRESH" = 0 ] || COMPONENT_ARGS+=(--fresh-files)
+    exec python3 -B "$SRC/install_components.py" "${COMPONENT_ARGS[@]}"
 fi
 if [ "$DIAG" = 1 ]; then
     MODE=--check
