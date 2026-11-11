@@ -35,6 +35,37 @@ class InstallTests(unittest.TestCase):
     def stage(self):
         return i.stage_module(self.package,self.old,self.daemon,self.state,self.parent,self.target,
                               self.package/'Library/Extensions/PhxAccel.kext',self.original,self.config)
+    def startup(self):
+        return i.stage_service(self.package,self.old,self.daemon,self.state,self.parent,self.original,self.config)
+    def same_native(self):
+        path='Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel'
+        (self.package/path).write_bytes((self.old/path).read_bytes())
+        (self.package/'startup.py').write_text('updated startup')
+        write(self.package,{'test_fixture':True})
+    def test_startup_update_preserves_native_and_backs_up_daemon(self):
+        self.same_native()
+        with patch.object(i,'NATIVE',('Library/Extensions/PhxAccel.kext',)),patch.object(i.subprocess,'run') as run:
+            backup,destination=self.startup()
+        run.assert_not_called();verify(destination)
+        self.assertEqual((backup/'daemon.plist').read_bytes(),self.original)
+        self.assertEqual(plistlib.loads(self.daemon.read_bytes())['ProgramArguments'][-1],str(destination))
+        self.assertEqual(inventory(self.target),inventory(self.old/'Library/Extensions/PhxAccel.kext'))
+    def test_startup_update_refuses_native_change_before_mutation(self):
+        with patch.object(i,'NATIVE',('Library/Extensions/PhxAccel.kext',)),self.assertRaisesRegex(ValueError,'native component changed'):
+            self.startup()
+        self.assertEqual(self.daemon.read_bytes(),self.original)
+        self.assertEqual(list(self.state.iterdir()),[]);self.assertEqual(list(self.parent.iterdir()),[])
+    def test_startup_update_preserves_concurrent_daemon(self):
+        self.same_native();self.daemon.write_bytes(b'concurrent')
+        with patch.object(i,'NATIVE',('Library/Extensions/PhxAccel.kext',)),self.assertRaisesRegex(ValueError,'changed during staging'):
+            self.startup()
+        self.assertEqual(self.daemon.read_bytes(),b'concurrent');self.assertEqual(list(self.parent.iterdir()),[])
+    def test_startup_update_write_failure_keeps_old_service(self):
+        self.same_native()
+        with patch.object(i,'NATIVE',('Library/Extensions/PhxAccel.kext',)),patch.object(i,'atomic_write',side_effect=OSError('write failed')),self.assertRaises(OSError):
+            self.startup()
+        self.assertEqual(self.daemon.read_bytes(),self.original);self.assertEqual(list(self.parent.iterdir()),[])
+
     def test_staging_keeps_backup_and_updates_only_next_boot_package(self):
         with patch.object(i.subprocess,'run') as run:backup,destination=self.stage()
         run.assert_not_called();verify(destination)

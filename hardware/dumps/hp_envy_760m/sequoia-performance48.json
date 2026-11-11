@@ -1,0 +1,18 @@
+{
+  "scope": "Passive current-boot HP counter sample; user workload/idle intervals not controlled",
+  "seconds": 12.014245484,
+  "presents": 394,
+  "presents_per_second": 32.79440232220246,
+  "copy_us_mean": 10698.401015228426,
+  "present_gap_buckets": [
+    319,
+    39,
+    7,
+    29
+  ],
+  "failed_transactions": 0,
+  "vsync_late": 0,
+  "vbl_ticks": 721,
+  "vbl_late_us_sum": 53460,
+  "interpretation": "Uneven intervals observed. Idle and app rendering are not separated. This is not a sustained-render benchmark or proof of a cursor root cause. Timer-generated VBL and CPU scanout copy remain in use."
+}

@@ -1254,3 +1254,26 @@ The 20 display guard tests and 512 scanout-copy cases pass. The reference
 startup keeps its own selection. Current live settings have been applied by
 the user's sysctl commands. The immutable installed boot package predates the
 new default, which is included in the updated source/package.
+
+### Release/startup integration and remaining latency
+
+The standard `sudo ./install.sh --windowserver` entry now accepts a verified
+healthy accelerated desktop for startup-only updates, after checking identical
+native inputs, current-boot Metal/presentation evidence and installed UUIDs.
+The daemon and immutable package are backed up; concurrent edits are preserved.
+The measured copy defaults persist in the staged package. One-shot arming and
+fallback remain intact. OpenCore configuration and signing policy are unchanged.
+
+The user reports Safari hover cursor stutter, video/web slowness and game tearing
+even after the smooth-copy selection. The earlier 60 presents/s sample is not
+proof of low input latency or tear-free scanout. The active display still uses a
+CPU frame copy and timer-generated VBL; hardware flips remain off. No speculative
+flip/register changes are included. Brightness control is requested but deferred
+until the current release/performance work is finished. Full support is not claimed.
+
+A later uncontrolled 12-second sample recorded 394 presents, 319 one-refresh
+gaps, 39 two-refresh gaps, seven three-refresh gaps and 29 longer/idle gaps,
+with 10.7 ms mean CPU copy and zero failed transactions. This confirms variable
+intervals in that sample, without separating idle time from application stalls.
+See `sequoia-performance48.json`. Nine transactional installer tests, the full
+`make test` suite and shell syntax checks passed; native binaries are unchanged.

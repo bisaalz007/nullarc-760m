@@ -45,7 +45,7 @@ fi
 if [ "$DIAG" = 1 ] && { [ "$WS" = 1 ] || [ -z "$OC" ]; }; then
     echo "--diagnostics requires --oc and cannot be combined with --windowserver" >&2; exit 2
 fi
-if [ "$DIAG" = 0 ] && [ -n "$OC" ]; then echo "--oc requires --diagnostics" >&2; exit 2; fi
+if [ "$DIAG" = 0 ] && [ "$WS" = 0 ] && [ -n "$OC" ]; then echo "--oc requires --diagnostics or --windowserver" >&2; exit 2; fi
 command -v python3 >/dev/null || { echo "Python 3 is required; see INSTALL.md" >&2; exit 1; }
 python3 -B "$SRC/package_manifest.py" "$SRC"
 if [ "$HP_NATIVE" = 1 ]; then
@@ -68,8 +68,10 @@ POLICY=$(python3 -B "$SRC/collect_macos_evidence.py" --target-policy)
 if [ "$POLICY" = hp-diagnostic-only ]; then
     if [ "$WS" = 1 ] && [ -f "$SRC/install_hp_windowserver.py" ]; then
         MODE=--install; [ "$CHECK" = 0 ] || MODE=--check
-        if [ "$MODE" = --check ]; then exec python3 -B "$SRC/install_hp_windowserver.py" --package "$SRC"; fi
-        exec python3 -B "$SRC/install_hp_windowserver.py" --package "$SRC" --install
+        HP_ARGS=(--package "$SRC")
+        [ -z "$OC" ] || HP_ARGS+=(--oc "$OC")
+        [ "$MODE" = --check ] || HP_ARGS+=(--install)
+        exec python3 -B "$SRC/install_hp_windowserver.py" "${HP_ARGS[@]}"
     fi
     echo 'HP Radeon 760M: WindowServer acceleration is not verified; the reference boot path is unavailable.' >&2
     echo 'After native bootstrap and Metal tests, use --hp-native for app-only automatic initialization.' >&2

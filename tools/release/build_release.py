@@ -75,7 +75,7 @@ def assemble(a):
         (p/'sources/mesa-darwin-phoenix.patch').write_bytes(git('diff','f5cb8ee032adabef599ae892ec4e42d796b84da9','HEAD',cwd=a.mesa))
         (p/'README.txt').write_text(f'NullArc Radeon 760M {a.version} development prerelease\n'
             f'Source commit: {commit}\nRead INSTALL.md before running install.sh.\n'
-            'HP build 39 passed native and public Metal compute/render; WindowServer unverified.\n'
+            'HP Sequoia native/Metal and accelerated desktop verified; performance limitations remain.\n'
             'Default diagnostic boot; explicit bootstrap or opt-in app-only boot service.\n'
             'Includes AMD firmware under LICENSES/LICENSE.amdgpu.txt; no automatic activation.\n')
         metadata={k:v for k,v in stack.items() if k not in ('files','format','policy','acceleration_verified')}
@@ -91,9 +91,8 @@ def assemble(a):
         (tmp/'RELEASE_NOTES.md').write_text(f'''## Radeon 760M development prerelease
 
 Built from [`{commit[:12]}`](https://github.com/yt42c2mvn2-cmd/nullarc-760m/commit/{commit})
-on the development branch. Download **{bundle.name}** for compiled binaries;
-GitHub's automatic source archives follow the existing `alpha` tag and are not
-the binary installer. Matching driver source is inside the binary ZIP under
+on main. Download **{bundle.name}** for compiled binaries;
+GitHub's automatic source archives are not the binary installer. Matching driver source is inside the binary ZIP under
 `sources/nullarc-source.tar.gz`; translator source is also attached separately.
 
 The ZIP includes the source-built kexts, Metal plugin, translator, patched RADV,
@@ -101,21 +100,24 @@ seven command-line tools, AMD firmware, installer/uninstaller, checksums and lic
 Use `INSTALL.md` from the extracted ZIP. Noncommercial terms apply to components
 derived from NullMoth; see the included license notices.
 
-**The prior HP Sequoia build 39 passed real native and public Metal compute/render,
-automatic initialization and app activation. This updated display module has not
-been runtime-verified. WindowServer/panel acceleration remains experimental.**
+**The measured HP running Sequoia 15.8.2 passed native command execution, public
+Metal compute/render, IOSurface sharing, framebuffer fetch and an accelerated
+desktop. The PCI-aperture copy path sampled 60 presents/s. Safari hover stutter,
+video/web slowness and game tearing are reported; full support is not claimed.
+Hardware video decoding, brightness, sleep/resume and external displays are unverified.**
 
-`sudo ./install.sh --windowserver` uses two stages on the measured HP: first stage
-backs up/updates PhxAccel and the next-boot app package with NVRAM unchanged. After
-an app-mode reboot validates the new loaded UUID, runtime ABI/console plan and
-Metal tests, the same command can authorize one display boot. It never automatically
-rearms the framebuffer. A failed custom-framebuffer boot requests one firmware
-fallback reboot and disables GPU retries. Read INSTALL.md before running it.
+`sudo ./install.sh --windowserver` uses the existing verified HP native/app service.
+With matching native binaries it can back up and update startup scripts from a
+healthy accelerated desktop, retaining the measured PCI-aperture/SSE defaults.
+For a changed display module it stages an app-mode reboot first. It then authorizes
+one guarded display boot; it never automatically rearms the framebuffer. A failed
+display boot requests firmware fallback and disables GPU retries. Read INSTALL.md.
 
-The package requires the existing working HP app-only service and matching native
-runtime; it refuses changed non-display execution components. It changes no EFI,
-SIP/AMFI or boot arguments. This is not a general production installer. The included
-source retains the reference 780M path; no new 740M/780M runtime result is claimed.
+The installer refuses changed non-display execution components. Early framebuffer
+metadata is verified/backed up on the selected USB; OpenCore configuration,
+SIP/AMFI and boot arguments are unchanged. Existing documented signing-policy
+prerequisites must already be satisfied. This is not a general production
+installer. Reference 780M source is retained; no new 740M/780M result is claimed.
 No Apple software, captured metallib binaries or personal EFI is distributed.
 ''')
         # Publish the directory atomically after payload/ZIP verification.

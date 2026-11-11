@@ -4,7 +4,9 @@
 
 First invocation replaces only PhxAccel and the immutable next-boot package, with
 NVRAM unchanged. After a successful app-mode reboot, the second invocation arms
-one framebuffer boot. No automatic rearming, EFI/security edits or live takeover.
+one framebuffer boot. Identical native binaries allow a startup-only update from
+a verified accelerated desktop. Early framebuffer metadata is backed up if needed;
+OpenCore configuration and signing policy are preserved. No automatic rearming.
 """
 import argparse
 import json
@@ -39,6 +41,34 @@ def configured_package(daemon,parent):
     verify(old)
     return original,config,old
 
+def stage_service(package,old,daemon,state,parent,original,config):
+    """Update startup scripts only when every native execution input matches."""
+    verify(package)
+    for name in NATIVE:
+        before=old/name;after=package/name
+        same=inventory(before)==inventory(after) if before.is_dir() else before.read_bytes()==after.read_bytes()
+        if not same:raise ValueError('native component changed; validate it separately: '+name)
+    backup=Path(tempfile.mkdtemp(prefix='startup-update-',dir=state))
+    (backup/'daemon.plist').write_bytes(original)
+    destination=Path(tempfile.mkdtemp(prefix='package-startup-',dir=parent))
+    destination.rmdir()
+    updated=dict(config)
+    updated['ProgramArguments']=['/usr/bin/python3','-B',str(destination/'gpu/phxctl/hp_boot.py'),'--package',str(destination)]
+    encoded=plistlib.dumps(updated)
+    try:
+        shutil.copytree(package,destination);verify(destination)
+        for path in [destination]+list(destination.rglob('*')):
+            if path.is_symlink():raise ValueError('symlink in immutable package')
+            os.chown(path,0,0);path.chmod(path.stat().st_mode&0o755)
+        if daemon.read_bytes()!=original:raise ValueError('service changed during staging')
+        atomic_write(daemon,encoded);daemon.chmod(0o644)
+        if daemon.read_bytes()!=encoded:raise ValueError('service update readback mismatch')
+    except BaseException:
+        if daemon.read_bytes()==encoded:atomic_write(daemon,original)
+        if destination.exists():shutil.rmtree(destination)
+        raise
+    return backup,destination
+
 def stage_module(package,old,daemon,state,parent,target,source,original,config):
     backup=Path(tempfile.mkdtemp(prefix='display-update-',dir=state));(backup/'daemon.plist').write_bytes(original)
     shutil.copytree(target,backup/'PhxAccel.kext')
@@ -70,7 +100,9 @@ def stage_module(package,old,daemon,state,parent,target,source,original,config):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True)
-    ap.add_argument('--install',action='store_true');a=ap.parse_args();package=a.package.resolve()
+    ap.add_argument('--install',action='store_true')
+    ap.add_argument('--oc',type=Path,default=Path('/Volumes/EFI/EFI/OC'))
+    a=ap.parse_args();package=a.package.resolve()
     document=verify(package)
     if document.get('minimum_macos')!='15.0' or not subprocess.check_output(['/usr/bin/sw_vers','-productVersion'],text=True).startswith('15.'):
         raise ValueError('HP display experiment currently requires the Sequoia build and macOS 15')
@@ -87,7 +119,7 @@ def main():
     if Path('/Library/LaunchDaemons/local.phxboot.plist').exists():raise ValueError('conflicting reference boot service')
     nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
     if 'phxfb-boot' in nv:raise ValueError('existing framebuffer NVRAM request must be reviewed first')
-    if display.nodes('PhxAMDFB'):raise ValueError('cannot change mode while a custom framebuffer is active')
+    active_display=bool(display.nodes('PhxAMDFB'))
     for name in NATIVE:
         if name=='Library/Extensions/PhxAccel.kext':continue
         x=old/name;y=package/name
@@ -107,10 +139,32 @@ def main():
         display.validated_accelerator()
         status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
         validate_current_apps(status,display.boot_uuid())
+        if active_display:
+            display.framebuffer()
+            if status.get('desktop_armed') is not True or status.get('desktop_present_verified') is not True:
+                raise ValueError('active display has no successful current-boot presentation validation')
         if inventory(target)!=inventory(source):raise ValueError('installed module differs from running package')
-        if inventory(old)!=inventory(package):raise ValueError('installed service package differs from requested display implementation')
-        if not a.install:print('HP runtime display ABI/console plan and app checks passed; next invocation arms one boot. No changes.');return
+        update=inventory(old)!=inventory(package)
+        if update:
+            for name in NATIVE:
+                x=old/name;y=package/name
+                if (inventory(x)!=inventory(y) if x.is_dir() else x.read_bytes()!=y.read_bytes()):
+                    raise ValueError('native execution input changed; separate validation required: '+name)
+        from install_early_fb import install as install_early
+        install_early(package,a.oc)
+        if not a.install:
+            print('HP runtime checks passed; startup update '+('needed' if update else 'already installed')+
+                  '. Install arms one guarded display boot.')
+            return
         if os.geteuid()!=0:raise ValueError('local administrator authentication required')
+        if update:
+            backup,destination=stage_service(package,old,daemon,state,parent,original,config)
+            print('Startup package updated. Backup: '+str(backup))
+            print('Package: '+str(destination))
+        early=install_early(package,a.oc,apply=True)
+        if early.get('backup'):print('EFI metadata backup: '+early['backup'])
+        if active_display:
+            print('Current copy settings: '+json.dumps(display.configure_copy()))
         request={'format':1,'armed_from_boot':display.boot_uuid(),'accelerator_uuid':expected}
         path=state/display.REQUEST
         with path.open('x') as f:
@@ -126,6 +180,7 @@ def main():
             path.unlink(missing_ok=True);raise
         print('One WindowServer boot armed. Reboot with the same USB. It is not automatically rearmed; a failed display boot requests one firmware-fallback reboot.')
         return
+    if active_display:raise ValueError('loaded accelerator update requires a firmware-framebuffer boot')
     if inventory(target)!=inventory(old/'Library/Extensions/PhxAccel.kext'):raise ValueError('installed module differs from verified app package')
     subprocess.run(['/usr/bin/codesign','--verify','--strict',str(source)],check=True,timeout=15)
     if not a.install:print('HP display module update checks passed. First install stages app-only reboot; WindowServer remains disabled.');return

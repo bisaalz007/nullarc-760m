@@ -55,7 +55,7 @@ The display guard therefore also requires both upstream AMFI arguments in the
 actual `kern.bootargs`: `amfi=0x80 amfi_get_out_of_my_way=0x1`. These are a
 system-wide security relaxation, not a per-driver exception. On the HP, after
 explicit authorization and a policy-only reboot, a hardened authored test host
-successfully loads the actual plugin; actual WindowServer rendering remains unverified.
+successfully loads the actual plugin; actual WindowServer rendering subsequently reached the desktop on this HP.
 
 Neither the display installer nor the boot supervisor edits signing policy.
 For the separately authorized experiment, `configure_hp_amfi.py --package
@@ -69,9 +69,21 @@ reboot must leave GPU/display startup disabled while actual arguments and loader
 policy are checked. Flag presence alone is not runtime proof of relaxed validation.
 
 ```sh
-./install.sh --windowserver --check
+sudo ./install.sh --windowserver --check
 sudo ./install.sh --windowserver
 ```
+
+For an existing healthy accelerated HP desktop with identical native binaries,
+the same command backs up the daemon and stages an immutable startup-only update;
+it applies the measured PCI-aperture/SSE copy selection and arms one next boot.
+It does not reload a kext or reinitialize GPU queues. These copy defaults persist
+in that installed startup package. The display request is still consumed once;
+run the command again to authorize a later display boot. `--oc /path/to/EFI/OC`
+selects the boot USB (default `/Volumes/EFI/EFI/OC`). Early framebuffer metadata
+is verified and backed up if replacement is needed; `config.plist` is unchanged.
+A verified HP native/app boot service is required; this is not a fresh-machine
+single-step installer. Safari hover stutter, video performance and game tearing
+remain unresolved. Brightness control is deferred until those release tasks finish.
 
 First installation backs up PhxAccel and the daemon, stages the new PhxAccel and
 an immutable service package, then requests standard start-only kext loading.

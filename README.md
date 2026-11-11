@@ -6,14 +6,14 @@
 </p>
 
 <p align="center">
-  <b>Metal on AMD Radeon 780M (soon also Radeon 740M and 760M) for macOS Tahoe.</b><br>
+  <b>Verified Radeon 760M Metal compute, rendering and accelerated desktop on macOS Sequoia.</b><br>
   GPU bring-up, a display driver WindowServer composites on, and Metal over Vulkan (Mesa RADV)<br>
   for Phoenix / Hawk Point APUs (RDNA 3, GC 11.0.1, gfx1103).
 </p>
 
 <p align="center">
-  <img alt="macOS Tahoe 26" src="https://img.shields.io/badge/macOS-Tahoe%2026-0B0D12?logo=apple&logoColor=white">
-  <img alt="Radeon 780M gfx1103" src="https://img.shields.io/badge/GPU-Radeon%20780M%20%C2%B7%20gfx1103-FF3D2E?logo=amd&logoColor=white">
+  <img alt="macOS Sequoia 15" src="https://img.shields.io/badge/macOS-Sequoia%2015-0B0D12?logo=apple&logoColor=white">
+  <img alt="Radeon 760M gfx1103" src="https://img.shields.io/badge/GPU-Radeon%20760M%20%C2%B7%20gfx1103-FF3D2E?logo=amd&logoColor=white">
   <img alt="Metal over Vulkan" src="https://img.shields.io/badge/Metal-over%20Vulkan%20(RADV)-7C5CFF">
   <a href="https://github.com/luuumi-dev/nullarc/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/luuumi-dev/nullarc/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-multi-FF2D87"></a>
@@ -24,6 +24,32 @@
 ---
 
 ## Radeon 760M fork status
+
+**Hardware-verified on the HP Envy x360 16-ad0013dx, Sequoia 15.8.2:** native
+command execution, Metal compute/render, IOSurface sharing, framebuffer fetch,
+and an accelerated WindowServer desktop. The measured PCI-aperture copy path
+reached 60 presents/s. This is an experimental prerelease, with reported Safari
+hover stutter, video/web slowness and game tearing still under investigation.
+Hardware video decoding, brightness control, sleep/resume and external displays
+are not verified. Full device support is not yet established.
+
+Download the compiled ZIP from [Releases](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases),
+verify `SHA256SUMS`, extract it and read its `INSTALL.md`. For the already verified
+HP native/app installation, the original command now stages startup updates and
+authorizes one guarded display boot:
+
+```sh
+sudo ./install.sh --windowserver --check
+sudo ./install.sh --windowserver
+```
+
+The startup package retains `debug.phxfb_alias=0` and enables the tested SSE4.1
+copy only on capable CPUs. The installer can update startup scripts from a
+healthy accelerated desktop when all native binaries match. It preserves the
+one-shot recovery policy; it does not enable automatic display rearming.
+Fresh machines need the documented diagnostic, firmware and app-mode stages.
+The reference 780M/Tahoe path remains available, without a new runtime claim.
+
 
 This fork adds the supplied HP Envy x360 16-ad0013dx capture (`1002:1900`, revision
 `ca`, subsystem `103c:8c6a`): 8 active CUs with physical masks `[0x0f, 0x0f]`, six
