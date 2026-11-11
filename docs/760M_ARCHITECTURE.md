@@ -19,7 +19,9 @@ presents before its console-session check requested firmware fallback.
 Resource46 reproduces native BO allocation/handle-reuse failures and an OOM
 cleanup crash in RADV. Phoenix patches 0011..0013 address those resource paths.
 The corrected backend passes bounded native IOSurface, churn and shader
-readbacks. Stable desktop compositing remains a target validation requirement.
+readbacks. Its guarded HP boot now reaches the desktop and passes the live
+framebuffer-client/present check. CPU frame-copy durations around 100 ms remain
+the next measured bottleneck. Longer-session desktop stability needs validation.
 
 ```text
 App / WindowServer

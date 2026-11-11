@@ -86,6 +86,7 @@ test: $(TESTS) build/tools/phxfw
 	python3 tests/test_hp_boot_recovery.py
 	python3 tests/test_hp_display_capture.py
 	python3 tests/test_hp_windowserver.py
+	python3 tests/test_scanout_copy.py
 	python3 tests/test_hp_amfi.py
 	python3 tests/test_hp_display_install.py
 	python3 tests/test_hp_aux_update.py

@@ -61,10 +61,11 @@ See the [native execution report](hardware/dumps/hp_envy_760m/sequoia-build39-na
 and [Metal execution report](hardware/dumps/hp_envy_760m/sequoia-build39-metal-execution.json).
 
 These results establish basic compute and offscreen graphics acceleration through
-NullArc's kernel, Darwin RADV, translator and Metal plugin. **WindowServer/panel
-acceleration, GPU reset, suspend/resume and broad
-application compatibility remain unverified or unimplemented.** The firmware
-framebuffer still drives the panel. HP boot remains diagnostic until the explicit
+NullArc's kernel, Darwin RADV, translator and Metal plugin. The resource46 guarded
+boot now reaches the accelerated desktop and passes actual WindowServer
+presentation checks on the HP. Frame-copy performance remains about 10 FPS.
+GPU reset, suspend/resume and broad application compatibility still need work.
+HP boot remains diagnostic until the explicit
 administrator experiment or opt-in `--hp-native` app-only service. Automatic native
 initialization, GUI-session Metal readbacks and app activation passed a fresh boot;
 see the [cold-boot evidence](hardware/dumps/hp_envy_760m/sequoia-build39-automatic-app-activation.json).
@@ -107,8 +108,13 @@ on the deployed RADV. Corrections now synchronize native handle reuse and make
 failed command-buffer construction safe to clean up. The corrected RADV passed
 three churn runs, IOSurface sharing through 1920×1200, and framebuffer-fetch
 readbacks on the HP. A mock resource-exhaustion test reproduces the old cleanup
-crash and verifies the Vulkan OOM return with the fix. WindowServer still needs
-a guarded retest. See the [resource regression report](hardware/dumps/hp_envy_760m/sequoia-resource46-offscreen.json).
+crash and verifies the Vulkan OOM return with the fix. The guarded retest reached
+the desktop with successful native/Metal readbacks, live framebuffer-client
+presentation checks and zero failed transactions. Scalar frame copies took
+110–226 ms, and enabling the existing streaming-copy path still left copies
+around 100 ms. Performance investigation continues. See the
+[resource regression report](hardware/dumps/hp_envy_760m/sequoia-resource46-offscreen.json)
+and [desktop evidence](hardware/dumps/hp_envy_760m/sequoia-resource46-desktop.json).
 
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,

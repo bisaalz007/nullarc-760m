@@ -1,0 +1,40 @@
+{
+  "target": "HP Envy x360 16-ad0013dx, Radeon 760M",
+  "os": "macOS Sequoia 15.8.2",
+  "source_commit": "7edf1c0",
+  "boot_session_uuid": "B244CA2D-51B9-4C40-9DD3-2D4EADA6A109",
+  "radv_sha256": "4cce36d8e14a300516b7d79b52c607a30e60deb56dba61fd94d35fb804e6edbb",
+  "user_confirmed_accelerated_desktop": true,
+  "runtime": {
+    "native_initialization_verified": true,
+    "native_compute_verified": true,
+    "native_render_verified": true,
+    "metal_readbacks_verified": true,
+    "metal_verified": true,
+    "desktop_armed": true,
+    "desktop_present_verified": true,
+    "present_count_at_validation": 143,
+    "present_delta_during_validation": 7,
+    "failed_transactions": 0,
+    "apps_enabled": true,
+    "panel": {"width": 1920, "height": 1200, "nominal_refresh_millihz": 60000}
+  },
+  "performance": {
+    "user_reported_approximate_fps": 10,
+    "initial_streaming_copy_enabled": false,
+    "initial_last_frame_copy_us": 110022,
+    "initial_max_frame_copy_us": 225888,
+    "initial_total_frame_copy_us": 29834741,
+    "initial_copied_frames": 250,
+    "live_streaming_copy_enabled_by_user": true,
+    "streaming_copy_still_exceeds_frame_budget": true,
+    "subsequent_last_frame_copy_us": 101259,
+    "copy_routine_pixel_checks_passed": 512,
+    "copy_source_and_destination_timing_separation_pending": true
+  },
+  "validation_scope": {
+    "single_guarded_display_boot": true,
+    "sustained_60_fps_confirmed": false,
+    "reset_suspend_resume_confirmed": false
+  }
+}

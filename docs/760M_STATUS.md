@@ -1210,3 +1210,27 @@ and these documentation/evidence updates. The Sequoia RADV/probe build and
 packaged AIR/SPIR-V/ACO tests passed. The faults reproduce resource allocation
 and cleanup failures, but their correction still needs a WindowServer boot
 to establish whether the missing text/cursor and stutter are resolved.
+
+### First verified accelerated desktop and remaining copy bottleneck
+
+The resource46 one-shot boot reached the HP desktop. The user confirmed the
+accelerated desktop, and the supervisor completed native initialization,
+GUI Metal compute/render, stable console UID and live framebuffer-client/present
+checks. It enabled app access after 143 presents, including seven during its
+presentation check, with zero failed transactions. The loaded RADV hash matches
+the corrected candidate. Evidence is in
+`hardware/dumps/hp_envy_760m/sequoia-resource46-desktop.json`.
+
+The user reported roughly 10 FPS. The initial scalar-copy sample had 250
+completed copies, a last-frame duration of 110022 microseconds, a maximum of
+225888 microseconds and 29834741 microseconds total. Native BO cache flushing was
+off. The existing system-RAM scanout alias had validated 4100/4100 samples,
+including nonzero pixels. The HP CPU advertises SSE4.1.
+
+The actual existing streaming-copy routine passed 512 host cases covering raw
+BGRA bytes, ARGB2101010 conversion, aligned offsets, source preservation and
+destination guards. The user enabled `debug.nvaccel_iop_sse=1` for the current
+boot. Subsequent frame copies remained around 100 ms, so streaming copy alone
+does not resolve the bottleneck. A read-only source timing measurement is pending.
+The new `tests/test_scanout_copy.py` is part of `make test`. No default startup
+copy setting has been promoted from this incomplete performance test.
