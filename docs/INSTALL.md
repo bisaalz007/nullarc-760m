@@ -2,8 +2,8 @@
 
 Download the ZIP asset from this fork's
 [Releases](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases), verify its
-SHA-256 using `SHA256SUMS-sequoia` for the Sequoia asset (`SHA256SUMS` for the
-older Tahoe asset), and extract it. Open Terminal in the
+SHA-256 using the matching `SHA256SUMS` asset, and extract it. Older alpha
+packages use `SHA256SUMS-sequoia` for Sequoia. Open Terminal in the
 extracted `nullarc-...` directory containing `install.sh`.
 
 This guide uses the upstream installation stages as a reference, with commands
@@ -16,14 +16,15 @@ do not establish HP compatibility.
 | Target | Available operation |
 |---|---|
 | HP Envy x360 16-ad0013dx, Radeon 760M | Diagnostic PhxBringup kext in an explicitly selected OpenCore directory |
-| HP with Sequoia 15 | Build-39 native RADV and public Metal compute/render verified; manual bootstrap and opt-in app boot service |
+| HP with Sequoia 15 | Native RADV/Metal and accelerated desktop verified; staged guarded display installer |
 | HP with Tahoe | Same diagnostic gate; GPU acceleration is not enabled |
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
-Linux tests executed translated compute and graphics shaders on the HP. Build 39 now also passes native macOS GPU and public Metal compute/render readbacks. WindowServer remains unverified.
+Linux tests executed translated compute and graphics shaders on the HP. Build 39 now also passes native macOS GPU and public Metal compute/render readbacks. The corrected resource46 stack also reached the accelerated desktop.
 The new Sequoia display-development package provides a staged one-shot
 `sudo ./install.sh --windowserver` experiment, described below. Older packages
-still refuse this mode on HP. Display acceleration is not yet verified.
+still refuse this mode on HP. Safari latency, video performance and game tearing
+remain unresolved; this is not full device support.
 
 Choose the Sequoia-labelled ZIP for macOS 15. Its native deployment target is 15.0;
 the older Tahoe-only ZIP remains a different build. CPU loading/translation is

@@ -152,8 +152,8 @@ pass can the same command arm one display boot. New preflight also requires the
 reviewed Sequoia-compatible AMFIPass version, active service and the authorized
 upstream AMFI arguments in the actual boot; these checks do not prove that
 WindowServer can load the plugin. New crash monitoring
-stops the experiment on a fresh current-boot WindowServer report. This experimental
-display path is **not confirmed functional**. See
+stops the experiment on a fresh current-boot WindowServer report. This scoped display path subsequently **reached the accelerated HP desktop**;
+reported app latency and tearing remain unresolved. See
 [installation stages](docs/INSTALL.md#hp-experimental-windowserver-stages). Do not
 rerun the bootstrap in a boot with initialized or lost queues.
 
@@ -234,7 +234,8 @@ in October 2026:
 | **First use of a new effect** | A one-time pause of about 1–3 s while its shader is translated and compiled. After that it comes from the disk cache. |
 | **Not yet** | External displays (HDMI, USB-C), hardware video decode/encode, backlight control. |
 
-Other Radeon 780M / 760M machines (Phoenix, Hawk Point) are untested.
+The HP 760M/Sequoia results are documented above. Other Phoenix/Hawk Point
+machines have no new validation in this fork.
 
 ## How it works
 
@@ -263,7 +264,7 @@ plugin; its source is attached to every release. The `NVMTL` prefix is NullMoth'
 ## Installing
 
 Download the **compiled ZIP asset** from this fork's
-[alpha release](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases/tag/alpha),
+[Releases page](https://github.com/yt42c2mvn2-cmd/nullarc-760m/releases),
 choose the Sequoia-labelled ZIP for macOS 15, verify `SHA256SUMS`, extract it, and follow **[docs/INSTALL.md](docs/INSTALL.md)**.
 GitHub's automatic “Source code” downloads are not binary installer packages.
 
@@ -275,8 +276,8 @@ sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC
 ```
 
 Use the actual EFI/OC path for your machine. The release also contains
-`sudo ./install.sh --windowserver` for the reference acceleration flow, but the
-HP remains diagnostic-only and that command refuses acceleration before writing.
+`sudo ./install.sh --windowserver` for the staged HP display flow described above.
+It requires the verified native/app service and refuses unvalidated native updates.
 Python 3 is required. Diagnostic installation preserves boot/security settings.
 
 The original Firebat installation/security instructions are retained in
