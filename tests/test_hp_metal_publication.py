@@ -69,4 +69,44 @@ class PublicationTests(unittest.TestCase):
             h.wait_for_metal(Path('/mtlprobe'),{},lambda a:None)
         run.assert_not_called()
 
+class RegistryReadinessTests(unittest.TestCase):
+    def test_boot_waits_for_empty_and_malformed_registry_plists(self):
+        ready={'phx-profile':'hp-760m','phx-build':39,'phx-stage':'profile-diagnostic-only'}
+        replies=[b'',b'not a plist',plistlib.dumps([ready])]
+        with patch.object(h.subprocess,'check_output',side_effect=replies) as read,patch.object(h.time,'sleep') as sleep,patch.object(h.subprocess,'run') as gpu:
+            self.assertEqual(h.wait_for_phxbringup(),ready)
+        self.assertEqual(read.call_count,3)
+        self.assertEqual(sleep.call_count,2)
+        self.assertTrue(all(0<call.kwargs['timeout']<=10 for call in read.call_args_list))
+        gpu.assert_not_called()
+
+    def test_boot_waits_for_hp_profile_and_published_stage(self):
+        partial={'phx-profile':'hp-760m','phx-build':39}
+        ready=dict(partial,**{'phx-stage':'profile-diagnostic-only'})
+        replies=[plistlib.dumps([]),plistlib.dumps([partial]),plistlib.dumps([ready])]
+        with patch.object(h.subprocess,'check_output',side_effect=replies) as read,patch.object(h.time,'sleep'):
+            self.assertEqual(h.wait_for_phxbringup(),ready)
+        self.assertEqual(read.call_count,3)
+
+    def test_boot_registry_timeout_is_bounded_and_halts_pre_gpu(self):
+        with patch.object(h.time,'monotonic',side_effect=[0,0,0,91]),patch.object(h.subprocess,'check_output',return_value=b'') as read,patch.object(h.time,'sleep'),patch.object(h.subprocess,'run') as gpu:
+            with self.assertRaisesRegex(ValueError,'PhxBringup registry unavailable after 90s'):
+                h.wait_for_phxbringup()
+        read.assert_called_once()
+        gpu.assert_not_called()
+
+    def test_wrong_phx_build_is_not_waited_out(self):
+        old=plistlib.dumps([{'phx-profile':'hp-760m','phx-build':38,'phx-stage':'profile-diagnostic-only'}])
+        with patch.object(h.subprocess,'check_output',return_value=old) as read,patch.object(h.time,'sleep') as sleep,self.assertRaisesRegex(ValueError,'build 39'):
+            h.wait_for_phxbringup()
+        read.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_duplicate_hp_services_are_rejected(self):
+        node={'phx-profile':'hp-760m','phx-build':39,'phx-stage':'profile-diagnostic-only'}
+        with patch.object(h.subprocess,'check_output',return_value=plistlib.dumps([node,node])),patch.object(h.time,'sleep') as sleep,self.assertRaisesRegex(ValueError,'multiple HP'):
+            h.wait_for_phxbringup()
+        sleep.assert_not_called()
+
+
 if __name__=='__main__':unittest.main()
