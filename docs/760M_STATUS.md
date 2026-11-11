@@ -1277,3 +1277,27 @@ with 10.7 ms mean CPU copy and zero failed transactions. This confirms variable
 intervals in that sample, without separating idle time from application stalls.
 See `sequoia-performance48.json`. Nine transactional installer tests, the full
 `make test` suite and shell syntax checks passed; native binaries are unchanged.
+
+### Published Sequoia beta 0.2.0
+
+Release v0.2.0-sequoia-beta is published from main 776fd94491946e6a15162b58f4f95adcf8d0add9.
+The public compiled ZIP download matches SHA-256
+d409db36fd7c7df17e724036f176d62a9b3e18e15c19226ca054bad0635fd8a9.
+Its 90 packaged files and all 11 native execution groups match the HP's working
+resource46 package. The source was published through the authorized GitHub API:
+logical commit order/messages and every tree were verified; API-created commits
+carry Original-Development-Commit trailers. Original local commit history remains
+in codex/local-development-history-52bc620, without force-push or deletion.
+
+The HP copy is staged under /Users/Shared/nullarc-760m-sequoia-test/release-beta48/.
+The standard local-sudo install command has been requested; installation of its
+persistent copy defaults is not yet confirmed. Do not report the old installed
+package as updated without checking its launch-daemon path. No reboot requested.
+The public ZIP preserves Unix modes; the HP extraction's modes were restored from
+the ZIP attributes before requesting installation.
+
+A bounded live log inspection found only zero-failure census lines among matches
+for 'failed', with no OOM/VK_ERROR/unsupported messages in the last 2 MiB.
+That is not proof that every app works. WindowServer used about 73% of one CPU
+in an uncontrolled two-second sample. Timer VBL/CPU copying and unresolved Safari
+hover latency/game tearing remain; brightness is deferred at the user's request.
