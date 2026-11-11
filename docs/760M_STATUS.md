@@ -1001,3 +1001,20 @@ Four config tests, 17 display tests and 11 recovery tests pass (63 targeted cont
 tests total including boot/install/early tests). No driver native code changed.
 Next: assemble/stage these guards and run this idle boot's first app/native checks,
 then consider a single display test under the now-demonstrated loader policy.
+
+Policy42 guard package is assembled from the unchanged verified native build,
+source 308ba6d, and staged on the HP. ZIP `nullarc-760m-0.1.6-sequoia-policy42.zip`
+SHA-256 af8468d44f3e48b8b170e39550724242ca153d198d963c575068d495623a9853;
+manifest SHA-256 5dc378bb2bfaab9bad070f400a6003f28a8888b3f93d6e74aa4f2b703157004d.
+All 90 HP files, strict plugin/accelerator signatures, Python syntax/executable
+modes, 11 unchanged native groups and actual-boot policy guard verify. The complete
+63-test control subset passes. The load-only hardened real-plugin probe returns
+zero, with no GPU commands. Display acceleration is still unverified.
+
+Local-sudo wrapper `/Users/Shared/nullarc-760m-sequoia-test/hp42-recover-apps.sh
+--arm-windowserver` is pinned to boot 5FFFC48D, prior monitored failure 5F65B2FD,
+new config hash 97686062, exact EFI/manifest and protected crash/native evidence.
+It first backs up/stages the service, then performs this boot's first native/GUI
+Metal tests; only success restores the early metadata opt-in and arms one display
+boot. Result: `hp42-recover-apps-result.json`. Local administrator execution is
+pending; do not run the obsolete hp41 wrapper or remove failure markers manually.

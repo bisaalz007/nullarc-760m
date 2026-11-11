@@ -290,7 +290,9 @@ check was relaxed. A second boot with 1.4.1 active still failed library validati
 the guards now additionally require both explicitly authorized upstream AMFI
 arguments in the actual boot. An authored hardened/validation-required host loads
 the actual plugin under that policy without GPU commands. Actual WindowServer loading/presents remain separate runtime
-requirements. No AMFI boot-argument editing is performed. Crash-report monitoring
+requirements. The supervisor/display installer never edits AMFI arguments; only
+the separate explicitly invoked configuration helper does so, with backup.
+Crash-report monitoring
 is armed before panel release and checked during console waiting and presentation,
 so a fresh same-boot WindowServer crash requests fallback without waiting the full
 login deadline. Existing app-only startup does not inspect display crash reports.
