@@ -1081,3 +1081,15 @@ The new plugin/control changes are not installed on the HP. Display activation
 remains disabled. Next required work is app-only reproduction of these measured
 texture layouts, framebuffer-fetch rendering and allocation pressure, before a
 new GPU display test. No complete acceleration or visual correctness is claimed.
+
+Memory43 candidate ZIP is built locally from 4cd8070:
+`nullarc-760m-0.1.7-sequoia-memory43.zip`, SHA-256
+64f83178999446acb8ef5cf32331b7d1c78cf4a2b19217c927e4075246d25d0a;
+manifest SHA-256 9bd6fdbc873429cde9dc0bb21d09e45618bb732452a17ecff01db4c8af205875.
+The packaging guard correctly rejected stale shader receipts after the new plugin
+build. Fresh authored MSL/AIR translation, independent SPIR-V validation and gfx1103
+ACO compute/graphics compilation passed for 8-CU/12-CU mocks, with zero GPU commands;
+only then did ZIP assembly pass. This candidate is NOT installed or runtime-tested
+on the HP and has not been published as a working-acceleration release. Current HP
+stays on the firmware framebuffer with failure markers retained and early display
+metadata removed. No reboot or additional root command is requested at this checkpoint.
