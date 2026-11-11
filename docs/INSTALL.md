@@ -77,7 +77,18 @@ no display registers; the existing GPU display pipe copies completed frames into
 the firmware scanout surface. Its 60 Hz clock is nominal, derived from captured
 totals and corroborated panel mode, not a measured/programmed PLL clock.
 
-The daemon initializes/test-checks native queues, registers exactly one display
+For the HP early-match correction, `install_early_fb.py --package <package>
+--oc <explicit-USB-EFI/OC> --install` backs up and adds only the HP matching
+personality to the already-injected Root PhxBringup Info.plist. It copies the
+framebuffer class/score from PhxAccel, matches exact captured PCI properties, and
+requests that existing auxiliary driver through Apple's catalogue mechanism.
+It changes neither executable nor OpenCore config. The default diagnostic kext
+is not modified in source. Keep the printed Info.plist backup; restoring that
+file removes the early opt-in. This mechanism is implemented and host-tested;
+its actual boot matching still needs HP runtime verification.
+
+The daemon first waits for the validated held framebuffer (up to 90 seconds),
+then initializes/test-checks native queues, registers exactly one display
 pipe and AGDC, and releases the panel hold before waiting for a GUI session.
 It then requires Metal readbacks and live framebuffer-client/present evidence.
 Failure disables retries; if the custom framebuffer owns the panel, it requests

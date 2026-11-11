@@ -47,7 +47,19 @@ def validate_failure(evidence,supervisor=None):
             or not (immediate or deadline)):
         raise ValueError('failure differs from reviewed empty Metal catalogue case; investigate before updating')
 
-def recover(package,daemon,state,parent):
+def validate_before_gpu(supervisor,folder,boot,accel_uuid):
+    if (supervisor.get('boot_session_uuid')!=boot or
+        supervisor.get('error')!='framebuffer one-shot was not consumed by the running kext' or
+        supervisor.get('automatic_initialization_attempted') is not True or
+        supervisor.get('desktop_armed') is not False or
+        any(k in supervisor for k in ('last_stage','returncode','native_initialization_verified')) or
+        (folder/'execution').exists()):
+        raise ValueError('failure is not the reviewed pre-GPU framebuffer miss')
+    request=json.loads((folder/'windowserver-next-boot.json').read_text())
+    if request.get('format')!=1 or request.get('accelerator_uuid')!=accel_uuid or request.get('armed_from_boot')==boot:
+        raise ValueError('protected display request differs')
+
+def recover(package,daemon,state,parent,before_gpu=False):
     verify(package)
     original=daemon.read_bytes();config=plistlib.loads(original);args=config.get('ProgramArguments',[])
     if config.get('Label')!='local.nullarc.hp-native' or len(args)!=5 or args[:2]!=['/usr/bin/python3','-B'] or args[3]!='--package':
@@ -63,10 +75,16 @@ def recover(package,daemon,state,parent):
     folders=list(state.glob('boot-*'))
     if not folders:raise ValueError('no protected boot report')
     latest=max(folders,key=lambda p:p.stat().st_mtime)
-    evidence=json.loads((latest/'execution/result.json').read_text())
     supervisor=json.loads((latest/'boot-result.json').read_text()) if (latest/'boot-result.json').exists() else None
-    validate_failure(evidence,supervisor)
-    if evidence.get('source_package')!=str(old):raise ValueError('boot report belongs to another package')
+    if before_gpu:
+        sys.path.insert(0,str(package/'gpu/phxctl'))
+        from hp_bringup import macho_uuid
+        boot=subprocess.check_output(['/usr/sbin/sysctl','-n','kern.bootsessionuuid'],text=True).strip()
+        validate_before_gpu(supervisor or {},latest,boot,macho_uuid(package/'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel'))
+    else:
+        evidence=json.loads((latest/'execution/result.json').read_text())
+        validate_failure(evidence,supervisor)
+        if evidence.get('source_package')!=str(old):raise ValueError('boot report belongs to another package')
     for name in ('pending','disabled'):
         if not (state/name).is_file() or (state/name).is_symlink():raise ValueError('expected failed-boot markers missing')
     if parent.is_symlink() or parent.stat().st_uid!=0 or parent.stat().st_mode&0o022:raise ValueError('unsafe service directory')

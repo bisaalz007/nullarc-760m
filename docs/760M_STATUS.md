@@ -837,3 +837,40 @@ Publication/boot/recovery/display tests pass. Next action is backed-up service
 update, GUI-session Metal verification on the existing healthy queues, then one-shot
 WindowServer arming in the same root operation. No kext, firmware, translator,
 RADV, EFI or security changes are needed for this control-only update.
+
+
+### First WindowServer boot did not attach the framebuffer
+
+Boot 9173526D-03BD-449C-879D-4EA92BA7BA23 remained on IONDRVFramebuffer, with
+PhxAMDFB/NMXAccel absent and PhxBringup diagnostic-only. The service failed before
+its native subprocess: the one-shot was still present, so the old begin() cleared
+it immediately. No WindowServer acceleration or GPU initialization occurred.
+The firmware framebuffer's reported score is 20000; PhxFB's score is 60000. The
+auxiliary collection contains the correct PhxFB personality, but its early match
+was missed. Graphics/accelerator/AGDC reside in the HP's System collection, so
+injecting the full accelerator into Boot is not an appropriate dependency fix.
+
+An opt-in Info.plist-only early personality is now staged in the existing USB
+PhxBringup bundle. It targets the real PhxAccel/PhxAMDFB implementation, keeps its
+60000 score, and matches all five captured PCI properties as exact four-byte data.
+The executable and OpenCore configuration are byte-for-byte unchanged; no NVRAM
+or security setting was changed. Backup:
+`/Volumes/EFI/EFI/OC/.nullarc-early-match-backup-_izrl93k`.
+Default source/diagnostic PhxBringup metadata remains unchanged; only the explicit
+`install_early_fb.py --install` operation opts in.
+
+This uses Apple's supported foreign-personality publisher/load-defer mechanism:
+[IOCatalogue, matching the Sequoia source release](https://github.com/apple-oss-distributions/xnu/blob/xnu-11417.140.69/iokit/Kernel/IOCatalogue.cpp),
+[IOService matching](https://github.com/apple-oss-distributions/xnu/blob/xnu-11417.140.69/iokit/Kernel/IOService.cpp).
+No Apple code or executables are injected/copied into Boot. Runtime effectiveness
+of the early metadata still requires the next HP boot.
+
+The supervisor now waits up to 90 seconds for complete validated framebuffer
+properties and an unopened, held panel before GPU initialization. It preserves
+the NVRAM request while matching is pending, reports wait phases, and clears stale
+arming on failure. It never retries GPU work or rearms an expired hold. The reviewed
+pre-GPU failure can be backed up/recovered only in this same idle boot, with no
+execution directory and a matching protected request. Four early-metadata tests,
+twelve display tests, twenty boot tests and seven recovery tests pass. No native
+code rebuild was needed. Next: current-boot first initialization/app readbacks,
+then one-shot display arming with the corrected metadata/wait path.

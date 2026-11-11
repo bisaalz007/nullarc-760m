@@ -47,6 +47,10 @@ def validated_accelerator():
             raise ValueError('unreviewed display family version: '+identifier)
     return a
 
+PANEL={'PhxFBWidth':1920,'PhxFBHeight':1200,'PhxFBHTotal':2260,'PhxFBVTotal':1240,
+       'PhxFBHSyncStart':1968,'PhxFBHSyncEnd':2000,'PhxFBVSyncStart':1203,'PhxFBVSyncEnd':1209,
+       'PhxFBNominalPixelClockHz':168144000,'PhxFBRefreshMilliHz':60000}
+
 def framebuffer():
     frames=nodes('PhxAMDFB')
     if not frames:return None
@@ -54,10 +58,7 @@ def framebuffer():
     f=frames[0]
     if f.get('PhxFBHP') is not True or f.get('PhxFBTimingCaptured') is not True:
         raise ValueError('framebuffer is not the validated HP console presenter')
-    expected={'PhxFBWidth':1920,'PhxFBHeight':1200,'PhxFBHTotal':2260,'PhxFBVTotal':1240,
-              'PhxFBHSyncStart':1968,'PhxFBHSyncEnd':2000,'PhxFBVSyncStart':1203,'PhxFBVSyncEnd':1209,
-              'PhxFBNominalPixelClockHz':168144000,'PhxFBRefreshMilliHz':60000}
-    if any(f.get(k)!=v for k,v in expected.items()):raise ValueError('framebuffer timing differs from validated plan')
+    if any(f.get(k)!=v for k,v in PANEL.items()):raise ValueError('framebuffer timing differs from validated plan')
     return f
 
 def unopened_held_framebuffer():
@@ -68,7 +69,31 @@ def unopened_held_framebuffer():
     if sysctl('debug.phxfb_hold')!=1:raise ValueError('framebuffer boot hold expired')
     return f
 
-def begin(package,state,folder):
+def wait_for_framebuffer(timeout=90,progress=None):
+    deadline=time.monotonic()+timeout;last=None
+    def phase(value):
+        nonlocal last
+        if value!=last and progress:progress(value)
+        last=value
+    while time.monotonic()<deadline:
+        try:
+            frames=nodes('PhxAMDFB')
+            if not frames:phase('awaiting-early-framebuffer')
+            elif len(frames)!=1:raise ValueError('unexpected framebuffer count')
+            elif not all(k in frames[0] for k in list(PANEL)+['PhxFBHP','PhxFBTimingCaptured']):
+                phase('awaiting-framebuffer-properties')
+            else:
+                # start() publishes properties before installing the hold sysctl.
+                try:hold=sysctl('debug.phxfb_hold')
+                except subprocess.CalledProcessError:phase('awaiting-framebuffer-hold')
+                else:
+                    if hold!=1:raise ValueError('framebuffer boot hold expired')
+                    unopened_held_framebuffer();return
+        except subprocess.TimeoutExpired:phase('awaiting-framebuffer-registry-snapshot')
+        time.sleep(.5)
+    raise ValueError('validated early framebuffer did not become ready before deadline')
+
+def begin(package,state,folder,progress=None):
     request=state/REQUEST
     if not request.exists():
         if nodes('PhxAMDFB'):raise DisplayOwnershipError('HP framebuffer active without an authorized next-boot request')
@@ -80,13 +105,16 @@ def begin(package,state,folder):
     if config.get('accelerator_uuid')!=macho_uuid(package/'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel'):
         raise ValueError('next-boot accelerator differs from request')
     request.rename(folder/REQUEST)  # consumed, never automatically re-armed
-    # The kext commits removal before attempting console attachment. A leftover
-    # flag means it did not run; clear it before falling back to app mode.
-    nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
-    if 'phxfb-boot' in nv:
-        subprocess.run(['/usr/sbin/nvram','-d','phxfb-boot'],check=True,timeout=5)
-        raise ValueError('framebuffer one-shot was not consumed by the running kext')
-    unopened_held_framebuffer()
+    # Do not clear the request while System/Aux driver matching is pending.
+    # GPU initialization remains forbidden until the validated held FB appears.
+    try:
+        wait_for_framebuffer(progress=progress)
+        nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
+        if 'phxfb-boot' in nv:raise ValueError('attached framebuffer did not consume its one-shot')
+    except (OSError,ValueError,subprocess.SubprocessError):
+        nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
+        if 'phxfb-boot' in nv:subprocess.run(['/usr/sbin/nvram','-d','phxfb-boot'],check=True,timeout=5)
+        raise
     return True
 
 def arm(report,save,allow,atomic):

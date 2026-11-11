@@ -106,8 +106,9 @@ def boot(package,state,allow,status=None):
     def save():
         (folder/'boot-result.json').write_text(json.dumps(report,indent=2)+'\n')
         publish(status,report)
+    def frame_progress(phase):report.update(desktop_phase=phase);save()
     try:
-        display=desktop.begin(package,state,folder)
+        display=desktop.begin(package,state,folder,progress=frame_progress)
         p=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
         try:stdout,stderr=p.communicate(timeout=300)
         except subprocess.TimeoutExpired:

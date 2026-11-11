@@ -14,6 +14,23 @@ sys.path.insert(0,str(ROOT/'tools/phxctl'))
 import hp_windowserver as d
 
 class DisplayTests(unittest.TestCase):
+    def test_waits_for_delayed_and_partial_framebuffer_publication(self):
+        ready=dict(d.PANEL,PhxFBHP=True,PhxFBTimingCaptured=True);progress=[]
+        with patch.object(d,'nodes',side_effect=[[],[{'PhxFBHP':True}],[ready]]),patch.object(d,'sysctl',return_value=1),patch.object(d,'unopened_held_framebuffer') as held,patch.object(d.time,'sleep'):
+            d.wait_for_framebuffer(progress=progress.append)
+        held.assert_called_once();self.assertEqual(progress,['awaiting-early-framebuffer','awaiting-framebuffer-properties'])
+
+    def test_wait_deadline_does_not_issue_gpu_commands(self):
+        with patch.object(d.time,'monotonic',side_effect=[0,91]),patch.object(d.subprocess,'run') as run,self.assertRaisesRegex(ValueError,'deadline'):
+            d.wait_for_framebuffer()
+        run.assert_not_called()
+
+    def test_expired_framebuffer_hold_is_not_rearmed(self):
+        ready=dict(d.PANEL,PhxFBHP=True,PhxFBTimingCaptured=True)
+        with patch.object(d,'nodes',return_value=[ready]),patch.object(d,'sysctl',return_value=0) as control,self.assertRaisesRegex(ValueError,'expired'):
+            d.wait_for_framebuffer()
+        self.assertEqual(control.call_args.args,('debug.phxfb_hold',))
+
     def test_empty_ioreg_is_not_misparsed_as_plist(self):
         with patch.object(d.subprocess,'check_output',return_value=b''):self.assertEqual(d.nodes('PhxAMDFB'),[])
 

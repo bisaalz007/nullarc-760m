@@ -15,6 +15,18 @@ SPEC=importlib.util.spec_from_file_location('recover_hp_boot',ROOT/'install/reco
 r=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(r)
 
 class RecoveryTests(unittest.TestCase):
+    def test_pre_gpu_display_failure_requires_no_execution_and_this_boot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);request={'format':1,'accelerator_uuid':'expected','armed_from_boot':'previous'}
+            (folder/'windowserver-next-boot.json').write_text(json.dumps(request))
+            status={'boot_session_uuid':'current','error':'framebuffer one-shot was not consumed by the running kext',
+                    'automatic_initialization_attempted':True,'desktop_armed':False}
+            r.validate_before_gpu(status,folder,'current','expected')
+            with self.assertRaises(ValueError):r.validate_before_gpu(status,folder,'other','expected')
+            with self.assertRaises(ValueError):r.validate_before_gpu(status,folder,'current','different')
+            (folder/'execution').mkdir()
+            with self.assertRaises(ValueError):r.validate_before_gpu(status,folder,'current','expected')
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         root=Path(self.tmp.name);self.parent=root/'service';self.parent.mkdir()
