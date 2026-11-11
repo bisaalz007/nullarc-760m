@@ -27,6 +27,7 @@ PERSISTENCE_COMMIT='5de9ab4221a5af7af20723b9c2bc1faf5ffa4b64'
 OVERLAY={
     'tools/phxctl/hp_bringup.py':'gpu/phxctl/hp_bringup.py',
     'install/recover_hp_boot.py':'recover_hp_boot.py',
+    'README.md':'README.md',
 }
 SUFFIX='-startup-readiness'
 
@@ -55,19 +56,26 @@ def assemble(original,checksums,output):
             for source,target in sorted(OVERLAY.items()):
                 payload=git('show',f'{commit}:{source}')
                 dest=package/target
-                if not dest.is_file():
+                if not dest.is_file() and target != 'README.md':
                     raise ValueError('missing expected startup file '+target)
                 dest.write_bytes(payload)
                 changed.add(target)
                 item=tarfile.TarInfo('nullarc-startup-readiness/'+source)
                 item.mode=0o644;item.mtime=0;item.size=len(payload)
                 tar.addfile(item,io.BytesIO(payload))
+        (package/'README.txt').write_text(
+            'NullArc-760M Sequoia beta — HP Envy x360 16-ad0013dx only\n'
+            'Start with README.md for the full verified hardware status, checksums,\n'
+            'guarded staged installation and rollback. INSTALL.md retains the\n'
+            'advanced, historical recovery reference.\n'
+        )
+        changed.add('README.txt')
         changed.add('sources/startup-readiness-source.tar.gz')
         new_files=inventory(package)
         for name,sha in original_files.items():
             if name not in changed and new_files.get(name)!=sha:
                 raise ValueError('unexpected native or other asset change: '+name)
-        if set(new_files)-set(original_files)!={'sources/startup-readiness-source.tar.gz'}:
+        if set(new_files)-set(original_files)!={'sources/startup-readiness-source.tar.gz','README.md'}:
             raise ValueError('unexpected new file inventory')
         metadata={k:v for k,v in baseline.items()
                   if k not in ('format','files','policy','acceleration_verified')}
@@ -97,7 +105,8 @@ def assemble(original,checksums,output):
             'before any GPU initialization and records a distinct failure stage.\n\n'
             'The compiled GPU kexts, Metal plugin, translator, RADV and firmware '
             'are byte-for-byte unchanged from the published fresh-files beta. '
-            'The previous release ZIPs are preserved.\n\n'
+            'After verified publication, older release ZIP assets are retired; '
+            'source history and other non-ZIP assets are retained.\n\n'
             'For the *exact* previously recorded Invalid file failure, reboot first '
             'to a new idle firmware-framebuffer diagnostic boot, keep pending and '
             'disabled markers intact, and extract this ZIP. From its directory run:\n\n'
@@ -109,9 +118,14 @@ def assemble(original,checksums,output):
             'Reboot with the same OpenCore EFI after successful staging, then inspect '
             '/Users/Shared/nullarc-hp-native-status.json. Do not retry initialization '
             'in the same boot or bypass refused safety checks.\n\n'
-            'The timing hypothesis has regression tests, but this hotfix has not '
-            'yet been validated on the actual HP. Confirm a successful app-mode '
-            'Metal boot before attempting WindowServer persistence.\n'
+            'HP runtime report, 2026-11-11: automatic native initialization, '
+            'console-user Metal device/compute/render and app access all passed, '
+            'and the operator confirmed working WindowServer compositing with '
+            'guarded persistence configured. This is one-machine validation, '
+            'not general stability certification. Safari/Spotlight/login text-field '
+            'flicker and boot progress flicker remain unresolved.\n\n'
+            'Read README.md for the exact staged installation and verification; '
+            'do not replace a healthy running kernel stack without a recovery path.\n'
         )
     return {'zip':zip_path.name,'sha256':digest(zip_path),'source_commit':commit}
 
