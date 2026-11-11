@@ -96,6 +96,68 @@ class RecoveryTests(unittest.TestCase):
         parent=self.parent
         self.stat=patch.object(Path,'stat',lambda p,*a,**k:SimpleNamespace(st_uid=0,st_mode=0o755) if p==parent else actual_stat(p,*a,**k))
 
+    def registry_case(self):
+        old_script=self.old/'gpu/phxctl/hp_bringup.py'
+        new_script=self.new/'gpu/phxctl/hp_bringup.py'
+        old_script.write_bytes(b'old registry read')
+        new_script.write_bytes(b'bounded registry read')
+        for p in (self.old,self.new):write(p,{'minimum_macos':'15.0'})
+        supervisor={'boot_session_uuid':'failed','last_stage':'firmware-entry-points',
+                    'bootstrap_error':'Invalid file','error':'bootstrap failed; no application allow list enabled',
+                    'desktop_armed':False,'metal_verified':False}
+        evidence={'source_package':str(self.old),'error':'Invalid file',
+                  'executed':False,'native_compute_verified':False,'native_render_verified':False,
+                  'accelerator_claimed':False,'display_takeover_requested':False,
+                  'stages':[{'stage':'package-hashes','returncode':0},
+                            {'stage':'firmware-plan','returncode':0},
+                            {'stage':'firmware-entry-points','returncode':0,
+                             'stdout':'0xfffffffff0005000 0xfffffffff0005000\\n','stderr':''}]}
+        (self.state/'boot-fixture/boot-result.json').write_text(json.dumps(supervisor))
+        (self.state/'boot-fixture/execution/result.json').write_text(json.dumps(evidence))
+        return supervisor,evidence
+
+    def test_registry_boot_race_stages_only_new_startup_code(self):
+        self.registry_case()
+        display=SimpleNamespace(REQUEST='windowserver-next-boot.json',
+            nodes=lambda name:[{'phx-profile':'hp-760m','phx-stage':'profile-diagnostic-only'}]
+                if name=='PhxBringup' else [])
+        with self.stat,patch.object(r.os,'chown'),patch.dict(sys.modules,{
+                'hp_bringup':SimpleNamespace(macho_uuid=lambda p:'expected'),
+                'hp_windowserver':display}),patch.object(r.subprocess,'check_output',
+                side_effect=['current',plistlib.dumps({})]),patch.object(r.subprocess,'run') as commands:
+            r.recover(self.new,self.daemon,self.state,self.parent,after_registry_unavailable=True)
+        commands.assert_not_called()
+        self.assertFalse((self.state/'pending').exists())
+        self.assertFalse((self.state/'disabled').exists())
+        self.assertTrue((self.state/'boot-fixture/execution/result.json').exists())
+        backup=next(self.state.glob('recovery-*'))
+        self.assertTrue((backup/'pending').exists())
+        self.assertTrue((backup/'disabled').exists())
+        self.assertNotEqual(self.daemon.read_bytes(),self.original)
+
+    def test_registry_recovery_rejects_same_boot_and_unreviewed_failure(self):
+        supervisor,evidence=self.registry_case()
+        with self.assertRaisesRegex(ValueError,'reviewed pre-GPU'):
+            r.validate_registry_failure(supervisor,evidence,'failed')
+        evidence['stages'][-1]['returncode']=1
+        with self.assertRaisesRegex(ValueError,'reviewed pre-GPU'):
+            r.validate_registry_failure(supervisor,evidence,'current')
+
+    def test_registry_recovery_rejects_any_other_changed_runtime_file(self):
+        self.registry_case()
+        (self.new/'gpu/phxctl/hp_boot.py').write_bytes(b'unreviewed replacement')
+        write(self.new,{'minimum_macos':'15.0'})
+        display=SimpleNamespace(REQUEST='windowserver-next-boot.json',
+            nodes=lambda name:[{'phx-profile':'hp-760m','phx-stage':'profile-diagnostic-only'}]
+                if name=='PhxBringup' else [])
+        with self.stat,patch.dict(sys.modules,{
+                'hp_bringup':SimpleNamespace(macho_uuid=lambda p:'expected'),
+                'hp_windowserver':display}),patch.object(r.subprocess,'check_output',
+                side_effect=['current',plistlib.dumps({})]),self.assertRaisesRegex(ValueError,'only reviewed startup'):
+            r.recover(self.new,self.daemon,self.state,self.parent,after_registry_unavailable=True)
+        self.assertEqual(self.daemon.read_bytes(),self.original)
+        self.assertTrue((self.state/'pending').exists())
+
     def test_known_failure_updates_only_next_boot_and_backs_up(self):
         with self.stat,patch.object(r.os,'chown'):r.recover(self.new,self.daemon,self.state,self.parent)
         self.assertNotEqual(self.daemon.read_bytes(),self.original)
