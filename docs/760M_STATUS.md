@@ -1,6 +1,6 @@
 # Radeon 760M development status
 
-Updated 2026-11-08. Fork: `yt42c2mvn2-cmd/nullarc-760m`.
+Updated 2026-11-09. Fork: `yt42c2mvn2-cmd/nullarc-760m`.
 Branch: `codex/radeon-760m-driver-completion`. Continuation baseline: merged `main` at `f08b898` (PR #1).
 
 **Current verified state:** HP Sequoia 15.8.2, build 39: exclusive VRAM/PSP/MES
@@ -965,3 +965,39 @@ stages. No boot-argument edits or reboots are performed by the wrapper. Its resu
 is `hp41-recover-apps-result.json` alongside it. Local administrator execution is
 pending because SSH cannot provide the user's administrator authentication. Do
 not repeat the older hp41-prepare.sh, which is pinned to an obsolete boot.
+
+### Active AMFIPass alone failed; upstream AMFI policy now has loader evidence
+
+The guarded retest boot 5F65B2FD-C933-419D-A8CE-C93A6AB0BDE4 still rejected
+NVMTLDriver as non-platform code inside WindowServer, with active AMFIPass 1.4.1.
+Two WindowServer IPS reports show the same CoreDisplay assertion (+3349). The new
+crash monitor ended the attempt sooner; fallback boot E332B90C is diagnostic-only,
+with automatic GPU/app/display access disabled. The early matching Info.plist was
+restored from `.nullarc-early-match-backup-n21uebkx`; config/code were unchanged.
+
+The user explicitly requested the actual NullArc/NullMoth relaxed AMFI setup.
+Both primary project guides require `amfi=0x80 amfi_get_out_of_my_way=0x1`; NullArc
+also specifies `-amfipassbeta phxdebug=1`. A new explicit configuration helper
+backs up and appends these four options, preserving all other config fields. The
+existing HP SIP mask 7f0a0000 already covers the documented required bits, and
+SecureBootModel was Disabled; neither was changed. Backup:
+`/Volumes/EFI/EFI/OC/.nullarc-amfi-policy-backup-0nu6nz0u`.
+
+Policy-only boot 5FFFC48D-703B-439B-9195-9B713CADF742 actually reports all requested
+arguments. GPU initialization/display remain disabled. `tools/policyprobe` supplies
+an authored hardened/validation-required dlopen host plus a trivial library fixture.
+On the development Mac the fixture is refused (different Team IDs). On the HP,
+the fixture AND real NVMTLDriver load successfully without GPU/device calls; csops
+reports 0x26012201 (platform + require-LV + runtime) versus control 0x22012201.
+The real-driver load-only probe returns zero. This is effective loader evidence,
+not WindowServer rendering proof. Sanitized report:
+`sequoia-display42-amfi-experiment.json`.
+
+The display guard now rejects active AMFIPass without BOTH actual boot arguments,
+preventing repetition of the confirmed failed configuration. Recovery additionally
+accepts only the measured monitored CoreDisplay assertion when its protected
+report names an actual same-boot IPS with that frame; other crashes remain refused.
+Four config tests, 17 display tests and 11 recovery tests pass (63 targeted control
+tests total including boot/install/early tests). No driver native code changed.
+Next: assemble/stage these guards and run this idle boot's first app/native checks,
+then consider a single display test under the now-demonstrated loader policy.

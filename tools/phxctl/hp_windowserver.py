@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import shlex
 import struct
 import subprocess
 import time
@@ -27,6 +28,12 @@ def require_library_policy():
     loaded=subprocess.check_output(['/usr/bin/kmutil','showloaded','--list-only'],text=True,timeout=15)
     if not any('com.dhinakg.AMFIPass (1.4.1)' in line for line in loaded.splitlines()) or len(nodes('AMFIPass'))!=1:
         raise ValueError('WindowServer signing dependency preflight failed: reviewed Sequoia-compatible AMFIPass 1.4.1 must be loaded with an active service. Boot flags and app Metal tests alone are insufficient. No security setting changed.')
+    # Actual HP boot 5F65B2FD proved that active 1.4.1 alone still rejects the
+    # plugin. Require the explicitly authorized upstream AMFI experiment too.
+    args=shlex.split(subprocess.check_output(['/usr/sbin/sysctl','-n','kern.bootargs'],text=True,timeout=5))
+    for flag in ('amfi=0x80','amfi_get_out_of_my_way=0x1'):
+        if [x for x in args if x.split('=')[0]==flag.split('=')[0]]!=[flag]:
+            raise ValueError('actual boot lacks the reviewed upstream AMFI option '+flag+'; active AMFIPass alone failed on this HP. No security setting changed.')
 
 CRASH_DIR=Path('/Library/Logs/DiagnosticReports')
 

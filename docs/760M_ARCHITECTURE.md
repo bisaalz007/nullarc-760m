@@ -286,7 +286,10 @@ WindowServer's platform-process library validation, before loading NVMTLDriver.
 App Metal tests do not exercise that boundary. The supervisor and arming installer
 now require the reviewed Sequoia-compatible AMFIPass 1.4.1 and an active service;
 neither version presence nor service attachment is a claim that every signature
-check was relaxed. Actual WindowServer loading/presents remain separate runtime
+check was relaxed. A second boot with 1.4.1 active still failed library validation;
+the guards now additionally require both explicitly authorized upstream AMFI
+arguments in the actual boot. An authored hardened/validation-required host loads
+the actual plugin under that policy without GPU commands. Actual WindowServer loading/presents remain separate runtime
 requirements. No AMFI boot-argument editing is performed. Crash-report monitoring
 is armed before panel release and checked during console waiting and presentation,
 so a fresh same-boot WindowServer crash requests fallback without waiting the full

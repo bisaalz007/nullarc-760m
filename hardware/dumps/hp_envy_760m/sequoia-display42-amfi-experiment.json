@@ -1,0 +1,42 @@
+{
+  "format": 1,
+  "failed_display_boot": "5F65B2FD-C933-419D-A8CE-C93A6AB0BDE4",
+  "failure_with_active_amfipass_1.4.1": "mapping process is a platform binary, but mapped file is not",
+  "crash_reports": [
+    "WindowServer-2026-11-09-222308.ips",
+    "WindowServer-2026-11-09-222308.000.ips"
+  ],
+  "fault_symbol": "CoreDisplay_CreateDisplayForCGXDisplayDevice",
+  "fault_symbol_offset": 3349,
+  "fallback_boot": "E332B90C-722A-4DC6-8789-56342B1ADE78",
+  "early_metadata_removed_after_failure": true,
+  "policy_boot": "5FFFC48D-703B-439B-9195-9B713CADF742",
+  "actual_boot_args": "-v keepsyms=1 alcid=12 xhcinudge=1 amfi=0x80 amfi_get_out_of_my_way=0x1 -amfipassbeta phxdebug=1",
+  "config_backup": "/Volumes/EFI/EFI/OC/.nullarc-amfi-policy-backup-0nu6nz0u",
+  "config_before_sha256": "1bded090fe745c6da38050534b183c7d93ea2f6c43b449f8ff263ef76f8982e6",
+  "config_after_sha256": "97686062074532bb4c65d42cc99fba29e5740ef4e247f608f6a7d3ad809a8cee",
+  "only_boot_args_changed": true,
+  "sip_mask_unchanged": "7f0a0000",
+  "SecureBootModel": "Disabled",
+  "hardened_loader_probe": {
+    "development_control": {
+      "flags": "0x22012201",
+      "fixture_loaded": false,
+      "rejection": "different Team IDs"
+    },
+    "hp": {
+      "flags": "0x26012201",
+      "fixture_loaded": true,
+      "actual_plugin_loaded": true,
+      "actual_plugin_probe_returncode": 0,
+      "gpu_commands_submitted": false
+    }
+  },
+  "gpu_startup_enabled_on_policy_boot": false,
+  "display_armed_on_policy_boot": false,
+  "windowserver_compatibility_verified": false,
+  "requirements_sources": [
+    "https://github.com/luuumi-dev/nullarc/blob/main/docs/INSTALL.md",
+    "https://github.com/nullmoth/nvidia-macos-driver/blob/main/docs/HOW-IT-WORKS.md"
+  ]
+}

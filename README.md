@@ -76,7 +76,12 @@ firmware framebuffer; display activation is disabled. AMFIPass 1.3.1 was loaded
 but had no active service and declares Darwin 22 as its maximum; the HP is Darwin
 24. A backed-up, explicitly authorized update to OCLP's AMFIPass 1.4.1 now loads
 and publishes its active service after a dependency-only reboot, with boot arguments
-unchanged. Actual WindowServer compatibility still requires runtime testing.
+unchanged. That active dependency alone still failed the same WindowServer
+library-validation check. The user then authorized the upstream NullArc AMFI
+boot options: both `amfi=0x80` and `amfi_get_out_of_my_way=0x1`, plus its beta/debug
+options. These now boot on the HP, and an authored hardened loader can load the
+actual Metal plugin without GPU commands. Actual WindowServer compatibility still
+requires a guarded runtime retest; no display success is claimed.
 The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
 
@@ -84,8 +89,9 @@ The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
 runtime family sizes/versions, captured console plan and current-boot app tests
 pass can the same command arm one display boot. New preflight also requires the
-reviewed Sequoia-compatible AMFIPass version and an active service; this dependency
-check does not prove that WindowServer can load the plugin. New crash monitoring
+reviewed Sequoia-compatible AMFIPass version, active service and the authorized
+upstream AMFI arguments in the actual boot; these checks do not prove that
+WindowServer can load the plugin. New crash monitoring
 stops the experiment on a fresh current-boot WindowServer report. This experimental
 display path is **not confirmed functional**. See
 [installation stages](docs/INSTALL.md#hp-experimental-windowserver-stages). Do not

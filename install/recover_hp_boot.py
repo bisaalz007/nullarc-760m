@@ -25,6 +25,7 @@ NATIVE=('EFI/OC/Kexts/PhxBringup.kext','Library/Extensions/PhxAccel.kext',
         'PhxGPU/NVMTLDriver.bundle','PhxGPU/nvmtl','gpu/fw',
         'gpu/phxctl/phxctl','gpu/phxctl/mesboot','gpu/phxctl/phxfw',
         'gpu/phxctl/vkprobe-native','gpu/phxctl/render-native','validation')
+CRASH_DIR=Path('/Library/Logs/DiagnosticReports')
 
 def validate_failure(evidence,supervisor=None):
     stages=evidence.get('stages',[])
@@ -60,13 +61,23 @@ def validate_before_gpu(supervisor,folder,boot,accel_uuid):
         raise ValueError('protected display request differs')
 
 def validate_display_fallback(supervisor,evidence,folder,boot,accel_uuid):
-    """Only the reviewed post-arm GUI failure, after a completed fallback reboot."""
+    """Only reviewed post-arm GUI failures, after a completed fallback reboot."""
+    reviewed=supervisor.get('error')=='no active console-user GUI session before deadline; native GPU retained, app access restricted'
+    name=supervisor.get('desktop_crash_report')
+    if (isinstance(name,str) and Path(name).name==name and name.startswith('WindowServer') and name.endswith('.ips') and
+        supervisor.get('error')=='WindowServer crashed during the one-shot display test; stop and collect '+name):
+        with (CRASH_DIR/name).open() as f:raw=f.read(8*1024*1024+1)
+        if len(raw)>8*1024*1024:raise ValueError('crash report too large')
+        _,end=json.JSONDecoder().raw_decode(raw);crash=json.loads(raw[end:])
+        frames=[f for t in crash.get('threads',[]) if t.get('triggered') is True for f in t.get('frames',[])]
+        reviewed=(crash.get('procName')=='WindowServer' and crash.get('bootSessionUUID')==supervisor.get('boot_session_uuid') and
+                  any(f.get('symbol')=='CoreDisplay_CreateDisplayForCGXDisplayDevice' and f.get('symbolLocation')==3349 for f in frames))
     if (not supervisor.get('boot_session_uuid') or supervisor['boot_session_uuid']==boot or
         supervisor.get('desktop_armed') is not True or
         supervisor.get('firmware_fallback_reboot_requested') is not True or
         supervisor.get('native_initialization_verified') is not True or
         supervisor.get('metal_verified') is not False or
-        supervisor.get('error')!='no active console-user GUI session before deadline; native GPU retained, app access restricted'):
+        not reviewed):
         raise ValueError('failure is not the reviewed WindowServer GUI/fallback case')
     stages=evidence.get('stages',[])
     if (not stages or stages[-1].get('stage')!='accelerator-claim' or stages[-1].get('returncode')!=0 or

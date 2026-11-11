@@ -24,8 +24,14 @@ class DisplayTests(unittest.TestCase):
             for loaded,services in (('com.dhinakg.AMFIPass (1.3.1)',[{}]),('amfi=0x80',[]),('com.dhinakg.AMFIPass (1.4.1)',[])):
                 with self.subTest(loaded=loaded),patch.object(d.subprocess,'check_output',return_value=loaded),patch.object(d,'nodes',return_value=services),self.assertRaisesRegex(ValueError,'signing dependency'):
                     d.require_library_policy()
-            with patch.object(d.subprocess,'check_output',return_value='com.dhinakg.AMFIPass (1.4.1)'),patch.object(d,'nodes',return_value=[{}]):
+            with patch.object(d.subprocess,'check_output',side_effect=['com.dhinakg.AMFIPass (1.4.1)','amfi=0x80 amfi_get_out_of_my_way=0x1']),patch.object(d,'nodes',return_value=[{}]):
                 d.require_library_policy()
+
+    def test_active_amfipass_without_full_reviewed_boot_flags_is_refused(self):
+        with patch.object(d,'require_library_policy',new=REAL_POLICY),patch.object(d,'nodes',return_value=[{}]):
+            for args in ('-v','amfi=0x80','amfi_get_out_of_my_way=0x1','amfi=0x80 amfi=0 amfi_get_out_of_my_way=0x1'):
+                with self.subTest(args=args),patch.object(d.subprocess,'check_output',side_effect=['com.dhinakg.AMFIPass (1.4.1)',args]),self.assertRaisesRegex(ValueError,'actual boot'):
+                    d.require_library_policy()
 
     def test_policy_failure_prevents_all_display_controls(self):
         self.policy.side_effect=ValueError('library-validation')

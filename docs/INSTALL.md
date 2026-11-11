@@ -50,10 +50,23 @@ native initialization/display release. Presence in `kmutil showloaded` alone is
 insufficient; Lilu may report a successful kext load without starting a plugin.
 Even this stronger check is not proof of WindowServer compatibility.
 
-The legacy AMFI boot flags in the archived reference guide have not been tested
-as a solution on this HP/Sequoia build. Neither the display installer nor the
-boot supervisor changes them. Any security-extension update requires an explicit,
-backed-up operation and a dependency-only reboot before another display test.
+An actual retest with active 1.4.1 still failed that platform-library check.
+The display guard therefore also requires both upstream AMFI arguments in the
+actual `kern.bootargs`: `amfi=0x80 amfi_get_out_of_my_way=0x1`. These are a
+system-wide security relaxation, not a per-driver exception. On the HP, after
+explicit authorization and a policy-only reboot, a hardened authored test host
+successfully loads the actual plugin; actual WindowServer rendering remains unverified.
+
+Neither the display installer nor the boot supervisor edits signing policy.
+For the separately authorized experiment, `configure_hp_amfi.py --package
+<verified-package> --oc <explicit-EFI/OC>` shows the exact proposed boot-args.
+`--apply-upstream-policy` explicitly backs up/applies the NullArc-documented
+`amfi=0x80 amfi_get_out_of_my_way=0x1 -amfipassbeta phxdebug=1`. It preserves all
+other config fields, including the HP's existing SIP bits, requires the existing
+NVRAM Delete behavior and Disabled SecureBootModel, and refuses active GPU/display
+state. Restore the printed backup's `config.plist` to undo this change. The first
+reboot must leave GPU/display startup disabled while actual arguments and loader
+policy are checked. Flag presence alone is not runtime proof of relaxed validation.
 
 ```sh
 ./install.sh --windowserver --check
@@ -130,7 +143,8 @@ on the previous build; the updated display module requires its own runtime test.
 
 The narrowly scoped `recover_hp_boot.py --package <verified-package>
 --after-display-fallback` can stage a backed-up service update after the reviewed
-post-arm GUI timeout. It requires a different, idle diagnostic-only boot, no
+post-arm GUI timeout or the measured CoreDisplay assertion caught by its crash
+monitor (verified against the actual same-boot IPS report). It requires a different, idle diagnostic-only boot, no
 accelerator/custom framebuffer/request, the active reviewed signing dependency,
 the protected successful native results and consumed request from the failed boot,
 and identical native components. It initializes nothing and does not arm display;

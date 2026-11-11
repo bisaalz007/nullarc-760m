@@ -46,6 +46,17 @@ class RecoveryTests(unittest.TestCase):
             r.recover(self.new,self.daemon,self.state,self.parent,after_display_fallback=True)
         run.assert_not_called();self.assertFalse((self.state/'disabled').exists())
 
+    def test_monitored_display_crash_requires_matching_boot_and_reviewed_assert(self):
+        folder=self.state/'boot-fixture';name='WindowServer-fixture.ips'
+        (folder/'windowserver-next-boot.json').write_text(json.dumps({'format':1,'accelerator_uuid':'expected','armed_from_boot':'origin'}))
+        supervisor=self.display_failure();supervisor.update(desktop_crash_report=name,error='WindowServer crashed during the one-shot display test; stop and collect '+name)
+        crash={'procName':'WindowServer','bootSessionUUID':'failed','threads':[{'triggered':True,'frames':[{'symbol':'CoreDisplay_CreateDisplayForCGXDisplayDevice','symbolLocation':3349}]}]}
+        p=self.state/name;p.write_text('{}\n'+json.dumps(crash))
+        with patch.object(r,'CRASH_DIR',self.state):
+            r.validate_display_fallback(supervisor,self.display_evidence(),folder,'current','expected')
+            crash['bootSessionUUID']='different';p.write_text('{}\n'+json.dumps(crash))
+            with self.assertRaises(ValueError):r.validate_display_fallback(supervisor,self.display_evidence(),folder,'current','expected')
+
     def test_fallback_refuses_an_active_accelerator_before_marker_changes(self):
         display=SimpleNamespace(require_library_policy=lambda:None,nodes=lambda name:[{}])
         with patch.dict(sys.modules,{'hp_bringup':SimpleNamespace(macho_uuid=lambda p:'expected'),'hp_windowserver':display}),patch.object(r.subprocess,'check_output',return_value='current'),self.assertRaisesRegex(ValueError,'idle'):
