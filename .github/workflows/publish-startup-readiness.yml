@@ -1,0 +1,72 @@
+name: Publish bounded HP startup readiness hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-startup-readiness.yml'
+      - 'tools/phxctl/hp_bringup.py'
+      - 'install/recover_hp_boot.py'
+      - 'tests/test_hp_metal_publication.py'
+      - 'tests/test_hp_boot_recovery.py'
+      - 'tools/release/publish_startup_readiness.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package-hotfix:
+    if: github.repository == 'yt42c2mvn2-cmd/nullarc-760m'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify registry readiness and guarded recovery tests
+        run: |
+          python3 -B tests/test_hp_metal_publication.py
+          python3 -B tests/test_hp_boot_recovery.py
+          python3 -B tests/test_release_install.py
+          python3 -m py_compile tools/phxctl/hp_bringup.py install/recover_hp_boot.py tools/release/publish_startup_readiness.py
+      - name: Retrieve the published fresh-files beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist/base
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern 'nullarc-760m-0.2.0-sequoia-beta-fresh-files.zip' --dir dist/base
+          gh release download v0.2.0-sequoia-beta --repo "$GITHUB_REPOSITORY" \
+            --pattern 'SHA256SUMS-fresh-files' --dir dist/base
+      - name: Assemble and hash-check startup-only repair
+        run: |
+          python3 -B tools/release/publish_startup_readiness.py \
+            --original dist/base/nullarc-760m-0.2.0-sequoia-beta-fresh-files.zip \
+            --checksums dist/base/SHA256SUMS-fresh-files \
+            --output dist/startup-hotfix
+      - name: Append separate hotfix assets without modifying original beta downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=v0.2.0-sequoia-beta
+          for asset in dist/startup-hotfix/*; do
+            name="$(basename "$asset")"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$name"; then
+              echo "Already published: $name"
+            else
+              gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+          body="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq '.body')"
+          if [[ "$body" != *'## Add-on: startup registry readiness fix'* ]]; then
+            notes="$(cat dist/startup-hotfix/RELEASE_NOTES-startup-readiness.md)"
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+              --notes "$body
+
+          ---
+
+          ## Add-on: startup registry readiness fix
+
+          $notes"
+          fi
