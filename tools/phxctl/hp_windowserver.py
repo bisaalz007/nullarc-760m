@@ -205,5 +205,10 @@ def fallback(report,save):
     # Only used by the opted-in next-boot experiment when PhxAMDFB owns the panel.
     # Never try to hot-detach a framebuffer or initialize a second GPU queue set.
     if nodes('PhxAMDFB'):
+        counters={}
+        for name in ('nvaccel_iop_ok','nvaccel_iop_fail','nvaccel_iop_copy_unwritten','nvaccel_iop_copy_skip'):
+            try:counters[name]=sysctl('debug.'+name)
+            except (OSError,ValueError,subprocess.SubprocessError) as e:counters[name]={'read_error':str(e)}
+        report['desktop_failure_counters']=counters
         report['firmware_fallback_reboot_requested']=True;save()
         subprocess.run(['/sbin/shutdown','-r','now'],check=True,timeout=10)

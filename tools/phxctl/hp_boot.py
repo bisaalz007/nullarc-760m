@@ -63,6 +63,7 @@ def verify_console_metal(package,report,save):
         if p!=work:p.mkdir()
         p.chmod(0o700);os.chown(p,user.pw_uid,user.pw_gid)
     report['metal_workdir']=str(work)
+    report['metal_validation_uid']=user.pw_uid
     report['verification_phase']='console-user-metal';report['metal_stages']=[];save()
     probe=package/'gpu/phxctl/mtlprobe';prefix=user_prefix(user,work)
     environment={k:v for k,v in os.environ.items() if k in ('PATH','HOME','TMPDIR','LANG','LC_ALL')}
@@ -85,7 +86,9 @@ def verify_console_metal(package,report,save):
         if submitted:
             subprocess.run([str(package/'gpu/phxctl/phxctl'),'abort'],capture_output=True,timeout=5)
         raise
-    if os.stat('/dev/console').st_uid!=user.pw_uid:raise ValueError('console user changed during validation; app access remains restricted')
+    report['metal_readbacks_verified']=True
+    report['console_uid_after_validation']=os.stat('/dev/console').st_uid;save()
+    if report['console_uid_after_validation']!=user.pw_uid:raise ValueError('console user changed during validation; app access remains restricted')
     report['metal_verified']=True;report['verification_phase']='complete';save()
 
 def boot(package,state,allow,status=None):

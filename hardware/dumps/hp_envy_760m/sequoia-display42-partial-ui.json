@@ -1,0 +1,51 @@
+{
+  "format": 1,
+  "boot": "6CC139BC-8891-44C5-B740-11E73BDF83BA",
+  "native_initialization_verified": true,
+  "native_compute_verified": true,
+  "native_render_verified": true,
+  "metal_stages": [
+    {
+      "stage": "metal-hp-device",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x100000578 lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "metal-compute-readback",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x100000578 lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\ncommand buffer status 4 error none\nresults: 4096/4096 correct (out[1]=0x9e3779b8, expected 0x9e3779b8)\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    },
+    {
+      "stage": "metal-render-readback",
+      "returncode": 0,
+      "stdout": "devices: 1\n  AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))  class=NVMTLDevice registryID=0x100000578 lowPower=0 headless=0\nusing AMD Radeon 760M Graphics (RADV PHOENIX) (NVMTL over AMD Radeon 760M Graphics (RADV PHOENIX))\nHP PCI identity verified: 1002:1900 ca 103c:8c6a; no device fallback\nrender command buffer status 4 error none\npixels: red 32640 blue 32896 other 0 (expect ~32896 red, ~32640 blue); corners: TL 0xff0000ff BL 0xffff0000 BR 0xff0000ff\n",
+      "stderr": "radv-darwin: native kext: ABI 1.12, build 39, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG 0x00000242, VRAM 256 MiB visible + 256 MiB hi, GTT cap 512 MiB\n"
+    }
+  ],
+  "supervisor_error": "console user changed during validation; app access remains restricted",
+  "firmware_fallback_reboot_requested": true,
+  "windowserver_actual_plugin_load": "NVMTL: NVMTLDevice +load in pid 159 (static class, image-owned) image 74168A42-5AC5-30BA-9DAE-72C899226290 /Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver at 2026-11-09T22:44:02-0500",
+  "windowserver_device_creation": "NVMTL: MTLIOAccelDevice's initWithAcceleratorPort: -> 0x7fd986ed3000",
+  "user_visible_observation": "Partial login UI: cursor, text box and time missing; failure during login.",
+  "display_present_verified": false,
+  "new_windowserver_ips_observed": false,
+  "fallback_boot": "6F0F9CBC-8226-49E4-9A20-2BD6E844DC0C",
+  "early_metadata_restored": true,
+  "allocation_findings": {
+    "buffer_texture_layout_error": -1000158000,
+    "buffer_texture_layout_error_name": "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT",
+    "observed_failed_pitches_bytes": [
+      128,
+      192,
+      960
+    ],
+    "rdna3_radv_linear_pitch_alignment_bytes": 256,
+    "image_allocation_error": -2,
+    "reported_free_mib": 512,
+    "configured_headroom_mib": 1024,
+    "framebuffer_fetch": "off in WindowServer; framebuffer-fetch shader reads use a dummy image"
+  },
+  "complete_acceleration_verified": false
+}

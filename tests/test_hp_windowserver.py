@@ -130,8 +130,13 @@ class DisplayTests(unittest.TestCase):
 
     def test_failed_display_boot_reboots_only_if_custom_framebuffer_owns_panel(self):
         for nodes,expected in (([],0),([{}],1)):
-            with patch.object(d,'nodes',return_value=nodes),patch.object(d.subprocess,'run') as run:
+            with patch.object(d,'nodes',return_value=nodes),patch.object(d,'sysctl',return_value=0),patch.object(d.subprocess,'run') as run:
                 d.fallback({},lambda:None);self.assertEqual(run.call_count,expected)
                 if expected:self.assertEqual(run.call_args.args[0],['/sbin/shutdown','-r','now'])
+
+    def test_counter_read_failure_cannot_prevent_firmware_fallback(self):
+        with patch.object(d,'nodes',return_value=[{}]),patch.object(d,'sysctl',side_effect=ValueError('counter unavailable')),patch.object(d.subprocess,'run') as run:
+            report={};d.fallback(report,lambda:None)
+        run.assert_called_once();self.assertEqual(len(report['desktop_failure_counters']),4)
 
 if __name__=='__main__':unittest.main()

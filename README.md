@@ -80,8 +80,13 @@ unchanged. That active dependency alone still failed the same WindowServer
 library-validation check. The user then authorized the upstream NullArc AMFI
 boot options: both `amfi=0x80` and `amfi_get_out_of_my_way=0x1`, plus its beta/debug
 options. These now boot on the HP, and an authored hardened loader can load the
-actual Metal plugin without GPU commands. Actual WindowServer compatibility still
-requires a guarded runtime retest; no display success is claimed.
+actual Metal plugin without GPU commands. The next actual display boot loaded
+NVMTL inside WindowServer and created its AMD Metal device. The user saw a partial
+login UI with missing cursor/text; native and GUI Metal compute/render tests passed,
+but the supervisor requested fallback when the console user changed. No successful
+presentation-counter check or complete desktop is verified. Logs identify invalid
+linear texture pitches, allocation failures and disabled framebuffer fetch.
+See the [partial-display report](hardware/dumps/hp_envy_760m/sequoia-display42-partial-ui.json).
 The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
 

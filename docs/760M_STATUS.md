@@ -8,7 +8,9 @@ bring-up, native fenced compute/render, public Metal compute/render and app acce
 all pass. Automatic cold-boot initialization and app activation passed in boot
 `49800A69-CF26-4E40-91FC-F09883D6268F`. WindowServer/display acceleration, reset
 and suspend/resume remain unverified. The current task is WindowServer support;
-its framebuffer boot ordering, measured timing and Sequoia ABI must be validated.
+early matching, measured timing and runtime size checks have passed. Under the
+explicit upstream AMFI policy, WindowServer now loads NVMTL and creates the AMD
+Metal device, but the login UI is incomplete and the guarded boot falls back.
 Historical implementation notes below describe earlier states.
 
 ## Continuation after PR #1
@@ -1018,3 +1020,64 @@ It first backs up/stages the service, then performs this boot's first native/GUI
 Metal tests; only success restores the early metadata opt-in and arms one display
 boot. Result: `hp42-recover-apps-result.json`. Local administrator execution is
 pending; do not run the obsolete hp41 wrapper or remove failure markers manually.
+
+### First partial WindowServer UI; shader tests pass, display remains incomplete
+
+Boot 6CC139BC-8891-44C5-B740-11E73BDF83BA gets past signing: actual WindowServer
+logs show NVMTL +load, initWithAcceleratorPort and successful MTLIOAccelDevice
+creation on the AMD device. The user saw a partly drawn login screen, with cursor,
+text box and clock missing, followed by failure during login. This is real display
+integration progress, not a working desktop. No successful presentation-counter
+validation was reached.
+
+Protected boot evidence shows successful native initialization/compute/render/claim
+and all three GUI Metal stages: exact HP device, compute 4096/4096 and rendering
+32640 red / 32896 blue / zero other pixels. The final supervisor error was
+`console user changed during validation; app access remains restricted`; it
+requested the fallback reboot. No new WindowServer IPS was found for this boot.
+The tests ran as the actual UID 501 user, not the loginwindow account. The previous
+supervisor did not retain the final changed UID; whether a logout/session failure
+or another transition caused it is not established. The user-identity guard is
+retained, not bypassed. Fallback boot 6F0F9CBC is disabled/diagnostic-only; early
+metadata was restored from `.nullarc-early-match-backup-2u9irwso`. Authorized AMFI
+settings remain unchanged. Raw logs/reports stay private. Sanitized evidence:
+`hardware/dumps/hp_envy_760m/sequoia-display42-partial-ui.json`.
+
+Actual WindowServer logs expose the next concrete defects:
+- Buffer textures with 128, 192 and 960-byte row pitches fail with
+  VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT. The current RADV gfx11
+  linear surface override requires 256-byte pitch alignment. This restriction must
+  not be bypassed with invalid hardware descriptors. The existing private tiled
+  texture fallback copies some images, but arbitrary buffer-alias semantics still
+  need a correct solution and GPU regression tests.
+- Image allocation returns OUT_OF_DEVICE_MEMORY while the plugin says 512 MiB is
+  free. Legacy policy reserves 1024 MiB headroom plus 256 MiB residency margin,
+  and a 2655 MiB non-image reserve / 1 GiB minimum working set also exceed this
+  heap. The previous fallback message falsely implied no compatible system type
+  even when an allocation in a compatible type had actually failed.
+- Framebuffer-fetch reads are explicitly served from a dummy image in WindowServer
+  by the current default. Whether this causes particular missing UI elements needs
+  targeted rendering tests; it is not fixed by inventing descriptor capabilities.
+
+Source now scales an impossible integrated-heap default reserve to 1/16 of the
+actual reported heap (engineering policy, not a hardware constant); on 512 MiB,
+1024/2655 MiB reserves become 32 MiB each. Discrete GPU defaults, explicit overrides
+and the 6 GiB reference defaults remain unchanged. Small integrated working-set
+recommendations are bounded by reported capacity. Allocation logs now distinguish
+no compatible type from failure to allocate in an existing fallback type. This
+corrects policy/diagnostics, not the underlying allocation/import failures.
+
+The source Metal plugin rebuilt successfully for x86_64/macOS 15.0, UUID
+32B608DC-8145-35D2-89A4-9D318F14D4C0, with the existing protocol/deprecation warnings.
+No kernel/RADV/translator code was rebuilt or changed. The targeted build receipt
+was refreshed only after verifying that all other compiled artifacts were unchanged
+and source changes were confined to the compiled plugin. `make test` passes,
+including the new small-heap policy test. Updated boot/display tests pass (23/18).
+New supervisor reports preserve successful shader readbacks separately from final
+session validation, record both UIDs, and capture read-only presentation counters
+before fallback without letting a failed counter read block recovery.
+
+The new plugin/control changes are not installed on the HP. Display activation
+remains disabled. Next required work is app-only reproduction of these measured
+texture layouts, framebuffer-fetch rendering and allocation pressure, before a
+new GPU display test. No complete acceleration or visual correctness is claimed.

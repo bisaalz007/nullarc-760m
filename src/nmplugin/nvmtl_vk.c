@@ -174,11 +174,20 @@ static PFN_vkGetAccelerationStructureDeviceAddressKHR pvkGetAccelerationStructur
 static PFN_vkCmdCopyAccelerationStructureKHR pvkCmdCopyAccelerationStructureKHR;
 #define NVMTL_VRAM_NONIMAGE (2655ull << 20)
 #define NVMTL_VRAM_HEADROOM_DEFAULT (1024ull << 20)
+#include "nvmtl_memory_policy.h"
+uint64_t nvmtl_vk_reserve_default(uint64_t legacy)
+{
+    uint64_t heap = 0;
+    for (uint32_t i = 0; i < g_memp.memoryHeapCount; ++i)
+        if ((g_memp.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) && g_memp.memoryHeaps[i].size > heap)
+            heap = g_memp.memoryHeaps[i].size;
+    return nvmtl_default_reserve(legacy, heap, g_integrated_device);
+}
 static uint64_t nvmtl_vk_headroom(void)
 {
     static long long ovr = -2;
     if (ovr == -2) { const char *e = getenv("NVMTL_VRAM_HEADROOM_MB"); ovr = (e && *e) ? atoll(e) : -1; }
-    return ovr >= 0 ? (uint64_t)ovr << 20 : NVMTL_VRAM_HEADROOM_DEFAULT;
+    return ovr >= 0 ? (uint64_t)ovr << 20 : nvmtl_vk_reserve_default(NVMTL_VRAM_HEADROOM_DEFAULT);
 }
 #define NVMTL_VRAM_HEADROOM nvmtl_vk_headroom()
 static int nvmtl_vk_vram_wall(uint64_t want, uint64_t *freev_out, uint64_t *bud_out, uint64_t *used_out, int *measured_out);
@@ -1705,14 +1714,14 @@ uint64_t nvmtl_vk_working_set(void)
       if (res2 && nvmtl_vk_vram_bytes()) return nvmtl_vk_vram_bytes(); }
     nvmtl_vk_vram_budget(&b, &u);
     static long long ovr = -2; if (ovr == -2) { const char *e = getenv("NVMTL_VRAM_WS_NONIMAGE_MB"); ovr = (e && *e) ? atoll(e) : -1; }
-    uint64_t nonimg = ovr >= 0 ? (uint64_t)ovr << 20 : NVMTL_VRAM_NONIMAGE;
+    uint64_t nonimg = ovr >= 0 ? (uint64_t)ovr << 20 : nvmtl_vk_reserve_default(NVMTL_VRAM_NONIMAGE);
     if (u > g_vram_bytes && u - g_vram_bytes > nonimg) nonimg = u - g_vram_bytes;
     uint64_t reserve = NVMTL_VRAM_HEADROOM + nonimg;
     uint64_t room = b > reserve ? b - reserve : 0;
     { static long long pct = -2; if (pct == -2) { const char *e = getenv("NVMTL_WS_FILL_PCT"); pct = (e && *e) ? atoll(e) : 92;
           if (pct < 50 || pct > 100) pct = 92; }
       room = room / 100 * (uint64_t)pct; }
-    return room > (1ull << 30) ? room : (1ull << 30);
+    return nvmtl_working_set_limit(room, nvmtl_vk_vram_bytes(), g_integrated_device);
 }
 unsigned long long nvmtl_tex_objs_live(void);
 unsigned long long nvmtl_tex_objs_released(void);
@@ -1775,7 +1784,10 @@ static VkResult nvmtl_vk_alloc_image_mem(const VkMemoryRequirements *mr, VkDevic
                   (unsigned long long)(g_vram_bytes >> 20), (unsigned long long)(g_sys_bytes >> 20),
                   (unsigned long long)(used >> 20), (unsigned long long)(freev >> 20),
                   (unsigned long long)g_spilled); }
-        else nvlog("vk: %s image: VRAM full and no system-memory type takes it (bits 0x%x) -> %d", what, mr->memoryTypeBits, r);
+        else if (mt2 >= 0)
+            nvlog("vk: %s image: device-local and system-memory allocations failed (fallback type %d, %llu bytes, bits 0x%x) -> %d",
+                  what, mt2, (unsigned long long)mr->size, mr->memoryTypeBits, r);
+        else nvlog("vk: %s image: VRAM full and no compatible system-memory type exists (bits 0x%x) -> %d", what, mr->memoryTypeBits, r);
     }
     return r;
 }

@@ -316,7 +316,7 @@ static int nvmtl_res2_on(void) {
         const char *e = getenv("NVMTL_NO_RES2"), *c = getenv("NVMTL_RES2_COLD"), *h = getenv("NVMTL_RES2_HOT"), *m = getenv("NVMTL_RES2_MARGIN_MB");
         gRes2Cold = c && *c ? strtoull(c, NULL, 10) : 600;
         gRes2Hot = h && *h ? strtoull(h, NULL, 10) : 120;
-        gRes2Margin = (m && *m ? strtoull(m, NULL, 10) : 256) << 20;
+        gRes2Margin = m && *m ? strtoull(m, NULL, 10) << 20 : nvmtl_vk_reserve_default(256ull << 20);
         gRes2On = !(e && e[0] == '1');
         nvlog("residency (res2): LRU page-off/page-on %s (NVMTL_NO_RES2=%s) - cold %llu ticks, hot %llu ticks, margin %llu MB",
               gRes2On ? "ON" : "OFF", e ? e : "unset", (unsigned long long)gRes2Cold, (unsigned long long)gRes2Hot, (unsigned long long)(gRes2Margin >> 20));

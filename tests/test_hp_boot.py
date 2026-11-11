@@ -133,7 +133,7 @@ class BootTests(unittest.TestCase):
         work=self.root/'console-work';work.mkdir()
         report={};user=SimpleNamespace(pw_uid=501,pw_gid=20,pw_name='fixture-user')
         actual_stat=b.os.stat
-        def stat(path,*args,**kwargs):return SimpleNamespace(st_uid=501) if str(path)=='/dev/console' else actual_stat(path,*args,**kwargs)
+        def stat(path,*args,**kwargs):return SimpleNamespace(st_uid=0 if failure=='console-change' else 501) if str(path)=='/dev/console' else actual_stat(path,*args,**kwargs)
         def command(args,**kwargs):
             from subprocess import CompletedProcess
             return CompletedProcess(args,2 if failure=='compute' and args[-1]=='--hp' else 0,'readback fixture','')
@@ -163,6 +163,12 @@ class BootTests(unittest.TestCase):
         report,wait,run,error=self.console_test('compute')
         self.assertIsNotNone(error);self.assertNotIn('metal_verified',report)
         self.assertEqual(run.call_args.args[0],[str(self.root/'gpu/phxctl/phxctl'),'abort'])
+
+    def test_console_change_retains_readback_evidence_without_enabling_apps(self):
+        report,wait,run,error=self.console_test('console-change')
+        self.assertIsNotNone(error);self.assertTrue(report['metal_readbacks_verified'])
+        self.assertEqual(report['metal_validation_uid'],501);self.assertEqual(report['console_uid_after_validation'],0)
+        self.assertNotIn('metal_verified',report)
 
     def test_existing_queue_verification_never_launches_native_initialization(self):
         self.state.mkdir();status=self.root/'status.json'

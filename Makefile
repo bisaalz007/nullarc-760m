@@ -15,7 +15,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_memory \
         $(TEST_BIN_DIR)/test_phx_vbios \
         $(TEST_BIN_DIR)/test_phx_vram_arena \
-        $(TEST_BIN_DIR)/test_phx_hp_display
+        $(TEST_BIN_DIR)/test_phx_hp_display \
+        $(TEST_BIN_DIR)/test_nvmtl_memory_policy
 
 .PHONY: all test clean kext fixtures
 
@@ -57,6 +58,9 @@ $(TEST_BIN_DIR)/test_phx_hp_display: tests/test_phx_hp_display.cpp src/amd/phx_h
 $(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
+$(TEST_BIN_DIR)/test_nvmtl_memory_policy: tests/test_nvmtl_memory_policy.cpp src/nmplugin/nvmtl_memory_policy.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
 build/tools/phxfw: tools/phxctl/phxfw.cpp src/amd/rdna3_ucode_extract.cpp src/amd/rdna3_ucode_extract.h src/amd/rdna3_ucode_psp.h
 	mkdir -p build/tools
 	$(CXX) $(CXXFLAGS) $(INCLUDES) tools/phxctl/phxfw.cpp src/amd/rdna3_ucode_extract.cpp -o $@
@@ -82,6 +86,7 @@ test: $(TESTS) build/tools/phxfw
 	python3 tests/test_hp_boot_recovery.py
 	python3 tests/test_hp_display_capture.py
 	python3 tests/test_hp_windowserver.py
+	python3 tests/test_hp_amfi.py
 	python3 tests/test_hp_display_install.py
 	python3 tests/test_hp_aux_update.py
 	python3 tests/test_hp_acpi_dependency.py
