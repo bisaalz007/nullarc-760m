@@ -63,7 +63,8 @@ and [Metal execution report](hardware/dumps/hp_envy_760m/sequoia-build39-metal-e
 These results establish basic compute and offscreen graphics acceleration through
 NullArc's kernel, Darwin RADV, translator and Metal plugin. The resource46 guarded
 boot now reaches the accelerated desktop and passes actual WindowServer
-presentation checks on the HP. Frame-copy performance remains about 10 FPS.
+presentation checks on the HP. Selecting its validated PCI-aperture copy path
+returned 301 presents over 5.01 seconds, about 60 FPS, with zero failed transactions.
 GPU reset, suspend/resume and broad application compatibility still need work.
 HP boot remains diagnostic until the explicit
 administrator experiment or opt-in `--hp-native` app-only service. Automatic native
@@ -112,7 +113,9 @@ crash and verifies the Vulkan OOM return with the fix. The guarded retest reache
 the desktop with successful native/Metal readbacks, live framebuffer-client
 presentation checks and zero failed transactions. Scalar frame copies took
 110–226 ms, and enabling the existing streaming-copy path still left copies
-around 100 ms. Performance investigation continues. See the
+around 100 ms. The HP's PCI aperture subsequently reduced mean copy time to
+11.6 ms and the user confirmed a smooth desktop. The HP supervisor now selects
+that mapping and enables streaming copy when the CPU advertises SSE4.1. See the
 [resource regression report](hardware/dumps/hp_envy_760m/sequoia-resource46-offscreen.json)
 and [desktop evidence](hardware/dumps/hp_envy_760m/sequoia-resource46-desktop.json).
 

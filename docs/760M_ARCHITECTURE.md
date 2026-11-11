@@ -20,8 +20,9 @@ Resource46 reproduces native BO allocation/handle-reuse failures and an OOM
 cleanup crash in RADV. Phoenix patches 0011..0013 address those resource paths.
 The corrected backend passes bounded native IOSurface, churn and shader
 readbacks. Its guarded HP boot now reaches the desktop and passes the live
-framebuffer-client/present check. CPU frame-copy durations around 100 ms remain
-the next measured bottleneck. Longer-session desktop stability needs validation.
+framebuffer-client/present check. Selecting the measured HP PCI-aperture copy
+path reduced mean copy time to 11.6 ms and yielded about 60 presents per second
+in a five-second sample. Longer-session desktop stability needs validation.
 
 ```text
 App / WindowServer

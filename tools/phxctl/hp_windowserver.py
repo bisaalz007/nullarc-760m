@@ -160,6 +160,25 @@ def begin(package,state,folder,progress=None):
         raise
     return True
 
+def configure_copy():
+    # HP measurements: reading a frame took 1.7 ms, but the system-RAM alias
+    # took about 95 ms to write. The validated PCI aperture took about 10 ms.
+    # Keep this choice in the HP supervisor; the reference startup is separate.
+    settings={'scanout_mapping':'pci-aperture'}
+    try:
+        features=subprocess.check_output(['/usr/sbin/sysctl','-n','machdep.cpu.features'],
+                                         text=True,timeout=5).split()
+    except (OSError,subprocess.SubprocessError) as e:
+        features=[]
+        settings['cpu_features_read_error']=str(e)
+    streaming='SSE4.1' in features
+    sysctl('debug.phxfb_alias',0)
+    sysctl('debug.nvaccel_iop_sse',int(streaming))
+    if sysctl('debug.phxfb_alias')!=0 or sysctl('debug.nvaccel_iop_sse')!=int(streaming):
+        raise ValueError('HP frame-copy setting readback mismatch')
+    settings['streaming_copy']=streaming
+    return settings
+
 def arm(report,save,allow,atomic):
     require_library_policy()
     validated_accelerator();unopened_held_framebuffer()
@@ -171,8 +190,7 @@ def arm(report,save,allow,atomic):
     if sysctl('debug.nvaccel_iop')!=1:raise ValueError('display pipe transaction gate did not open')
     sysctl('debug.phxagdc',1);time.sleep(1)
     if sysctl('debug.phxagdc')!=1:raise ValueError('HP AGDC did not start')
-    # Keep the existing scalar copy path for the first HP display experiment.
-    # No new scanout allocation, display register programming or refresh change.
+    report['desktop_copy_settings']=configure_copy();save()
     sysctl('debug.nvaccel_iop_vsync',1)
     unopened_held_framebuffer()
     report['desktop_phase']='releasing-panel';save()

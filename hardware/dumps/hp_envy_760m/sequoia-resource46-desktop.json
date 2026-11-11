@@ -30,11 +30,23 @@
     "streaming_copy_still_exceeds_frame_budget": true,
     "subsequent_last_frame_copy_us": 101259,
     "copy_routine_pixel_checks_passed": 512,
-    "copy_source_and_destination_timing_separation_pending": true
+    "source_read_us": 1658,
+    "copy_source_and_destination_timing_separation_pending": false,
+    "live_scanout_alias": 0,
+    "user_confirmed_smooth_after_pci_aperture_selection": true,
+    "pci_aperture_sample": {
+      "duration_seconds": 5.010394494,
+      "presents": 301,
+      "presents_per_second": 60.07510992606484,
+      "mean_copy_us": 11591.378737541529,
+      "failed_transactions": 0,
+      "one_refresh_gaps": 300,
+      "longer_gaps": 0
+    }
   },
   "validation_scope": {
     "single_guarded_display_boot": true,
-    "sustained_60_fps_confirmed": false,
+    "sixty_fps_during_five_second_sample": true,
     "reset_suspend_resume_confirmed": false
   }
 }

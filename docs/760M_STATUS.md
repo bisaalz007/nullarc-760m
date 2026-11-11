@@ -1233,4 +1233,24 @@ destination guards. The user enabled `debug.nvaccel_iop_sse=1` for the current
 boot. Subsequent frame copies remained around 100 ms, so streaming copy alone
 does not resolve the bottleneck. A read-only source timing measurement is pending.
 The new `tests/test_scanout_copy.py` is part of `make test`. No default startup
-copy setting has been promoted from this incomplete performance test.
+copy setting was promoted at that checkpoint.
+
+### HP PCI-aperture copy path reaches the panel refresh rate
+
+The source-only benchmark took 1658 microseconds, separating the fast read side
+from the roughly 95 ms full-frame copy. The existing system-RAM alias had
+validated its pixels, but its writes were slow on this HP. The user selected
+`debug.phxfb_alias=0`, retaining streaming copy, and immediately reported a smooth
+desktop. A subsequent five-second sample recorded 301 presents over 5.010394494
+seconds (60.075/s), mean copy duration 11591 microseconds, 300 single-refresh gaps,
+zero longer gaps and zero failed transactions. This uses the existing mapped
+PCI aperture and the existing copy implementation. The effective cache-type
+reason for the alias slowdown has not been established.
+
+`hp_windowserver.py` now selects the PCI-aperture mapping before releasing the
+HP panel and enables streaming copy only when actual CPU features include
+SSE4.1. Both settings are read back, and a mismatch stops before release.
+The 20 display guard tests and 512 scanout-copy cases pass. The reference
+startup keeps its own selection. Current live settings have been applied by
+the user's sysctl commands. The immutable installed boot package predates the
+new default, which is included in the updated source/package.

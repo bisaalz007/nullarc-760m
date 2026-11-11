@@ -101,14 +101,30 @@ class DisplayTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'family'):d.validated_accelerator()
 
     def test_arm_order_releases_only_after_positive_checks(self):
-        events=[];values={'debug.nvaccelfb':1,'debug.nvaccel_heads_piped':1,'debug.nvaccel_iop':1,'debug.phxagdc':1,'debug.phxfb_hold':0}
+        events=[];values={'debug.nvaccelfb':1,'debug.nvaccel_heads_piped':1,'debug.nvaccel_iop':1,'debug.phxagdc':1,'debug.phxfb_hold':0,
+                         'debug.phxfb_alias':0,'debug.nvaccel_iop_sse':1}
         def control(name,value=None):
             events.append((name,value));return values.get(name,0) if value is None else ''
-        with patch.object(d,'validated_accelerator'),patch.object(d,'unopened_held_framebuffer'),patch.object(d,'sysctl',side_effect=control),patch.object(d.time,'sleep'):
+        with patch.object(d,'validated_accelerator'),patch.object(d,'unopened_held_framebuffer'),patch.object(d,'sysctl',side_effect=control),patch.object(d.time,'sleep'),patch.object(d.subprocess,'check_output',return_value='SSE SSE2 SSE4.1'):
             report={};d.arm(report,lambda:None,Path('fixture'),lambda *args:events.append(('allow',None)))
         self.assertTrue(report['desktop_armed'])
         self.assertLess(events.index(('debug.phxagdc',1)),events.index(('allow',None)))
         self.assertLess(events.index(('allow',None)),events.index(('debug.phxfb_hold',0)))
+        self.assertLess(events.index(('debug.phxfb_alias',0)),events.index(('allow',None)))
+        self.assertEqual(report['desktop_copy_settings'],{'scanout_mapping':'pci-aperture','streaming_copy':True})
+
+    def test_copy_settings_follow_actual_cpu_features(self):
+        for features,expected in (('SSE SSE4.1 AVX',1),('SSE SSE2',0)):
+            values={'debug.phxfb_alias':0,'debug.nvaccel_iop_sse':expected}
+            def control(name,value=None):return values[name] if value is None else ''
+            with patch.object(d.subprocess,'check_output',return_value=features),patch.object(d,'sysctl',side_effect=control) as settings:
+                result=d.configure_copy()
+            self.assertEqual(result['streaming_copy'],bool(expected))
+            self.assertEqual(settings.call_args_list[0].args,('debug.phxfb_alias',0))
+
+    def test_copy_setting_mismatch_stops_before_panel_release(self):
+        with patch.object(d.subprocess,'check_output',return_value='SSE4.1'),patch.object(d,'sysctl',return_value=1),self.assertRaisesRegex(ValueError,'readback'):
+            d.configure_copy()
 
     def test_failed_pipe_registration_does_not_allow_or_release(self):
         events=[]
