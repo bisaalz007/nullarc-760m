@@ -167,7 +167,7 @@ def assemble(a):
         for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
                      'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
-        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py','install_hp_boot.py','recover_hp_boot.py','install_hp_windowserver.py'):
+        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py','install_hp_boot.py','recover_hp_boot.py','install_hp_windowserver.py','update_hp_aux.py'):
             copy(REPO / 'install' / name, p / name)
         for name in ('install.sh','uninstall.sh'):
             copy(REPO / 'install' / name, p / name)

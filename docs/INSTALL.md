@@ -52,6 +52,16 @@ framebuffer or initialize GPU queues. Follow any specific macOS approval message
 then reboot using the same USB and log in. Confirm the new loaded UUID and fresh
 `/Users/Shared/nullarc-hp-native-status.json` app/Metal results before continuing.
 
+If the reboot report stops at `loaded-kernel-uuid`, the on-disk replacement is
+not proof of a cache update. Inspect the auxiliary collection's kext UUIDs. Do
+not arm the display, rerun GPU initialization or clear failure markers. The
+explicit `update_hp_aux.py --package <installed-immutable-package> --update`
+repair supports only the reviewed idle/pre-GPU UUID mismatch, builds and checks
+a backed-up aux-only candidate, and preserves every other auxiliary entry. It
+uses existing boot/system collections with the documented missing-KDK option,
+without bypassing authorization, changing EFI/security or rebuilding boot/sys.
+Read its report before rebooting; a successful build is not a loaded-module test.
+
 After those checks pass, run the same command again. It verifies the measured
 1920×1200 console, 2260×1240 timing totals, firmware reservations and display ABI,
 then writes a root-only next-boot request and `phxfb-boot=1`. Reboot with the same

@@ -83,6 +83,7 @@ test: $(TESTS) build/tools/phxfw
 	python3 tests/test_hp_display_capture.py
 	python3 tests/test_hp_windowserver.py
 	python3 tests/test_hp_display_install.py
+	python3 tests/test_hp_aux_update.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

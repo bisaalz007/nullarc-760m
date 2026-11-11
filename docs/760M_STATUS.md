@@ -751,3 +751,29 @@ assembly verifies PhxAccel strictly, and a regression test covers resource copyi
 The unchanged OpenCore PhxBringup build is unsigned; no signature or USB change
 is introduced there. Unexpected kmutil failures now stop the display installer
 with the staged files and backup retained for review.
+
+
+### Display module cache mismatch after app-mode reboot
+
+Boot `A268D201-2389-4FF2-9E4D-388C08F5E56B` loaded the old PhxAccel UUID
+535B5212-AD0C-34E1-9F0F-489176793105, although the installed module and immutable
+`package-display-eylbejlw` contain 633BB085-1049-336E-B87E-C1626D9B5417. The
+wrapper stopped at its UUID comparison before hardware execution; PhxBringup is
+diagnostic, NMXAccel/PhxAMDFB absent, framebuffer NVRAM arming absent. USB OpenCore
+injects only unchanged PhxBringup. Actual auxiliary-collection inspection confirms
+that collection still contains the old UUID, alongside three unrelated extensions.
+
+`update_hp_aux.py` repairs only this reviewed pre-GPU failure. It builds an aux-only
+candidate against the existing exact-system boot/system collections, using the
+documented missing-KDK option already used by reference `kinst.sh` (HP has no KDK),
+without that script's `-z` authorization bypass. Before backed-up atomic publication
+it requires exactly the previous extension set, all other entries unchanged, and
+the new accelerator UUID. It preserves/moves failure markers only for this exact
+failure to enable the next app-mode boot; it submits no GPU work and never arms
+WindowServer or reboots. Seven host tests and parsing of the actual four-entry HP
+collection pass. Candidate build/publication and new module runtime remain pending
+local administrator authentication. Do not blindly remove failure markers.
+
+The first preparation wrapper also pinned the pre-firmware assembly manifest;
+its guard correctly aborted without installing. The wrapper was corrected against
+the final ZIP, whose manifest and all 86 payload files were verified on the HP.
