@@ -13,6 +13,14 @@ from package_manifest import write,verify,inventory
 import install_hp_windowserver as i
 
 class InstallTests(unittest.TestCase):
+    def test_arm_requires_current_boot_native_readiness_and_metal_readbacks(self):
+        status={'native_readiness_verified':True,'metal_verified':True,'apps_enabled':True,'boot_session_uuid':'current'}
+        i.validate_current_apps(status,'current')
+        for key in ('native_readiness_verified','metal_verified','apps_enabled'):
+            bad=dict(status);bad[key]=False
+            with self.assertRaises(ValueError):i.validate_current_apps(bad,'current')
+        with self.assertRaises(ValueError):i.validate_current_apps(status,'other')
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.package=self.root/'new';self.old=self.root/'old';self.parent=self.root/'installed';self.parent.mkdir()

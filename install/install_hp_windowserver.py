@@ -24,6 +24,12 @@ from package_manifest import verify,inventory,digest
 from install_diagnostics import atomic_write
 from recover_hp_boot import NATIVE
 
+def validate_current_apps(status,boot):
+    ready=status.get('native_initialization_verified') is True or status.get('native_readiness_verified') is True
+    if not ready or not all(status.get(k) is True for k in ('metal_verified','apps_enabled')):
+        raise ValueError('new module must first pass native readiness and Metal app tests')
+    if status.get('boot_session_uuid')!=boot:raise ValueError('app validation report is from another boot')
+
 def configured_package(daemon,parent):
     original=daemon.read_bytes();config=plistlib.loads(original);args=config.get('ProgramArguments',[])
     if config.get('Label')!='local.nullarc.hp-native' or len(args)!=5 or args[:2]!=['/usr/bin/python3','-B'] or args[3]!='--package':
@@ -99,10 +105,7 @@ def main():
     if running:
         display.validated_accelerator()
         status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
-        ready=status.get('native_initialization_verified') is True or status.get('native_readiness_verified') is True
-        if not ready or not all(status.get(k) is True for k in ('metal_verified','apps_enabled')):
-            raise ValueError('new module must first pass automatic native and Metal app tests')
-        if status.get('boot_session_uuid')!=display.boot_uuid():raise ValueError('app validation report is from another boot')
+        validate_current_apps(status,display.boot_uuid())
         if inventory(target)!=inventory(source):raise ValueError('installed module differs from running package')
         if inventory(old)!=inventory(package):raise ValueError('installed service package differs from requested display implementation')
         if not a.install:print('HP runtime display ABI/console plan and app checks passed; next invocation arms one boot. No changes.');return
