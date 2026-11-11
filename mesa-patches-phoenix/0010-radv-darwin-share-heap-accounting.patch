@@ -1,0 +1,56 @@
+From 61dc6dbec778de649bee386f282b882eb9a45e7a Mon Sep 17 00:00:00 2001
+From: imnotsayingthatlol <norrisethan65@icloud.com>
+Date: Tue, 10 Nov 2026 17:23:28 -0500
+Subject: [PATCH] radv/darwin: key heap accounting by the shared native client
+
+---
+ src/amd/common/ac_linux_drm.c         | 4 ++++
+ src/amd/common/darwin/ac_darwin_drm.c | 6 ++++++
+ src/amd/common/darwin/ac_darwin_drm.h | 2 ++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/src/amd/common/ac_linux_drm.c b/src/amd/common/ac_linux_drm.c
+index 9c3b071..284f74c 100644
+--- a/src/amd/common/ac_linux_drm.c
++++ b/src/amd/common/ac_linux_drm.c
+@@ -146,6 +146,10 @@ struct util_sync_provider *ac_drm_device_get_sync_provider(ac_drm_device *dev)
+
+ uintptr_t ac_drm_device_get_cookie(ac_drm_device *dev)
+ {
++#ifdef HAVE_AMDGPU_DARWIN
++   if (dev->is_darwin)
++      return acd_device_cookie(dev->ddev);
++#endif
+    return (uintptr_t) dev->adev;
+ }
+
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+index 6ce388d..6b24b28 100644
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -83,6 +83,12 @@ struct acd_device {
+ static pthread_mutex_t g_core_lock = PTHREAD_MUTEX_INITIALIZER;
+ static struct acd_core *g_core;
+
++uintptr_t
++acd_device_cookie(acd_device_handle dev)
++{
++   return (uintptr_t)dev->core;
++}
++
+ #define ACD_KERNEL_STUB(what)                                                                     \
+    do {                                                                                           \
+       fprintf(stderr, "radv-darwin: kernel stub '%s' -> -ENODEV (no kernel driver, S1a)\n", what); \
+diff --git a/src/amd/common/darwin/ac_darwin_drm.h b/src/amd/common/darwin/ac_darwin_drm.h
+index 3a559be..569e863 100644
+--- a/src/amd/common/darwin/ac_darwin_drm.h
++++ b/src/amd/common/darwin/ac_darwin_drm.h
+@@ -35,6 +35,8 @@ typedef struct acd_device *acd_device_handle;
+ int acd_device_initialize(uint32_t *drm_major, uint32_t *drm_minor, acd_device_handle *dev);
+ void acd_device_deinitialize(acd_device_handle dev);
+ struct util_sync_provider *acd_device_get_sync_provider(acd_device_handle dev);
++/* Logical devices sharing a native client also share its allocation tracker. */
++uintptr_t acd_device_cookie(acd_device_handle dev);
+
+ /* Emulates the DRM_AMDGPU_* command ioctls that ac_linux_drm.c issues. */
+ int acd_ioctl(acd_device_handle dev, unsigned cmd_index, void *data, unsigned size);

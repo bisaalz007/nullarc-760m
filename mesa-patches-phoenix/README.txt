@@ -1,7 +1,7 @@
 Phoenix (Radeon 780M, gfx1103) patches on top of Cobalt64's RADV Darwin port.
 
 Base: Mesa f5cb8ee032adabef599ae892ec4e42d796b84da9 + reference/Cobalt64/mesa-patches/0001..0009.
-Apply these after them (git am, 0001..0009).  0001..0003 are what tools/mesa_phoenix_canned.py,
+Apply these after them (git am, 0001..0010).  0001..0003 are what tools/mesa_phoenix_canned.py,
 tools/mesa_phoenix_identity.py and tools/mesa_phoenix_service.py produce (0003: open the PhxBringup service).
 0004 answers AMDGPU_INFO_TIMESTAMP from SMUIO GOLDEN_TSC (needs PhxBringup build 31): Metal GPUStartTime/GPUEndTime.
 0005 opens PhxBringup through NMXAccel when sandboxed (needs the PhxAccel proxy): Metal in WebKit's GPU process.
@@ -60,6 +60,10 @@ Alternative to 0009, after 0008:
   python3 /path/to/nullarc-760m/tools/mesa_phoenix_device_info.py /path/to/mesa
 Generated header check:
   python3 tools/phx_device_profile.py
+0010 keys Darwin heap accounting by the shared native client. Allocations through
+     the logical device are then visible to physical-device memory budget queries.
+     Linux keeps its existing device cookie. The packaged Vulkan test checks the
+     allocation/free delta for both mocked profiles.
 The roundtrip test above now covers 0007..0009. The separate Linux validation
 executes translated shaders on the HP with stock RADV, not this Darwin backend;
 see docs/LINUX_VALIDATION.md. Earlier vkprobe mock text describes compilation only;

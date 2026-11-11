@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT
  * Load the RADV ICD directly: mock inspection and ACO compilation only.
- * No Vulkan loader installation and no physical GPU connection required.
+ * The explicit --native-budget mode allocates and frees 1 MiB on an
+ * already initialized 760M. Neither mode submits GPU commands.
  */
 #include <vulkan/vulkan.h>
 #include <assert.h>
@@ -9,7 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 int main(int argc, char **argv) {
-    assert((argc == 4 || argc == 5 || argc == 7) && getenv("RADV_DARWIN_MOCK") && !strcmp(getenv("RADV_DARWIN_MOCK"), "1"));
+    const int native = argc == 4 && !strcmp(argv[3], "--native-budget");
+    const char *mock = getenv("RADV_DARWIN_MOCK");
+    if (native ? (strcmp(argv[2], "8") || mock || getenv("RADV_DARWIN_CANNED"))
+               : (!(argc == 4 || argc == 5 || argc == 7) || !mock || strcmp(mock, "1"))) return 2;
     unsigned expected = (unsigned)atoi(argv[2]);
     void *lib = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!lib) { fprintf(stderr, "%s\n", dlerror()); return 1; }
@@ -35,8 +39,9 @@ int main(int argc, char **argv) {
     assert(strstr(p.properties.deviceName, expected == 8 ? "760M" : "780M"));
     if (expected == 8) assert(p.properties.limits.timestampPeriod == 10.0f);
     else assert(p.properties.limits.timestampPeriod > 10.01f && p.properties.limits.timestampPeriod < 10.03f);
-    printf("[PASS] %s: %u CUs, SE=%u SA=%u CU/SA=%u (mock, no execution)\n", p.properties.deviceName,
-           core2.activeComputeUnitCount, core.shaderEngineCount, core.shaderArraysPerEngineCount, core.computeUnitsPerShaderArray);
+    printf("[PASS] %s: %u CUs, SE=%u SA=%u CU/SA=%u (%s transport, no execution)\n", p.properties.deviceName,
+           core2.activeComputeUnitCount, core.shaderEngineCount, core.shaderArraysPerEngineCount, core.computeUnitsPerShaderArray,
+           native ? "native" : "mock");
     // Compile a real storage-buffer shader using RADV/ACO, without dispatching.
     PFN_vkCreateDevice create_device = (PFN_vkCreateDevice)gpa(instance, "vkCreateDevice");
     PFN_vkGetDeviceProcAddr dgpa = (PFN_vkGetDeviceProcAddr)gpa(instance, "vkGetDeviceProcAddr");
@@ -55,7 +60,31 @@ int main(int argc, char **argv) {
     FN(PFN_vkDestroyDescriptorSetLayout, vkDestroyDescriptorSetLayout);
     FN(PFN_vkDestroyShaderModule, vkDestroyShaderModule);
     FN(PFN_vkDestroyDevice, vkDestroyDevice);
+    FN(PFN_vkAllocateMemory, vkAllocateMemory);
+    FN(PFN_vkFreeMemory, vkFreeMemory);
     #undef FN
+    // The physical-device budget query opens a different logical DRM handle.
+    // It must see allocations tracked against the same shared Darwin core.
+    PFN_vkGetPhysicalDeviceMemoryProperties2 memprops=(PFN_vkGetPhysicalDeviceMemoryProperties2)gpa(instance,"vkGetPhysicalDeviceMemoryProperties2");
+    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget={.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT};
+    VkPhysicalDeviceMemoryProperties2 memory={.sType=VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2,.pNext=&budget};
+    memprops(device,&memory);
+    uint32_t type=0;while(type<memory.memoryProperties.memoryTypeCount && !(memory.memoryProperties.memoryTypes[type].propertyFlags&VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))++type;
+    assert(type<memory.memoryProperties.memoryTypeCount);
+    uint32_t heap=memory.memoryProperties.memoryTypes[type].heapIndex;
+    VkDeviceSize before=budget.heapUsage[heap];
+    VkMemoryAllocateInfo ma={.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,.allocationSize=1u<<20,.memoryTypeIndex=type};
+    VkDeviceMemory allocation;assert(vkAllocateMemory(logical,&ma,NULL,&allocation)==VK_SUCCESS);
+    memprops(device,&memory);
+    VkDeviceSize after=budget.heapUsage[heap];
+    vkFreeMemory(logical,allocation,NULL);memprops(device,&memory);
+    printf("Darwin local heap usage (bytes): %llu -> %llu -> %llu\n",
+           (unsigned long long)before,(unsigned long long)after,(unsigned long long)budget.heapUsage[heap]);
+    if (after<before+ma.allocationSize || budget.heapUsage[heap]!=before || native) {
+        vkDestroyDevice(logical, NULL); destroy(instance, NULL); dlclose(lib);
+        return after>=before+ma.allocationSize && budget.heapUsage[heap]==before ? 0 : 42;
+    }
+    puts("[PASS] Darwin heap budget observes live allocations and frees (mock transport)");
     FILE *f = fopen(argv[3], "rb"); assert(f);
     assert(!fseek(f, 0, SEEK_END)); long bytes = ftell(f); assert(bytes > 0 && !(bytes % 4));
     rewind(f); uint32_t *code = malloc((size_t)bytes); assert(code);
