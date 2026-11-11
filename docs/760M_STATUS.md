@@ -944,3 +944,24 @@ HP diagnostic state, no accelerator/custom framebuffer or display request, activ
 Ten recovery tests pass, including same-boot rejection and active-accelerator refusal;
 total targeted control tests are now 57. Next: stage the guard package and run this
 fresh boot's first app/native checks before considering another one-shot display boot.
+
+The corrected guard package was assembled from the existing verified native build
+(no native recompilation), then packaged as private test ZIP
+`nullarc-760m-0.1.5-sequoia-guard41.zip`, source da0abff. ZIP SHA-256:
+9683e98c55ff9500321fec23f68fba056e0a752f3dcc691d92fb8f420e88834d;
+manifest SHA-256 bddc67b776d100f728aed83137751967bf620653e3091c88c347af84378812db.
+All 89 HP package files, strict plugin/accelerator signatures, Python syntax and
+executable modes verify; all 11 native groups match the previous early41 package.
+The new signing-dependency guard also passes against the real HP.
+
+A reviewed local-sudo wrapper is staged at
+`/Users/Shared/nullarc-760m-sequoia-test/hp41-recover-apps.sh`. With
+`--arm-windowserver`, it pins current boot 6DCA08D0, prior failure 6465C194, exact
+EFI UUID/config/manifest, validates/protects recovery state, runs this fresh boot's
+first native/GUI Metal tests, then restores the backed-up early matching opt-in
+and arms one guarded display boot only after success. It prints
+`READY FOR GUARDED DISPLAY RETEST` only after request readback; errors stop later
+stages. No boot-argument edits or reboots are performed by the wrapper. Its result
+is `hp41-recover-apps-result.json` alongside it. Local administrator execution is
+pending because SSH cannot provide the user's administrator authentication. Do
+not repeat the older hp41-prepare.sh, which is pinned to an obsolete boot.
