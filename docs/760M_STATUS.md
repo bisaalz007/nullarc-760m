@@ -790,3 +790,22 @@ wrapper now saves filtered protected-report/candidate diagnostics on failures an
 independently verifies the published UUID before printing READY TO REBOOT. No new
 kernel build, GPU initialization, cache publication or WindowServer arming is yet
 verified for this continuation; the corrected root operation is pending.
+
+
+### Actual auxiliary link error: missing ACPI dependency
+
+The corrected updater reached kmutil create and returned KMErrorDomain 31:
+`IOACPIPlatformDevice::metaClass` could not bind. No collection was published.
+PhxAccel's new read-only VFCT path imported that class but its OSBundleLibraries
+omitted IOACPIFamily; PhxBringup already declares the same dependency. The HP
+loads IOACPIFamily 1.4, compatible with minimum 1.0. PhxAccel now declares
+`com.apple.iokit.IOACPIFamily = 1.0`. This is a linkage correction, not an AMFI
+rejection; the HP already loads AMFIPass 1.3.1. No security changes are requested.
+
+The signed metadata fix preserves every compiled program byte outside the trailing
+signature (including UUID 633BB085). `fix_hp_acpi_dependency.py` clones the immutable
+package, verifies this exact dependency-only change, backs up disk/daemon state,
+and invokes the guarded aux updater bound to the original protected failure.
+Failed linking restores metadata when the collection is unchanged. Four added
+metadata/rollback tests and ten aux tests pass. Candidate linking, new module load
+and WindowServer remain pending actual HP root/runtime tests.

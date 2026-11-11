@@ -60,7 +60,13 @@ repair supports only the reviewed idle/pre-GPU UUID mismatch, builds and checks
 a backed-up aux-only candidate, and preserves every other auxiliary entry. It
 uses existing boot/system collections with the documented missing-KDK option,
 without bypassing authorization, changing EFI/security or rebuilding boot/sys.
-Read its report before rebooting; a successful build is not a loaded-module test.
+Read its report before rebooting; a successful build is not a loaded-module test. If the report
+specifically says `IOACPIPlatformDevice::metaClass` cannot bind, use the dependency
+correction, not a security-policy change. `fix_hp_acpi_dependency.py --package
+<installed-package> --bundle <verified-metadata-fixed-PhxAccel.kext>` permits only
+adding IOACPIFamily 1.0 and re-signing with identical program bytes. It stages a
+new backed-up package and retries the verified auxiliary build. It does not alter
+AMFI, EFI or WindowServer arming.
 
 After those checks pass, run the same command again. It verifies the measured
 1920×1200 console, 2260×1240 timing totals, firmware reservations and display ABI,

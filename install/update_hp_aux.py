@@ -15,6 +15,7 @@ import plistlib
 import re
 import shutil
 import subprocess
+import struct
 import sys
 import tempfile
 
@@ -27,6 +28,36 @@ from install_diagnostics import atomic_write
 IDENTIFIER='com.luuumi.PhxAccel'
 KC=Path('/Library/KernelCollections/AuxiliaryKernelExtensions.kc')
 UUID=r'[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}'
+
+def unsigned_prefix(data):
+    if data[:4]!=b'\xcf\xfa\xed\xfe':raise ValueError('expected thin 64-bit Mach-O')
+    offset=32;found=None
+    for _ in range(struct.unpack_from('<I',data,16)[0]):
+        command,size=struct.unpack_from('<II',data,offset)
+        if size<8 or offset+size>len(data):raise ValueError('invalid Mach-O commands')
+        if command==0x1d:
+            if size!=16 or found:raise ValueError('invalid code signature command')
+            start,length=struct.unpack_from('<II',data,offset+8);found=(offset,start,length)
+        offset+=size
+    if not found:raise ValueError('code signature missing')
+    cmd,start,length=found
+    if start<offset or start+length!=len(data):raise ValueError('signature must be trailing')
+    prefix=bytearray(data[:start]);prefix[cmd+12:cmd+16]=bytes(4)
+    return bytes(prefix)
+
+def validate_acpi_patch(old,new):
+    """Permit only the missing dependency and re-signing; all program bytes match."""
+    before=inventory(old);after=inventory(new)
+    base='Library/Extensions/PhxAccel.kext/Contents/'
+    allowed={base+'Info.plist',base+'MacOS/PhxAccel',base+'_CodeSignature/CodeResources'}
+    if any(before.get(k)!=after.get(k) for k in (before.keys()|after.keys())-allowed):
+        raise ValueError('ACPI metadata update changed another component')
+    original=plistlib.loads((old/(base+'Info.plist')).read_bytes())
+    if 'com.apple.iokit.IOACPIFamily' in original['OSBundleLibraries']:raise ValueError('original already declares ACPI')
+    original['OSBundleLibraries']['com.apple.iokit.IOACPIFamily']='1.0'
+    if plistlib.loads((new/(base+'Info.plist')).read_bytes())!=original:raise ValueError('unexpected Info.plist change')
+    if unsigned_prefix((old/(base+'MacOS/PhxAccel')).read_bytes())!=unsigned_prefix((new/(base+'MacOS/PhxAccel')).read_bytes()):
+        raise ValueError('compiled program changed beyond its code signature')
 
 def extensions(text):
     entries={}
@@ -91,8 +122,10 @@ def publish(candidate,target,backup,original_hash):
         if digest(target)!=digest(candidate):raise ValueError('published collection readback mismatch')
     finally:stage.unlink(missing_ok=True)
 
-def update(package,state,apply=False):
+def update(package,state,apply=False,failure_package=None):
     verify(package)
+    if failure_package is not None:
+        verify(failure_package);validate_acpi_patch(failure_package,package)
     sys.path.insert(0,str(package/'gpu/phxctl'))
     from hp_bringup import macho_uuid
     import hp_windowserver as display
@@ -107,7 +140,7 @@ def update(package,state,apply=False):
     if 'phxfb-boot' in plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'])):raise ValueError('framebuffer arming present')
     status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
     if status.get('boot_session_uuid')!=boot:raise ValueError('public service status is not from this boot')
-    failed_report,failed_status=last_failure(state,package)
+    failed_report,failed_status=last_failure(state,failure_package or package)
     for name in ('pending','disabled'):
         if not (state/name).is_file() or (state/name).is_symlink():raise ValueError('reviewed failure markers missing')
     before=inspect(KC);original_hash=digest(KC)
