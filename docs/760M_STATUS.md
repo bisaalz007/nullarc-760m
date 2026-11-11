@@ -3,11 +3,13 @@
 Updated 2026-11-08. Fork: `yt42c2mvn2-cmd/nullarc-760m`.
 Branch: `codex/radeon-760m-driver-completion`. Continuation baseline: merged `main` at `f08b898` (PR #1).
 
-**HP macOS acceleration is not functional or hardware-tested. This branch intentionally
-allows only diagnostics on the captured HP PCI identity. Do not install an upstream
-780M release expecting these source changes.** A diagnostic kext is now staged in the user-confirmed USB EFI with a backup;
-its diagnostic load is now verified on Sequoia. Older acceleration files were
-already present on the HP; replacement tests are being prepared.
+**Current verified state:** HP Sequoia 15.8.2, build 39: exclusive VRAM/PSP/MES
+bring-up, native fenced compute/render, public Metal compute/render and app access
+all pass. Automatic cold-boot initialization and app activation passed in boot
+`49800A69-CF26-4E40-91FC-F09883D6268F`. WindowServer/display acceleration, reset
+and suspend/resume remain unverified. The current task is WindowServer support;
+its framebuffer boot ordering, measured timing and Sequoia ABI must be validated.
+Historical implementation notes below describe earlier states.
 
 ## Continuation after PR #1
 
@@ -710,3 +712,35 @@ Thirty targeted publication/boot/recovery tests and four collector tests pass.
 All compiled inputs and artifacts remain unchanged; only Python/control/docs
 assembly is needed. Future cold-boot publication handling and current-session
 app activation still require their actual runtime results.
+
+
+## Automatic apps verified; WindowServer integration in progress
+
+Fresh boot `49800A69-CF26-4E40-91FC-F09883D6268F` passed automatic native
+initialization, console-user Metal compute/render and app activation. Saved report:
+`hardware/dumps/hp_envy_760m/sequoia-build39-automatic-app-activation.json`.
+This supersedes the earlier pending-publication notes above.
+
+The administrator's read-only build-39 display capture measured stable 1920×1200
+active timing, 2260×1240 totals, H porch/sync 48/32, V porch/sync 3/6, H+/V−,
+and approximately 60 Hz. PLL clock was not read; 168144000 Hz is the derived
+nominal clock at 60 Hz. CoreDisplay's four current shader entries translated,
+passed independent SPIR-V validation, and three PSOs compiled through the plugin's
+real pipeline-layout model using the explicit mock. No GPU execution is claimed
+for that preflight; Apple shader binaries are private and not redistributed.
+
+Modified components: shared `phx_hp_display.h`, PhxAMDFB, AGDC timing replies,
+NMXAccel runtime size/plan diagnostics and HP pipe guards; staged display installer,
+boot supervisor, packaging and tests. PhxBringup build 39 and the translator/RADV
+runtime are preserved. The early CPU console path resolves the previous circular
+ordering (framebuffer needed native claim, while WindowServer needs an early
+framebuffer). The new installer requires an app-mode validation reboot before it
+can arm one display boot. It does not modify USB EFI or security settings.
+
+Sequoia PhxAccel compilation and the complete host `make test` suite pass, including
+captured-plan bit mutation tests, display arm ordering/failure tests and installer
+backup/rollback/concurrent-edit tests. Current HP display module is still the
+previous app-tested UUID. Next required hardware step: install this display module
+with NVRAM unchanged, reboot and validate its ABI/console diagnostics and app tests;
+then authorize the one-shot display boot. WindowServer, reset and suspend/resume
+remain unverified. Do not report accelerated desktop support from these host tests.

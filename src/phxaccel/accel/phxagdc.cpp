@@ -51,7 +51,7 @@ public:
 OSDefineMetaClassAndStructors(PhxDeviceControl, AppleGraphicsDeviceControl)
 
 // CVT reduced-blanking timing for the panel's mode (PhxFB's IOFBConfig), in nvrm-agdc-k5.h's word layout.
-static void panelTiming(uint32_t t[NVK5_TIMING_WORDS])
+static bool panelTiming(uint32_t t[NVK5_TIMING_WORDS])
 {
     uint32_t w = 2560, h = 1600, mhz = 60000, ht = 0, vt = 0;
     if (gFB) {
@@ -65,12 +65,25 @@ static void panelTiming(uint32_t t[NVK5_TIMING_WORDS])
     }
     // the totals and refresh PhxAMDFB read off the display engine; CVT-RB (48/32/80 horizontal, 3/6/37 vertical) otherwise
     const uint32_t htot = ht > w ? ht : w + 160, vtot = vt > h ? vt : h + 46;
+    uint32_t hss=w+48,hse=w+80,vss=h+3,vse=h+9,hpositive=1,vpositive=0;
+    if (gFB && gFB->getProperty("PhxFBHP")==kOSBooleanTrue) {
+        if (gFB->getProperty("PhxFBTimingCaptured")!=kOSBooleanTrue || ht<=w || vt<=h) return false;
+        const char *keys[]={"PhxFBHSyncStart","PhxFBHSyncEnd","PhxFBVSyncStart","PhxFBVSyncEnd"};
+        uint32_t *values[]={&hss,&hse,&vss,&vse};
+        for (unsigned i=0;i<4;++i) {
+            OSNumber *n=OSDynamicCast(OSNumber,gFB->getProperty(keys[i]));if (!n) return false;*values[i]=n->unsigned32BitValue();
+        }
+        if (!(w<hss && hss<hse && hse<htot && h<vss && vss<vse && vse<vtot)) return false;
+        hpositive=gFB->getProperty("PhxFBHSyncPositive")==kOSBooleanTrue;
+        vpositive=gFB->getProperty("PhxFBVSyncPositive")==kOSBooleanTrue;
+    }
     bzero(t, NVK5_TIMING_WORDS * sizeof(uint32_t));
     t[NVK5_T_TAG] = NVK5_TIMING_TAG;
-    t[NVK5_T_HVIS] = w; t[NVK5_T_HSS] = w + 48; t[NVK5_T_HSE] = w + 80; t[NVK5_T_HTOT] = htot;
-    t[NVK5_T_VVIS] = h; t[NVK5_T_VSS] = h + 3; t[NVK5_T_VSE] = h + 9; t[NVK5_T_VTOT] = vtot;
+    t[NVK5_T_HVIS] = w; t[NVK5_T_HSS] = hss; t[NVK5_T_HSE] = hse; t[NVK5_T_HTOT] = htot;
+    t[NVK5_T_VVIS] = h; t[NVK5_T_VSS] = vss; t[NVK5_T_VSE] = vse; t[NVK5_T_VTOT] = vtot;
     t[NVK5_T_PCLK] = (uint32_t)((uint64_t)htot * vtot * mhz / 1000);
-    t[NVK5_T_REFRESH_MHZ] = mhz; t[NVK5_T_HSYNCPOS] = 1; t[NVK5_T_VSYNCPOS] = 0;
+    t[NVK5_T_REFRESH_MHZ] = mhz; t[NVK5_T_HSYNCPOS] = hpositive; t[NVK5_T_VSYNCPOS] = vpositive;
+    return true;
 }
 
 IOReturn PhxDeviceControl::vendor_doDeviceAttribute(unsigned int cmd, unsigned long *in, unsigned long inSize,
@@ -100,7 +113,7 @@ IOReturn PhxDeviceControl::vendor_doDeviceAttribute(unsigned int cmd, unsigned l
     // timing of the mode (NullMoth's K5 replies, nvrm-agdc-k5.h).
     if (cmd == NVK5_CMD_LINKCONFIG || cmd == NVK5_CMD_FBCAPEX) {
         uint32_t t[NVK5_TIMING_WORDS];
-        panelTiming(t);
+        if (!panelTiming(t)) return kIOReturnNotReady;
         int why = 0;
         const int r = nvk5_answer(cmd, in, inSize, out, outSize ? *outSize : 0, t, sizeof t, &why);
         if (r == NVK5_R_LINK || r == NVK5_R_CAPS) {

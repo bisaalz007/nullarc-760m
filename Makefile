@@ -14,7 +14,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_firmware_file \
         $(TEST_BIN_DIR)/test_phx_memory \
         $(TEST_BIN_DIR)/test_phx_vbios \
-        $(TEST_BIN_DIR)/test_phx_vram_arena
+        $(TEST_BIN_DIR)/test_phx_vram_arena \
+        $(TEST_BIN_DIR)/test_phx_hp_display
 
 .PHONY: all test clean kext fixtures
 
@@ -50,6 +51,9 @@ $(TEST_BIN_DIR)/test_phx_vbios: tests/test_phx_vbios.cpp src/amd/phx_vbios.h | $
 $(TEST_BIN_DIR)/test_phx_vram_arena: tests/test_phx_vram_arena.cpp src/amd/phx_vram_arena.h src/amd/phx_hp_memory.h src/amd/phx_bootstrap_layout.h tools/phxctl/mes_ring.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
+$(TEST_BIN_DIR)/test_phx_hp_display: tests/test_phx_hp_display.cpp src/amd/phx_hp_display.h src/amd/phx_hp_memory.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
+
 $(TEST_BIN_DIR)/test_phx_firmware_file: tests/test_phx_firmware_file.cpp tools/phxctl/fw_file.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
@@ -76,6 +80,9 @@ test: $(TESTS) build/tools/phxfw
 	python3 tests/test_hp_boot.py
 	python3 tests/test_hp_metal_publication.py
 	python3 tests/test_hp_boot_recovery.py
+	python3 tests/test_hp_display_capture.py
+	python3 tests/test_hp_windowserver.py
+	python3 tests/test_hp_display_install.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

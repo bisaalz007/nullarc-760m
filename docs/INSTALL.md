@@ -21,8 +21,9 @@ do not establish HP compatibility.
 | Reference 780M on Tahoe | Existing acceleration installer is included; this source build has not been runtime-validated there |
 
 Linux tests executed translated compute and graphics shaders on the HP. Build 39 now also passes native macOS GPU and public Metal compute/render readbacks. WindowServer remains unverified.
-Running `sudo ./install.sh --windowserver` on the HP returns an error **before
-installing acceleration or changing boot settings**. There is no bypass option.
+The new Sequoia display-development package provides a staged one-shot
+`sudo ./install.sh --windowserver` experiment, described below. Older packages
+still refuse this mode on HP. Display acceleration is not yet verified.
 
 Choose the Sequoia-labelled ZIP for macOS 15. Its native deployment target is 15.0;
 the older Tahoe-only ZIP remains a different build. CPU loading/translation is
@@ -31,6 +32,55 @@ verified on Sequoia 15.8.2. Basic native Metal compute/render are also verified;
 You need Python 3, a working OpenCore configuration and a backup of your EFI.
 Keep a separate way to boot if a diagnostic kext cannot load. These commands
 do not mount EFI, change SIP/AMFI, install OpenCore dependencies or reboot.
+
+## HP: experimental WindowServer stages
+
+This path currently supports the measured HP console on Sequoia 15 with
+IOGraphicsFamily 599, IOAcceleratorFamily2 485.2 and AGDC 8.1.10. It requires the
+working app-only boot service and matching native runtime. Class-size checks are
+necessary guards, not proof that every private display API is compatible.
+
+```sh
+./install.sh --windowserver --check
+sudo ./install.sh --windowserver
+```
+
+First installation backs up PhxAccel and the daemon, stages the new PhxAccel and
+an immutable service package, then requests standard start-only kext loading.
+It does not unload the current accelerator, change EFI/security/NVRAM, arm the
+framebuffer or initialize GPU queues. Follow any specific macOS approval message,
+then reboot using the same USB and log in. Confirm the new loaded UUID and fresh
+`/Users/Shared/nullarc-hp-native-status.json` app/Metal results before continuing.
+
+After those checks pass, run the same command again. It verifies the measured
+1920×1200 console, 2260×1240 timing totals, firmware reservations and display ABI,
+then writes a root-only next-boot request and `phxfb-boot=1`. Reboot with the same
+USB. The kext consumes/commits removal of that NVRAM flag before attachment. This
+is one display boot, never automatically rearmed. The console presenter changes
+no display registers; the existing GPU display pipe copies completed frames into
+the firmware scanout surface. Its 60 Hz clock is nominal, derived from captured
+totals and corroborated panel mode, not a measured/programmed PLL clock.
+
+The daemon initializes/test-checks native queues, registers exactly one display
+pipe and AGDC, and releases the panel hold before waiting for a GUI session.
+It then requires Metal readbacks and live framebuffer-client/present evidence.
+Failure disables retries; if the custom framebuffer owns the panel, it requests
+one reboot into the firmware framebuffer. A kernel/GPU fault can still require
+a manual power cycle. The consumed flag and failure markers prevent a repeated
+accelerated-display boot. No WindowServer compatibility is claimed until the HP
+runtime results and visible desktop have been checked.
+
+To cancel a staged display request before reboot (local administrator):
+
+```sh
+sudo nvram -d phxfb-boot
+sudo rm -f /var/db/nullarc-760m/windowserver-next-boot.json
+```
+
+Keep the printed `/var/db/nullarc-760m/display-update-*` backup. Do not remove
+pending/disabled markers or retry initialization after a failure without first
+reviewing its protected report. App-mode support remains independently verified
+on the previous build; the updated display module requires its own runtime test.
 
 ## HP: check and install diagnostics
 

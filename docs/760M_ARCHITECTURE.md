@@ -257,3 +257,32 @@ The opt-in app boot path is separate from the reference WindowServer daemon:
 allow list with an explicit WindowServer denial. Pending/disabled markers prevent
 retry after an interrupted or failed initialization. It does not change the
 framebuffer matching gates, display timing or NVRAM.
+
+
+## HP one-shot display integration (implemented; runtime validation pending)
+
+`phx_hp_display.h` validates the exact captured firmware console against two
+read-only timing/reservation snapshots and decoded VFCT/ATOM memory metadata.
+`PhxAMDFB` may present that CPU console early, before native GPU initialization,
+only with explicit consumed NVRAM arming. It refuses late matching beside an
+existing framebuffer. It neither opens PCI exclusively nor programs display
+registers. `NMXAccel` retains its independent native-readiness gate and publishes
+base-class sizes plus the validated console plan; HP pipe registration is refused
+when sizes differ. The AGDC timing reply uses captured porches/polarity instead of
+reference-machine CVT defaults. Nominal pixel clock is labelled accordingly.
+
+`install_hp_windowserver.py` -> app-only module-validation reboot -> same installer
+verifies actual ABI/plan/current-boot Metal -> root-owned one-shot request/NVRAM ->
+`hp_boot.py` privileged native tests -> `hp_windowserver.py` exact pipe and AGDC
+registration -> release hold -> GUI Metal and present checks. GUI waiting cannot
+precede releasing the panel. The request is consumed, not automatically renewed.
+A failed display boot disables GPU retries and requests a firmware-fallback reboot
+only when the custom framebuffer actually owns the panel. This preserves the
+existing reference-machine display path. Private method/offset compatibility,
+WindowServer shader execution and visible panel output still require HP testing.
+
+Source checks used Apple IOGraphics-599's IOFramebuffer::start/header and Linux
+v6.14 `dcn10_optc.c`/DCN 3.1.4 register definitions. The framebuffer base does not
+open its provider in those Apple sources; this matters because PhxBringup must
+still acquire exclusive PCI ownership later. Timing decode/capture provenance is
+in `hardware/profiles/hp-760m-display-registers.json`.

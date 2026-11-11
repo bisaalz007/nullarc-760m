@@ -62,10 +62,18 @@ and [Metal execution report](hardware/dumps/hp_envy_760m/sequoia-build39-metal-e
 
 These results establish basic compute and offscreen graphics acceleration through
 NullArc's kernel, Darwin RADV, translator and Metal plugin. **WindowServer/panel
-acceleration, cold-boot service execution, GPU reset, suspend/resume and
+acceleration, GPU reset, suspend/resume and broad
 application compatibility remain unverified or unimplemented.** The firmware
 framebuffer still drives the panel. HP boot remains diagnostic until the explicit
-administrator experiment or opt-in `--hp-native` app-only service; `install.sh --windowserver` remains refused. Do not
+administrator experiment or opt-in `--hp-native` app-only service. Automatic native
+initialization, GUI-session Metal readbacks and app activation passed a fresh boot;
+see the [cold-boot evidence](hardware/dumps/hp_envy_760m/sequoia-build39-automatic-app-activation.json).
+The new Sequoia `install.sh --windowserver` path first stages the display module
+for an **app-only validation reboot**. Only after that module's loaded UUID,
+runtime family sizes/versions, captured console plan and current-boot app tests
+pass can the same command arm one display boot. This experimental display path
+is implemented and host-tested, **not yet runtime-verified**. See
+[installation stages](docs/INSTALL.md#hp-experimental-windowserver-stages). Do not
 rerun the bootstrap in a boot with initialized or lost queues.
 
 The Sequoia build uses `--min-macos 15.0`; build headers still require SDK 26.
@@ -77,12 +85,12 @@ boot also passed native PSP/MES and compute/render tests, then failed an immedia
 Metal-device enumeration with an empty catalogue. The bounded system-context wait also timed out on a second boot, with native
 GPU tests still passing. The latest service verifies Metal in the logged-in
 console user’s GUI context after privileged native initialization; that corrected
-startup path awaits runtime proof. The third boot kept healthy native queues and passed subsequent SSH Metal
+startup path subsequently passed a fresh cold boot. The third boot kept healthy native queues and passed subsequent SSH Metal
 compute/render tests without reinitialization. PhxAccel's 60-second withholding
 of `MetalPluginName` was then identified; startup now waits for the actual
 property before entering Metal. A verification-only continuation can finish app
-activation without another reboot. Automatic app activation remains unverified
-until that continuation passes.
+activation without another reboot. Both that continuation and automatic app
+activation on boot `49800A69-CF26-4E40-91FC-F09883D6268F` passed.
 
 Development build 35 adds read-only memory snapshot selector 31 and `mesboot layout`.
 The tool gets MC/physical addresses from the kernel, validates the reply and rejects

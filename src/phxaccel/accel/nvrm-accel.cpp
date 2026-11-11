@@ -22,6 +22,7 @@
 #include "IOGraphicsAccelerator2.h"
 #include "IOAccelEventMachineFast2.h"
 #include "IOAccelLegacyDisplayMachine.h"
+#include "IOAccelDisplayPipe.h"
 #include "IOAccelTask.h"
 #include "IOAccelMemoryMap.h"
 #include "../nvrm_gpuva_abi.h"
@@ -41,7 +42,21 @@ static void               nvAccelWriteStamp(int index, unsigned int value);
 #endif
 #define ALOG(fmt, ...) do { kprintf(NV_LOG_TAG fmt "\n", ##__VA_ARGS__); IOLog(NV_LOG_TAG fmt "\n", ##__VA_ARGS__); } while (0)
 #include <libkern/c++/OSSymbol.h>
+#ifdef PHX_FB
+void phxFramebufferDiagnostics(IOPCIDevice *,IOService *);
+#endif
 #include "nvrm_vram_abi.h"
+bool phxDisplayFamilySizesCompatible() {
+    const char *names[]={"IOAccelDisplayMachine","IOAccelDisplayPipe"};
+    const unsigned sizes[]={sizeof(IOAccelDisplayMachine),sizeof(IOAccelDisplayPipe)};
+    for (unsigned i=0;i<2;++i) {
+        const OSSymbol *s=OSSymbol::withCStringNoCopy(names[i]);
+        const OSMetaClass *base=s?OSMetaClass::getMetaClassWithName(s):nullptr;
+        const unsigned runtime=base?base->getClassSize():0;OSSafeReleaseNULL(s);
+        if (runtime!=sizes[i]) return false;
+    }
+    return true;
+}
 #include <IOKit/IODeviceMemory.h>
 #include "tahoe_fwd.h"   // macOS 26: inherited slots Apple no longer exports, forwarded through its vtables
 #include "nvaccel_stubs.h"
@@ -279,6 +294,30 @@ public:
 
     NVDisplayMachine *fDM = nullptr;
     IOPCIDevice *fPCI = nullptr;
+    bool fHPDisplayABI = false;
+    bool isCapturedHP() const {
+        return fPCI && phx_topology_matches(&phx_hp_760m,fPCI->configRead16(0),fPCI->configRead16(2),
+            fPCI->configRead8(8),fPCI->configRead16(0x2c),fPCI->configRead16(0x2e));
+    }
+    void displayDiagnostics() {
+        const char *names[]={"IOAccelDisplayMachine","IOAccelDisplayPipe"};
+        const char *keys[]={"PhxABIDisplayMachineRuntime","PhxABIDisplayPipeRuntime"};
+        const unsigned headers[]={sizeof(IOAccelDisplayMachine),sizeof(IOAccelDisplayPipe)};
+        bool compatible=true;
+        for (unsigned i=0;i<2;++i) {
+            const OSSymbol *s=OSSymbol::withCStringNoCopy(names[i]);
+            const OSMetaClass *base=s?OSMetaClass::getMetaClassWithName(s):nullptr;
+            const unsigned runtime=base?base->getClassSize():0;
+            setProperty(keys[i],runtime,32);compatible&=runtime==headers[i];OSSafeReleaseNULL(s);
+        }
+        setProperty("PhxABIDisplayMachineHeader",headers[0],32);setProperty("PhxABIDisplayPipeHeader",headers[1],32);
+#ifdef PHX_FB
+        phxFramebufferDiagnostics(fPCI,this);
+#endif
+        fHPDisplayABI=compatible && getProperty("PhxABIFramebufferCompatible")==kOSBooleanTrue;
+        setProperty("PhxHPDisplayABICompatible",fHPDisplayABI);
+    }
+    bool displayABIAllowed() const { return !isCapturedHP() || fHPDisplayABI; }
     IONotifier *fFBNote = nullptr;
     IONotifier *fIntelNote = nullptr;
     static NVAccel *gAccel;
@@ -375,7 +414,7 @@ public:
         if (me->fRegLock) IOLockUnlock(me->fRegLock);
     }
     void deliverModeChange() {
-        if (!fDM) return;
+        if (!fDM || !displayABIAllowed()) return;
         uint8_t *dm = (uint8_t *)fDM;
         ALOG("  delivering display_mode_will_change/did_change (nest %u, pipes %u)",
              *(const volatile uint32_t *)(dm + 0x10c), *(const volatile uint32_t *)(dm + 0x108));
@@ -384,6 +423,7 @@ public:
         reportPipeGates("after deliverModeChange");
     }
     void reportPipeGates(const char *when) {
+        if (!displayABIAllowed()) return;
         uint8_t accelFlags = *(const volatile uint8_t *)((const uint8_t *)this + 0xc78);
         ALOG("  GATES %s: accel+0xc78 = 0x%02x (enabled bit 0x2 %s)",
              when, accelFlags, (accelFlags & 0x2) ? "SET" : "CLEAR <- kIOReturnNotReady");
@@ -399,6 +439,7 @@ public:
         }
     }
     unsigned registerPendingLocked(const char *why) {
+        if (!displayABIAllowed()) { ALOG("HP display ABI mismatch: pipe registration refused");return 0; }
         unsigned added = 0;
         for (unsigned i = 0; i < kNvMaxFB; i++) {
             IOService *fb = fFBs[i];
@@ -468,6 +509,7 @@ public:
         if (fRegLock) IOLockUnlock(fRegLock);
     }
     bool registerFramebufferLocked(int how) {
+        if (!displayABIAllowed()) { ALOG("HP display ABI mismatch: framebuffer registration refused");return false; }
         if (!fDM) { ALOG("registerFramebuffer(%d): no display machine", how); return false; }
         if (!fFB) { ALOG("registerFramebuffer(%d): no framebuffer has published yet", how); return false; }
         unsigned before = fDM->getFramebufferCount();
@@ -696,8 +738,9 @@ public:
             { unsigned n = 0; for (unsigned i = 0; i < NV_CARRIERS; i++) if (fCarriers[i]) n++;
               ALOG("user-client carriers: %u of %u ready (each holds ~1019 clients before "
                    "IOService::attach starts sleeping)", n, (unsigned)NV_CARRIERS); }
-            enableFromHook("start");
             fPCI = OSDynamicCast(IOPCIDevice, provider);
+            displayDiagnostics();
+            enableFromHook("start");
             ALOG("display machine framebuffer count after the family sweep = %u", fDM ? fDM->getFramebufferCount() : 0xFFFFFFFFu);
             fRegLock = IOLockAlloc();
             ALOG("multi-head: up to %u heads, registration lock %p%s", kNvMaxFB, fRegLock,

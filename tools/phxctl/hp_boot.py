@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Opt-in HP app acceleration at boot; never arms or restarts WindowServer."""
+"""HP app acceleration, with a separately authorized one-shot display experiment."""
 import argparse
 from datetime import datetime,timezone
 import json
@@ -16,6 +16,7 @@ import hashlib
 import plistlib
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from hp_bringup import wait_for_metal,macho_uuid,claimed_hp
+import hp_windowserver as desktop
 
 RESTRICTED='# NullArc: built-in test tools only; automatic initialization disabled\n'
 APPS='# NullArc: verified HP app acceleration; desktop remains on firmware framebuffer\n-WindowServer\n-mediaanalysisd\n-photoanalysisd\n-Spotlight\n*\n'
@@ -90,7 +91,7 @@ def boot(package,state,allow,status=None):
     atomic(allow,RESTRICTED)
     if status:
         atomic(status,json.dumps({'automatic_initialization_attempted':False,'apps_enabled':False,
-            'desktop_armed':False,'recorded_at':datetime.now(timezone.utc).isoformat()})+'\n')
+            'desktop_armed':False,'boot_session_uuid':desktop.boot_uuid(),'recorded_at':datetime.now(timezone.utc).isoformat()})+'\n')
     if (state/'disabled').exists():return 0
     pending=state/'pending'
     if pending.exists():
@@ -100,11 +101,13 @@ def boot(package,state,allow,status=None):
     folder=Path(tempfile.mkdtemp(prefix='boot-',dir=state))
     command=[sys.executable,'-B',str(package/'gpu/phxctl/hp_bringup.py'),
              '--package',str(package),'--output',str(folder/'execution'),'--execute','--claim','--defer-metal']
-    report={'automatic_initialization_attempted':True,'desktop_armed':False}
+    report={'automatic_initialization_attempted':True,'desktop_armed':False,'boot_session_uuid':desktop.boot_uuid()}
+    display_requested=(state/desktop.REQUEST).exists()
     def save():
         (folder/'boot-result.json').write_text(json.dumps(report,indent=2)+'\n')
         publish(status,report)
     try:
+        display=desktop.begin(package,state,folder)
         p=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
         try:stdout,stderr=p.communicate(timeout=300)
         except subprocess.TimeoutExpired:
@@ -124,14 +127,19 @@ def boot(package,state,allow,status=None):
         if not all(evidence.get(k) is True for k in ('executed','native_compute_verified','native_render_verified','accelerator_claimed')):
             raise ValueError('bootstrap did not prove native compute, render and accelerator claim')
         report['native_initialization_verified']=True;save()
+        if display:
+            desktop.arm(report,save,allow,atomic)
         verify_console_metal(package,report,save)
         if report.get('metal_verified') is not True:raise ValueError('console-user Metal verification missing')
         if (state/'disabled').exists():raise ValueError('service disabled during initialization; app access remains restricted')
-        atomic(allow,APPS)
+        if display:desktop.verify_present(report,save)
+        atomic(allow,desktop.DESKTOP if display else APPS)
         pending.unlink()
         report['apps_enabled']=True
     except (OSError,ValueError,subprocess.SubprocessError) as e:
-        report['error']=str(e);(state/'disabled').touch();atomic(allow,RESTRICTED);raise
+        report['error']=str(e);(state/'disabled').touch();atomic(allow,RESTRICTED)
+        if display_requested or isinstance(e,desktop.DisplayOwnershipError):desktop.fallback(report,save)
+        raise
     finally:
         save()
     return 0

@@ -1,4 +1,6 @@
 #include "../../amd/phx_hp_760m.h"
+#include "../../amd/phx_hp_display.h"
+#include "../../phxbringup/PhxNativeABI.h"
 // PhxFB: the 780M's display as an IOFramebuffer that PhxAccel (NMXAccel) composites for WindowServer.
 // Like NullMoth's NMIntelFB (phase 1), it takes over the mode the firmware (GOP) already lit, at boot in place of the
 // firmware framebuffer (IONDRV), and writes nothing to the display engine: the scan-out surface is the boot console's
@@ -7,6 +9,7 @@
 // interrupt WindowServer paces an accelerated display on.
 #include <IOKit/IOLib.h>
 #include <IOKit/pci/IOPCIDevice.h>
+#include <IOKit/acpi/IOACPIPlatformDevice.h>
 #include <IOKit/graphics/IOFramebuffer.h>
 #include <IOKit/IODeviceMemory.h>
 #include <IOKit/pwr_mgt/RootDomain.h>
@@ -24,9 +27,72 @@
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
+bool phxDisplayFamilySizesCompatible(); // private display bases checked before early console attachment
 void phxHoldInit(IOService *fb, unsigned bootHoldSec);   // phxagdc.cpp: debug.phxfb_hold keeps this framebuffer (and so the GPU) busy
 
 #define PFBLOG(fmt, ...) IOLog("PhxFB: " fmt "\n", ##__VA_ARGS__)
+
+static unsigned phxBaseSize(const char *className) {
+    const OSSymbol *symbol=OSSymbol::withCStringNoCopy(className);
+    const OSMetaClass *base=symbol?OSMetaClass::getMetaClassWithName(symbol):nullptr;
+    OSSafeReleaseNULL(symbol);
+    return base?base->getClassSize():0;
+}
+
+// Stateless early-console validation: no dependency on userspace GPU bring-up,
+// PCI open/bus-master changes, firmware execution, or register writes.
+static bool readHpConsole(IOPCIDevice *pci,phx_hp_display_plan &out) {
+    out={};
+    if (!pci || !phx_topology_matches(&phx_hp_760m,pci->configRead16(0),pci->configRead16(2),
+        pci->configRead8(8),pci->configRead16(0x2c),pci->configRead16(0x2e))) return false;
+    const OSData *vfct=nullptr;
+    for (IORegistryEntry *entry=pci;entry;entry=entry->getParentEntry(gIOServicePlane)) {
+        if (auto *acpi=OSDynamicCast(IOACPIPlatformDevice,entry)) { vfct=acpi->getACPITableData("VFCT",0);break; }
+    }
+    if (!vfct) return false;
+    PhxVbiosView view{};PhxVbiosInfo firmware{};
+    if (phxFindVfctImage((const uint8_t *)vfct->getBytesNoCopy(),vfct->getLength(),
+        pci->getBusNumber(),pci->getDeviceNumber(),pci->getFunctionNumber(),pci->configRead16(0),pci->configRead16(2),view)!=PhxVbiosResult::Decoded ||
+        phxDecodeAtom(view.bytes,view.size,firmware)!=PhxVbiosResult::Decoded) return false;
+    IODeviceMemory *bar=pci->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
+    IOMemoryMap *mm=pci->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress5);
+    if (!bar || !mm) { OSSafeReleaseNULL(mm);return false; }
+    const volatile uint32_t *regs=(const volatile uint32_t *)mm->getVirtualAddress();
+    const uint64_t count=mm->getLength()/4;
+    phx_memory_layout memory{};memory.version=1;memory.flags=PHX_MEMORY_DECODED;
+    bool valid=count>PHX_MMMC_VM_FB_LOCATION_TOP;
+    if (valid) {
+        memory.raw_base=regs[PHX_MMMC_VM_FB_LOCATION_BASE];memory.raw_top=regs[PHX_MMMC_VM_FB_LOCATION_TOP];memory.raw_offset=regs[PHX_MMMC_VM_FB_OFFSET];
+        valid=phx_memory_decode_raw(memory.raw_base,memory.raw_top,memory.raw_offset,&memory.mc_base,&memory.vram_bytes,&memory.physical_base);
+        memory.cpu_aperture_base=bar->getPhysicalAddress();memory.cpu_aperture_bytes=bar->getLength();
+    }
+    uint32_t a[PHX_RESERVATION_REG_COUNT]{},b[PHX_RESERVATION_REG_COUNT]{},ta[PHX_HP_DISPLAY_REG_COUNT]{},tb[PHX_HP_DISPLAY_REG_COUNT]{};
+    for (unsigned pass=0;pass<2 && valid;++pass) {
+        for (unsigned i=0;i<PHX_RESERVATION_REG_COUNT;++i) {
+            const auto reg=phx_reservation_registers[i].dword;if (reg>=count) { valid=false;break; }
+            (pass?b:a)[i]=regs[reg];
+        }
+        for (unsigned i=0;i<PHX_HP_DISPLAY_REG_COUNT && valid;++i) {
+            const auto reg=phx_hp_display_registers[i].dword;if (reg>=count) { valid=false;break; }
+            (pass?tb:ta)[i]=regs[reg];
+        }
+    }
+    mm->release();
+    PE_Video console{};IOPlatformExpert *platform=IOService::getPlatform();
+    return valid && platform && platform->getConsoleInfo(&console)==kIOReturnSuccess && console.v_baseAddr &&
+        phxHpDisplayPlan(memory,firmware,a,b,ta,tb,console.v_width,console.v_height,console.v_rowBytes,console.v_depth,out);
+}
+
+void phxFramebufferDiagnostics(IOPCIDevice *pci,IOService *accel) {
+    if (!pci || !accel) return;
+    const unsigned runtime=phxBaseSize("IOFramebuffer");
+    accel->setProperty("PhxABIFramebufferHeader",sizeof(IOFramebuffer),32);
+    accel->setProperty("PhxABIFramebufferRuntime",runtime,32);
+    accel->setProperty("PhxABIFramebufferCompatible",runtime==sizeof(IOFramebuffer));
+    phx_hp_display_plan plan{};const bool valid=readHpConsole(pci,plan);
+    accel->setProperty("PhxHPDisplayPlanValid",valid);
+    if (valid) if (OSData *data=OSData::withBytes(&plan,sizeof(plan))) { accel->setProperty("PhxHPDisplayPlan",data);data->release(); }
+}
 
 static int gAlias = 1;
 static bool gAliasSysctl;
@@ -57,6 +123,8 @@ static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysct
 class PhxAMDFB : public IOFramebuffer {
     OSDeclareDefaultStructors(PhxAMDFB)
     IOPCIDevice *fPCI = nullptr;
+    bool fHP=false;
+    phx_hp_display_plan fHPPlan{};
     IOMemoryMap *fSurfMap = nullptr;   // write-combined CPU view of the scan-out surface through the BAR
     // The same surface through its system-RAM address: the 780M's VRAM is a carve-out of system memory, and amdgpu maps
     // it there on APUs rather than through the BAR. Through the BAR a 2560x1600 frame took ~110 ms to copy (~7 fps, the
@@ -235,6 +303,11 @@ class PhxAMDFB : public IOFramebuffer {
     // Read-only: OTG0's H/V totals (DCN 3.1.4: segment 2 base 0x34c0 + 0x1b2a / 0x1b2f) and its frame counter (+0x1b4c)
     // over ~200 ms, snapped to a standard rate when within 2 %.
     void measureRefresh() {
+        if (fHP) {
+            // Captured OTG configuration and nominal 60 Hz mode; no CVT guess.
+            fRefreshMilliHz=fHPPlan.refresh_millihz;fHTotal=fHPPlan.htotal;fVTotal=fHPPlan.vtotal;
+            fFrameNs=1000000000000ull/fRefreshMilliHz;return;
+        }
         IOMemoryMap *mm = fPCI ? fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress5) : nullptr;
         if (!mm || mm->getLength() < 0x5100u * 4) { OSSafeReleaseNULL(mm); PFBLOG("refresh: no MMIO view, 60 Hz assumed"); return; }
         volatile uint32_t *r = (volatile uint32_t *)mm->getVirtualAddress();
@@ -436,6 +509,12 @@ OSDefineMetaClassAndStructors(PhxAMDFB, IOFramebuffer)
 
 // One boot per arming: `nvram phxfb-boot=1` lets the next start take the panel, and start removes the variable and
 // commits NVRAM at once, so a boot that panics after this point comes back on the firmware framebuffer without hands.
+static bool bootArmingPresent() {
+    IORegistryEntry *options=IORegistryEntry::fromPath("/options",gIODTPlane);
+    if (!options) return false;
+    OSObject *value=options->copyProperty("phxfb-boot");const bool present=value!=nullptr;
+    OSSafeReleaseNULL(value);options->release();return present;
+}
 static bool takeBootArming()
 {
     IORegistryEntry *opts = IORegistryEntry::fromPath("/options", gIODTPlane);
@@ -461,16 +540,25 @@ static bool takeBootArming()
 bool PhxAMDFB::start(IOService *provider)
 {
     IOPCIDevice *profilePCI = OSDynamicCast(IOPCIDevice, provider);
-    if (profilePCI && phx_topology_matches(&phx_hp_760m,
+    fHP=profilePCI && phx_topology_matches(&phx_hp_760m,
             profilePCI->configRead16(0), profilePCI->configRead16(2), profilePCI->configRead8(8),
-            profilePCI->configRead16(0x2c), profilePCI->configRead16(0x2e)) &&
-            (profilePCI->getProperty("nmxgpu-claimed")!=kOSBooleanTrue ||
-             profilePCI->getProperty("phx-diagnostic-only")!=kOSBooleanFalse)) {
-        PFBLOG("captured profile only: HP panel takeover requires validated bring-up");
-        return false;
-    }
+            profilePCI->configRead16(0x2c), profilePCI->configRead16(0x2e));
     char arg[8];
     if (PE_parse_boot_argn("-phxfboff", arg, sizeof arg)) { PFBLOG("-phxfboff: leaving the firmware framebuffer"); return false; }
+    if (fHP) {
+        if (!bootArmingPresent()) return false;
+        // The CPU console presenter must publish before GPUWrangler. GPU engine
+        // readiness remains a separate NMXAccel gate; no initialization here.
+        if (phxBaseSize("IOFramebuffer")!=sizeof(IOFramebuffer) || !phxDisplayFamilySizesCompatible() || !readHpConsole(profilePCI,fHPPlan)) {
+            (void)takeBootArming();PFBLOG("HP console/ABI validation failed; leaving firmware framebuffer");return false;
+        }
+        if (OSIterator *it=profilePCI->getChildIterator(gIOServicePlane)) {
+            bool beside=false;
+            while (OSObject *object=it->getNextObject()) if (object!=this && OSDynamicCast(IOFramebuffer,object)) beside=true;
+            it->release();
+            if (beside) { (void)takeBootArming();PFBLOG("HP framebuffer match arrived too late; refusing live takeover");return false; }
+        }
+    }
     if (!takeBootArming()) { PFBLOG("NVRAM phxfb-boot not set: leaving the firmware framebuffer this boot"); return false; }
     fPCI = OSDynamicCast(IOPCIDevice, provider);
     if (!fPCI) return false;
@@ -494,7 +582,24 @@ bool PhxAMDFB::start(IOService *provider)
     // pixels as the console mapping. (A descriptor over the mapping would need prepare(): getPhysicalSegment on an
     // unwired one panicked, 2026-10-20.)
     uint64_t base = v.v_baseAddr;
-    if (base >= 0xFFFF800000000000ull) {
+    if (fHP) {
+        base&=~(uint64_t)PAGE_MASK;
+        if (base>=0xffff800000000000ull) {
+            IODeviceMemory *range=IODeviceMemory::withRange(fHPPlan.aperture_physical,fHPPlan.scanout_bytes);
+            IOMemoryMap *map=range?range->map(kIOMapInhibitCache):nullptr;OSSafeReleaseNULL(range);
+            if (!map || base>UINT64_MAX-fHPPlan.scanout_bytes) { OSSafeReleaseNULL(map);return false; }
+            const volatile uint32_t *console=(const volatile uint32_t *)(uintptr_t)base;
+            const volatile uint32_t *pixels=(const volatile uint32_t *)map->getVirtualAddress();
+            const uint64_t words=fHPPlan.scanout_bytes/4,step=words/4096?words/4096:1;
+            unsigned n=0,same=0,nonzero=0;
+            for (uint64_t i=0;i<words;i+=step) { const uint32_t a=console[i],b=pixels[i];++n;same+=a==b;nonzero+=b!=0; }
+            map->release();
+            if (same!=n || !nonzero) { PFBLOG("HP console mapping mismatch (%u/%u, nonzero %u)",same,n,nonzero);return false; }
+        } else if (base!=fHPPlan.aperture_physical && base!=fHPPlan.backing_physical) {
+            PFBLOG("HP physical console does not match verified scanout");return false;
+        }
+        base=fHPPlan.aperture_physical;
+    } else if (base >= 0xFFFF800000000000ull) {
         const volatile uint32_t *con = (const volatile uint32_t *)(uintptr_t)base;
         const uint32_t probeWords = 64u * 1024u / 4u;
         uint64_t found = 0;
@@ -537,6 +642,13 @@ bool PhxAMDFB::start(IOService *provider)
     setProperty("PhxFBWidth", fWidth, 32); setProperty("PhxFBHeight", fHeight, 32);   // the AGDC's panel timing reads these
     measureRefresh();
     setProperty("PhxFBRefreshMilliHz", fRefreshMilliHz, 32);
+    if (fHP) {
+        setProperty("PhxFBHP",true);setProperty("PhxFBTimingCaptured",true);
+        setProperty("PhxFBHSyncStart",fHPPlan.hsync_start,32);setProperty("PhxFBHSyncEnd",fHPPlan.hsync_end,32);
+        setProperty("PhxFBVSyncStart",fHPPlan.vsync_start,32);setProperty("PhxFBVSyncEnd",fHPPlan.vsync_end,32);
+        setProperty("PhxFBHSyncPositive",(fHPPlan.sync_polarity&1)!=0);setProperty("PhxFBVSyncPositive",(fHPPlan.sync_polarity&2)!=0);
+        setProperty("PhxFBNominalPixelClockHz",fHPPlan.nominal_pixel_clock_hz,64);
+    }
     if (fHTotal) { setProperty("PhxFBHTotal", fHTotal, 32); setProperty("PhxFBVTotal", fVTotal, 32); }   // the AGDC's panel timing
     nanoseconds_to_absolutetime(fFrameNs, &gPhxFrameAbs);
     fVblTimer = thread_call_allocate(vblFire, this);

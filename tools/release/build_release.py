@@ -101,21 +101,22 @@ seven command-line tools, AMD firmware, installer/uninstaller, checksums and lic
 Use `INSTALL.md` from the extracted ZIP. Noncommercial terms apply to components
 derived from NullMoth; see the included license notices.
 
-**HP Radeon 760M macOS acceleration is not functional or runtime-verified.**
-`sudo ./install.sh --windowserver` is included but refuses the diagnostic HP path.
-For HP diagnostics use:
+**The prior HP Sequoia build 39 passed real native and public Metal compute/render,
+automatic initialization and app activation. This updated display module has not
+been runtime-verified. WindowServer/panel acceleration remains experimental.**
 
-```sh
-./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC --check
-sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC
-```
+`sudo ./install.sh --windowserver` uses two stages on the measured HP: first stage
+backs up/updates PhxAccel and the next-boot app package with NVRAM unchanged. After
+an app-mode reboot validates the new loaded UUID, runtime ABI/console plan and
+Metal tests, the same command can authorize one display boot. It never automatically
+rearms the framebuffer. A failed custom-framebuffer boot requests one firmware
+fallback reboot and disables GPU retries. Read INSTALL.md before running it.
 
-Supply your actual EFI/OC path. This mode preserves boot/security settings and
-does not install an accelerator or enable WindowServer. HP Sequoia build-37
-firmware/scanout captures and CPU translation/compiler tests passed. This packaged
-build-38 kext and its PSP changes have not been runtime-tested; no macOS GPU
-execution or accelerated display is verified. Linux shader readback success is
-separate from macOS bring-up. No Apple software or personal EFI is distributed.
+The package requires the existing working HP app-only service and matching native
+runtime; it refuses changed non-display execution components. It changes no EFI,
+SIP/AMFI or boot arguments. This is not a general production installer. The included
+source retains the reference 780M path; no new 740M/780M runtime result is claimed.
+No Apple software, captured metallib binaries or personal EFI is distributed.
 ''')
         # Publish the directory atomically after payload/ZIP verification.
         stage=tmp/'ready';stage.mkdir()

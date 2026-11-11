@@ -10,6 +10,8 @@ b=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(b)
 
 class BootTests(unittest.TestCase):
     def setUp(self):
+        bootid=patch.object(b.desktop,'boot_uuid',return_value='TEST-BOOT');bootid.start();self.addCleanup(bootid.stop)
+        display=patch.object(b.desktop,'begin',return_value=False);display.start();self.addCleanup(display.stop)
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);self.state=self.root/'state';self.allow=self.root/'allow'
         self.real_metal=b.verify_console_metal
@@ -95,6 +97,19 @@ class BootTests(unittest.TestCase):
     def test_root_boot_defers_metal_until_console_validation(self):
         with patch.object(b.subprocess,'Popen',side_effect=self.process(metal=False)) as spawn:b.boot(self.root,self.state,self.allow)
         self.assertIn('--defer-metal',spawn.call_args.args[0]);self.metal.assert_called_once()
+
+    def test_opted_in_display_is_armed_before_waiting_for_gui(self):
+        events=[]
+        self.metal.side_effect=lambda *args: (events.append('metal'),args[1].update(metal_verified=True))
+        with patch.object(b.desktop,'begin',return_value=True),patch.object(b.desktop,'arm',side_effect=lambda *args:events.append('arm')),patch.object(b.desktop,'verify_present',side_effect=lambda *args:events.append('present')),patch.object(b.subprocess,'Popen',side_effect=self.process()):
+            b.boot(self.root,self.state,self.allow)
+        self.assertEqual(events,['arm','metal','present']);self.assertIn('!WindowServer',self.allow.read_text())
+
+    def test_failed_display_arm_restricts_apps_and_requests_fallback(self):
+        self.state.mkdir();(self.state/b.desktop.REQUEST).write_text('{}')
+        with patch.object(b.desktop,'begin',return_value=True),patch.object(b.desktop,'arm',side_effect=ValueError('display failed')),patch.object(b.desktop,'fallback') as fallback,patch.object(b.subprocess,'Popen',side_effect=self.process()),self.assertRaises(ValueError):
+            b.boot(self.root,self.state,self.allow)
+        fallback.assert_called_once();self.metal.assert_not_called();self.assertNotIn('*',self.allow.read_text())
 
     def test_console_session_deadline_does_not_submit_commands(self):
         with patch.object(b.time,'monotonic',side_effect=[0,301]),patch.object(b.subprocess,'run') as run,self.assertRaisesRegex(ValueError,'console-user'):

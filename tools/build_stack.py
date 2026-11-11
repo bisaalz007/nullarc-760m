@@ -152,7 +152,7 @@ def assemble(a):
         run(['codesign', '--verify', '--deep', '--strict', bundle])
         for name in ('phxctl', 'mesboot', 'phxprofile', 'phxfw','vkprobe-native','render-native','mtlprobe'):
             copy(REPO / 'build/tools' / name, p / 'gpu/phxctl' / name)
-        for name in ('hp_bringup.py','hp_boot.py'):
+        for name in ('hp_bringup.py','hp_boot.py','hp_windowserver.py'):
             copy(REPO/'tools/phxctl'/name,p/'gpu/phxctl'/name)
         for name in ('phxboot.sh', 'full.sh', 'bringup5.sh', 'kinst.sh', 'local.phxboot.plist'):
             copy(REPO / 'tools/phxctl' / name, p / 'gpu' / name)
@@ -163,7 +163,7 @@ def assemble(a):
         for name in ('760M_STATUS.md', '760M_ARCHITECTURE.md', 'BUILD_STACK.md', 'LINUX_VALIDATION.md',
                      'INSTALL.md','INSTALL_REFERENCE.md'):
             copy(REPO / 'docs' / name, p / 'docs' / name)
-        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py','install_hp_boot.py','recover_hp_boot.py'):
+        for name in ('install_diagnostics.py','install_components.py','prepare_experiment.py','install_hp_boot.py','recover_hp_boot.py','install_hp_windowserver.py'):
             copy(REPO / 'install' / name, p / name)
         for name in ('install.sh','uninstall.sh'):
             copy(REPO / 'install' / name, p / name)
@@ -186,7 +186,7 @@ def assemble(a):
                     'translator_commit':(translator / 'SOURCE_COMMIT').read_text().strip(),
                     'minimum_macos':a.min_macos, 'native_targets':native_targets,
                     'experimental_hp_bootstrap':True,'bootstrap_requires_local_admin':True,
-                    'validation':'compiled and offline-tested; native HP acceleration unverified'}
+                    'validation':'build-39 HP native/Metal/apps verified; updated display module compiled/host-tested, runtime pending'}
         write(p, metadata); verify(p)
         p.rename(dest)
     print(f'Assembled {dest}; HP diagnostic boot, explicit experimental bootstrap')

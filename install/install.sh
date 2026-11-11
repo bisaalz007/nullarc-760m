@@ -27,7 +27,7 @@ while [ "$#" -gt 0 ]; do
         --oc) [ "$#" -ge 2 ] || { echo "--oc needs an EFI/OC directory" >&2; exit 2; }; OC=$2; shift ;;
         -h|--help)
             echo 'Usage: ./install.sh --check [--windowserver]'
-            echo '       sudo ./install.sh --windowserver  (reference acceleration path; HP refused)'
+            echo '       sudo ./install.sh --windowserver  (HP staged one-shot display experiment)'
             echo '       sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC [--check]'
             echo '       sudo ./install.sh --components  (HP files only; no automatic activation)'
             echo '       sudo ./install.sh --hp-native [--check] (verified HP app-only boot service)'
@@ -66,6 +66,11 @@ if [ "$DIAG" = 1 ]; then
 fi
 POLICY=$(python3 -B "$SRC/collect_macos_evidence.py" --target-policy)
 if [ "$POLICY" = hp-diagnostic-only ]; then
+    if [ "$WS" = 1 ] && [ -f "$SRC/install_hp_windowserver.py" ]; then
+        MODE=--install; [ "$CHECK" = 0 ] || MODE=--check
+        if [ "$MODE" = --check ]; then exec python3 -B "$SRC/install_hp_windowserver.py" --package "$SRC"; fi
+        exec python3 -B "$SRC/install_hp_windowserver.py" --package "$SRC" --install
+    fi
     echo 'HP Radeon 760M: WindowServer acceleration is not verified; the reference boot path is unavailable.' >&2
     echo 'After native bootstrap and Metal tests, use --hp-native for app-only automatic initialization.' >&2
     echo 'Use sudo ./install.sh --diagnostics --oc /Volumes/EFI/EFI/OC instead.' >&2
