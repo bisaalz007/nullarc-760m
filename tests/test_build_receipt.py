@@ -10,6 +10,13 @@ import build_stack
 from package_manifest import digest
 
 class BuildReceiptTests(unittest.TestCase):
+    def test_kext_copy_preserves_signature_resources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source.kext';seal=source/'Contents/_CodeSignature/CodeResources'
+            seal.parent.mkdir(parents=True);seal.write_bytes(b'sealed resource fixture')
+            build_stack.copy(source,root/'copied.kext')
+            self.assertEqual((root/'copied.kext/Contents/_CodeSignature/CodeResources').read_bytes(),seal.read_bytes())
+
     def test_wrong_input_stale_source_and_changed_artifact_rejected(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(build_stack,'REPO',Path(tmp)):
             root=Path(tmp);mesa=root/'mesa';source=root/'src/component.cpp'

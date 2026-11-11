@@ -744,3 +744,10 @@ previous app-tested UUID. Next required hardware step: install this display modu
 with NVRAM unchanged, reboot and validate its ABI/console diagnostics and app tests;
 then authorize the one-shot display boot. WindowServer, reset and suspend/resume
 remain unverified. Do not report accelerated desktop support from these host tests.
+
+HP-side strict signature validation caught an assembly bug that omitted the
+accelerator's `_CodeSignature/CodeResources`. Kext copying now preserves seals,
+assembly verifies PhxAccel strictly, and a regression test covers resource copying.
+The unchanged OpenCore PhxBringup build is unsigned; no signature or USB change
+is introduced there. Unexpected kmutil failures now stop the display installer
+with the staged files and backup retained for review.

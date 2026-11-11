@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -133,6 +134,8 @@ def main():
     print('Display module and next-boot app package staged; WindowServer and NVRAM unchanged. Backup: '+str(backup))
     if result.returncode:
         print('kmutil did not load the new UUID; follow its specific approval/reboot message. No successful load is claimed.')
+        if not re.search(r'KMErrorDomain\s+Code=(?:27|28)\b',result.stdout+result.stderr):
+            raise ValueError('unexpected kmutil failure; staging and backup retained for review. Do not reboot until resolved.')
     print('Reboot with the same USB and log in. Verify app-mode results before running --windowserver again.')
 
 if __name__=='__main__':

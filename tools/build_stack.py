@@ -30,7 +30,10 @@ def output(args):
 def copy(src, dst):
     dst.parent.mkdir(parents=True, exist_ok=True)
     if src.is_dir():
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns('_CodeSignature', '*.new'))
+        # Kexts are copied without subsequent mutation; preserve their sealed
+        # resources. The plugin is relocated and explicitly re-signed below.
+        ignored=('*.new',) if src.suffix=='.kext' else ('_CodeSignature','*.new')
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*ignored))
     else:
         shutil.copy2(src, dst)
 
@@ -127,6 +130,7 @@ def assemble(a):
         p = Path(temp) / 'package'; p.mkdir()
         copy(REPO / 'src/phxbringup/build/PhxBringup.kext', p / 'EFI/OC/Kexts/PhxBringup.kext')
         copy(REPO / 'src/phxaccel/build/PhxAccel.kext', p / 'Library/Extensions/PhxAccel.kext')
+        run(['codesign','--verify','--strict',p/'Library/Extensions/PhxAccel.kext'])
         bundle = p / 'PhxGPU/NVMTLDriver.bundle'
         copy(REPO / 'src/nmplugin/build/NVMTLDriver.bundle', bundle)
         native = bundle / 'Contents/MacOS'
