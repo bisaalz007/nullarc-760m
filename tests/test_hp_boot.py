@@ -111,9 +111,21 @@ class BootTests(unittest.TestCase):
             b.boot(self.root,self.state,self.allow)
         fallback.assert_called_once();self.metal.assert_not_called();self.assertNotIn('*',self.allow.read_text())
 
+    def test_display_dependency_failure_prevents_native_initialization(self):
+        self.state.mkdir();(self.state/b.desktop.REQUEST).write_text('{}')
+        with patch.object(b.desktop,'begin',side_effect=ValueError('signing dependency')),patch.object(b.desktop,'fallback') as fallback,patch.object(b.subprocess,'Popen') as spawn,self.assertRaises(ValueError):
+            b.boot(self.root,self.state,self.allow)
+        spawn.assert_not_called();fallback.assert_called_once();self.metal.assert_not_called()
+        self.assertTrue((self.state/'disabled').exists())
+
     def test_console_session_deadline_does_not_submit_commands(self):
         with patch.object(b.time,'monotonic',side_effect=[0,301]),patch.object(b.subprocess,'run') as run,self.assertRaisesRegex(ValueError,'console-user'):
             b.console_user()
+        run.assert_not_called()
+
+    def test_display_crash_stops_console_wait_before_another_launch_check(self):
+        with patch.object(b.time,'monotonic',side_effect=[0,1]),patch.object(b.subprocess,'run') as run,self.assertRaisesRegex(ValueError,'WindowServer crashed'):
+            b.console_user(check=lambda: (_ for _ in ()).throw(ValueError('WindowServer crashed')))
         run.assert_not_called()
 
     def console_test(self,failure=None):

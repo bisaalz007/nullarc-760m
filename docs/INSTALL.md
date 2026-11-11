@@ -40,6 +40,21 @@ IOGraphicsFamily 599, IOAcceleratorFamily2 485.2 and AGDC 8.1.10. It requires th
 working app-only boot service and matching native runtime. Class-size checks are
 necessary guards, not proof that every private display API is compatible.
 
+The first actual display boot failed because WindowServer's library validation
+rejected NVMTLDriver. Its firmware fallback succeeded. Do not repeat that boot
+with the old signing dependency: the HP's AMFIPass 1.3.1 declares a maximum Darwin
+version of 22 and published no active service on Sequoia/Darwin 24. The reviewed
+1.4.1 distributed by OCLP declares Darwin 24 support. New preflight requires that
+loaded version and its active service, both before next-boot arming and before
+native initialization/display release. Presence in `kmutil showloaded` alone is
+insufficient; Lilu may report a successful kext load without starting a plugin.
+Even this stronger check is not proof of WindowServer compatibility.
+
+The legacy AMFI boot flags in the archived reference guide have not been tested
+as a solution on this HP/Sequoia build. Neither the display installer nor the
+boot supervisor changes them. Any security-extension update requires an explicit,
+backed-up operation and a dependency-only reboot before another display test.
+
 ```sh
 ./install.sh --windowserver --check
 sudo ./install.sh --windowserver
@@ -84,13 +99,17 @@ framebuffer class/score from PhxAccel, matches exact captured PCI properties, an
 requests that existing auxiliary driver through Apple's catalogue mechanism.
 It changes neither executable nor OpenCore config. The default diagnostic kext
 is not modified in source. Keep the printed Info.plist backup; restoring that
-file removes the early opt-in. This mechanism is implemented and host-tested;
-its actual boot matching still needs HP runtime verification.
+file removes the early opt-in. Its actual early matching passed on the HP, but
+the subsequent WindowServer library-validation failure required rollback of the
+opt-in. That successful match does not establish working display acceleration.
 
 The daemon first waits for the validated held framebuffer (up to 90 seconds),
 then initializes/test-checks native queues, registers exactly one display
 pipe and AGDC, and releases the panel hold before waiting for a GUI session.
 It then requires Metal readbacks and live framebuffer-client/present evidence.
+Before releasing the panel it snapshots WindowServer crash reports. A new
+same-boot report aborts the experiment while waiting for login or presents;
+historical, other-boot and incomplete reports do not trigger that check.
 Failure disables retries; if the custom framebuffer owns the panel, it requests
 one reboot into the firmware framebuffer. A kernel/GPU fault can still require
 a manual power cycle. The consumed flag and failure markers prevent a repeated

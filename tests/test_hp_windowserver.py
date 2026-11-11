@@ -12,8 +12,44 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools/phxctl'))
 import hp_windowserver as d
+REAL_POLICY=d.require_library_policy
 
 class DisplayTests(unittest.TestCase):
+    def setUp(self):
+        policy=patch.object(d,'require_library_policy');self.policy=policy.start();self.addCleanup(policy.stop)
+
+    def test_policy_requires_supported_loaded_version_and_active_service(self):
+        # Exercise the actual guard separately from the arm-order fixtures.
+        with patch.object(d,'require_library_policy',new=REAL_POLICY):
+            for loaded,services in (('com.dhinakg.AMFIPass (1.3.1)',[{}]),('amfi=0x80',[]),('com.dhinakg.AMFIPass (1.4.1)',[])):
+                with self.subTest(loaded=loaded),patch.object(d.subprocess,'check_output',return_value=loaded),patch.object(d,'nodes',return_value=services),self.assertRaisesRegex(ValueError,'signing dependency'):
+                    d.require_library_policy()
+            with patch.object(d.subprocess,'check_output',return_value='com.dhinakg.AMFIPass (1.4.1)'),patch.object(d,'nodes',return_value=[{}]):
+                d.require_library_policy()
+
+    def test_policy_failure_prevents_all_display_controls(self):
+        self.policy.side_effect=ValueError('library-validation')
+        with patch.object(d,'sysctl') as control,self.assertRaises(ValueError):
+            d.arm({},lambda:None,Path('fixture'),lambda *args:self.fail('must not change allow list'))
+        control.assert_not_called()
+
+    def test_crash_monitor_ignores_history_partial_and_other_boot(self):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(d,'CRASH_DIR',Path(tmp)):
+            root=Path(tmp);(root/'WindowServer-old.ips').write_text('history')
+            report={'boot_session_uuid':'current'};d.watch_crashes(report);report['desktop_armed']=True
+            path=root/'WindowServer-new.ips';path.write_text('{}\n{"procName":')
+            d.check_crashes(report,lambda:None)
+            path.write_text('{}\n'+json.dumps({'procName':'WindowServer','bootSessionUUID':'previous'}))
+            d.check_crashes(report,lambda:None)
+            path.write_text('{}\n'+json.dumps({'procName':'WindowServer','bootSessionUUID':'current'}))
+            saved=[]
+            with self.assertRaisesRegex(ValueError,'WindowServer crashed'):d.check_crashes(report,lambda:saved.append(True))
+            self.assertEqual(report['desktop_crash_report'],path.name);self.assertEqual(saved,[True])
+
+    def test_app_only_does_not_inspect_display_crashes(self):
+        with patch.object(d,'CRASH_DIR') as directory:d.check_crashes({},lambda:None)
+        directory.glob.assert_not_called()
+
     def test_waits_for_delayed_and_partial_framebuffer_publication(self):
         ready=dict(d.PANEL,PhxFBHP=True,PhxFBTimingCaptured=True);progress=[]
         with patch.object(d,'nodes',side_effect=[[],[{'PhxFBHP':True}],[ready]]),patch.object(d,'sysctl',return_value=1),patch.object(d,'unopened_held_framebuffer') as held,patch.object(d.time,'sleep'):

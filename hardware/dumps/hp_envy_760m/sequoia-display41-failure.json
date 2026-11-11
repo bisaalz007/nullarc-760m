@@ -1,0 +1,121 @@
+{
+  "format": 1,
+  "runtime_display_success": false,
+  "crashes": [
+    {
+      "boot_session_uuid": "6465C194-05D1-486D-96B9-D28495A13F9E",
+      "process": "WindowServer",
+      "pid": 600,
+      "exception": {
+        "codes": "0x0000000000000000, 0x0000000000000000",
+        "rawCodes": [
+          0,
+          0
+        ],
+        "type": "EXC_CRASH",
+        "signal": "SIGABRT"
+      },
+      "fault_symbols": [
+        "__pthread_kill",
+        "pthread_kill",
+        "abort",
+        "__assert_rtn"
+      ]
+    },
+    {
+      "boot_session_uuid": "6465C194-05D1-486D-96B9-D28495A13F9E",
+      "process": "WindowServer",
+      "pid": 637,
+      "exception": {
+        "codes": "0x0000000000000000, 0x0000000000000000",
+        "rawCodes": [
+          0,
+          0
+        ],
+        "type": "EXC_CRASH",
+        "signal": "SIGABRT"
+      },
+      "fault_symbols": [
+        "__pthread_kill",
+        "pthread_kill",
+        "abort",
+        "__assert_rtn"
+      ]
+    },
+    {
+      "boot_session_uuid": "6465C194-05D1-486D-96B9-D28495A13F9E",
+      "process": "WindowServer",
+      "pid": 686,
+      "exception": {
+        "codes": "0x0000000000000000, 0x0000000000000000",
+        "rawCodes": [
+          0,
+          0
+        ],
+        "type": "EXC_CRASH",
+        "signal": "SIGABRT"
+      },
+      "fault_symbols": [
+        "__pthread_kill",
+        "pthread_kill",
+        "abort",
+        "__assert_rtn"
+      ]
+    },
+    {
+      "boot_session_uuid": "6465C194-05D1-486D-96B9-D28495A13F9E",
+      "process": "WindowServer",
+      "pid": 783,
+      "exception": {
+        "codes": "0x0000000000000000, 0x0000000000000000",
+        "rawCodes": [
+          0,
+          0
+        ],
+        "type": "EXC_CRASH",
+        "signal": "SIGABRT"
+      },
+      "fault_symbols": [
+        "__pthread_kill",
+        "pthread_kill",
+        "abort",
+        "__assert_rtn"
+      ]
+    }
+  ],
+  "observed_loader_rejection": {
+    "driver": "/Library/GPUBundles/NVMTLDriver.bundle/Contents/MacOS/NVMTLDriver",
+    "reason": "mapping process is a platform binary, but mapped file is not",
+    "source": "HP unified logs observed during crash investigation"
+  },
+  "recovery": {
+    "firmware_fallback_boot": "4D735626-6419-412C-98AC-6409AC0CE51A",
+    "automatic_gpu_initialization": false,
+    "desktop_armed": false,
+    "early_personality_removed": true,
+    "opencore_config_changed": false
+  },
+  "signing_dependency": {
+    "source": "https://github.com/dortania/OpenCore-Legacy-Patcher/blob/main/payloads/Kexts/Acidanthera/AMFIPass-v1.4.1-RELEASE.zip",
+    "zip_git_blob_sha1": "b42fe05c39c4da22d239efedfb1111c51f226eee",
+    "layout_source": "https://github.com/acidanthera/Lilu/blob/master/Lilu/Headers/plugin_start.hpp",
+    "old_1.3.1": {
+      "executable_sha256": "304659aceba09074c91ebda08f77fd54f8187e0de4aacfe3f50ef27c8bd927d4",
+      "min_darwin": 20,
+      "max_darwin": 22
+    },
+    "candidate_1.4.1": {
+      "executable_sha256": "4c35bc196d35c69b5f9dca83fe733801211c7828716f51585c7f5450039ca884",
+      "min_darwin": 20,
+      "max_darwin": 24
+    },
+    "installed": false,
+    "windowserver_compatibility_verified": false
+  },
+  "authorized_update": {
+    "staged_on_usb": true,
+    "backup": "/Volumes/EFI/EFI/OC/.nullarc-amfipass-backup-jasuq34y",
+    "loaded_active_verified": false,
+    "boot_arguments_changed": false
+  }
+}

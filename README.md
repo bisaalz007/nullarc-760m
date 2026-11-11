@@ -69,15 +69,24 @@ administrator experiment or opt-in `--hp-native` app-only service. Automatic nat
 initialization, GUI-session Metal readbacks and app activation passed a fresh boot;
 see the [cold-boot evidence](hardware/dumps/hp_envy_760m/sequoia-build39-automatic-app-activation.json).
 The new display module (633BB085) now also passes native/Metal execution and the
-HP console-plan/runtime ABI checks. WindowServer itself remains unverified; its
-next step is a one-shot boot test. The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
+HP console-plan/runtime ABI checks. The first actual display boot attached PhxAMDFB
+and passed native tests, but WindowServer crashed: library validation rejected the
+ad-hoc Metal plugin in the platform process. The one-shot fallback restored the
+firmware framebuffer; display activation is disabled. AMFIPass 1.3.1 was loaded
+but had no active service and declares Darwin 22 as its maximum; the HP is Darwin
+24. A backed-up, explicitly authorized update to OCLP's AMFIPass 1.4.1 is staged on
+the USB, with boot arguments unchanged. Its loaded/active state and WindowServer
+compatibility still require runtime testing. The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
 
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
 runtime family sizes/versions, captured console plan and current-boot app tests
-pass can the same command arm one display boot. This experimental display path
-is implemented and host-tested, **not yet runtime-verified**. See
+pass can the same command arm one display boot. New preflight also requires the
+reviewed Sequoia-compatible AMFIPass version and an active service; this dependency
+check does not prove that WindowServer can load the plugin. New crash monitoring
+stops the experiment on a fresh current-boot WindowServer report. This experimental
+display path is **not confirmed functional**. See
 [installation stages](docs/INSTALL.md#hp-experimental-windowserver-stages). Do not
 rerun the bootstrap in a boot with initialized or lost queues.
 

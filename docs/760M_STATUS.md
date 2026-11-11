@@ -874,3 +874,56 @@ execution directory and a matching protected request. Four early-metadata tests,
 twelve display tests, twenty boot tests and seven recovery tests pass. No native
 code rebuild was needed. Next: current-boot first initialization/app readbacks,
 then one-shot display arming with the corrected metadata/wait path.
+
+### Actual early attachment passed; WindowServer library validation blocked Metal
+
+Boot 6465C194-05D1-486D-96B9-D28495A13F9E attached the HP framebuffer with the early
+foreign personality. Native initialization, compute/render readbacks and claim
+passed; the daemon registered/released the panel. WindowServer then crashed four
+times in CoreDisplay_CreateDisplayForCGXDisplayDevice. Unified logs explicitly
+rejected NVMTLDriver: "mapping process is a platform binary, but mapped file is
+not". This is actual failed display execution, not an acceleration success.
+App Metal readbacks and a successful NSBundle load in osascript do not establish
+that WindowServer can load the plugin. Sanitized crash/dependency observations:
+`hardware/dumps/hp_envy_760m/sequoia-display41-failure.json`. Raw IPS reports and
+Apple code inspected locally are private and are not redistributed.
+
+The existing one-shot supervisor disabled retries and rebooted into the firmware
+framebuffer. Boot 4D735626-6419-412C-98AC-6409AC0CE51A is stable, with GPU/app/display
+activation disabled and no framebuffer NVRAM request. The original USB PhxBringup
+Info.plist was restored from its early-match backup; executable and OpenCore config
+are unchanged. No further display experiment is armed.
+
+A concrete signing-dependency mismatch was found: loaded AMFIPass 1.3.1 has no
+active IOKit service, and its PluginConfiguration declares min/max Darwin 20/22.
+The official OCLP-distributed 1.4.1 declares 20/24. These values were decoded from
+the unmodified binaries using Lilu's published PluginConfiguration layout; Lilu's
+plugin start code returns KERN_SUCCESS even when shouldLoad refuses startup.
+The HP runs Darwin 24.6.0 with Lilu 1.7.3. Primary references:
+[configuration layout](https://github.com/acidanthera/Lilu/blob/master/Lilu/Headers/plugin_start.hpp),
+[startup behavior](https://github.com/acidanthera/Lilu/blob/master/Lilu/Library/plugin_start.cpp),
+[OCLP binary](https://github.com/dortania/OpenCore-Legacy-Patcher/blob/main/payloads/Kexts/Acidanthera/AMFIPass-v1.4.1-RELEASE.zip).
+
+The user explicitly authorized replacing only USB AMFIPass with 1.4.1. Source ZIP
+git-blob SHA-1 b42fe05c39c4da22d239efedfb1111c51f226eee, executable SHA-256
+4c35bc196d35c69b5f9dca83fe733801211c7828716f51585c7f5450039ca884. Signature/resource
+verification passed locally, on the staged HP candidate, and after USB replacement.
+Backup: `/Volumes/EFI/EFI/OC/.nullarc-amfipass-backup-jasuq34y` (old bundle, original
+config and receipt). Config SHA-256 remains
+1bded090fe745c6da38050534b183c7d93ea2f6c43b449f8ff263ef76f8982e6. Bringup/service/
+NVRAM unchanged. A dependency-only reboot is requested; the active new version,
+service startup, actual validation effect and WindowServer compatibility remain
+unverified. A proposed amfi=0x80 edit was withdrawn without applying it: legacy
+flags are not established as a solution on this exact Sequoia build.
+
+Source changes now guard both installer arming and boot initialization/release
+with loaded AMFIPass 1.4.1 plus an active service. This is a dependency check, not
+proof of successful platform-process library loading. A new crash monitor snapshots
+IPS names before release and stops on a fresh same-boot WindowServer crash while
+waiting for GUI/presents, instead of allowing the full 300-second crash loop.
+Incomplete/old reports are ignored; app-only startup is unchanged. These Python
+changes are not installed into the root boot service yet. No native code changed
+or native rebuild was needed. Targeted control tests pass (54 tests); they verify
+failure handling and ordering, not GPU execution. Next: inspect the dependency-only
+boot, then stage the new guards before considering another explicitly armed display
+experiment. Full WindowServer acceleration, reset and suspend remain unverified.

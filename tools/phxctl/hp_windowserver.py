@@ -15,6 +15,41 @@ REQUEST='windowserver-next-boot.json'
 DESKTOP='# NullArc: one-shot HP accelerated compositor; firmware scanout\n-mediaanalysisd\n-photoanalysisd\n-Spotlight\n!WindowServer\n*\n'
 class DisplayOwnershipError(ValueError):pass
 
+def require_library_policy():
+    """Dependency guard, not proof WindowServer can load our ad-hoc plugin.
+
+    The HP's old 1.3.1 binary declares maxKernel=22; Sequoia is Darwin 24.
+    OCLP's 1.4.1 declares maxKernel=24. Lilu can return KERN_SUCCESS without
+    starting a plugin on unsupported kernels, so showloaded alone is inadequate.
+    Require its service too, and retain actual WindowServer runtime checks.
+    No AMFI boot flag or other unverified configuration substitutes for this.
+    """
+    loaded=subprocess.check_output(['/usr/bin/kmutil','showloaded','--list-only'],text=True,timeout=15)
+    if not any('com.dhinakg.AMFIPass (1.4.1)' in line for line in loaded.splitlines()) or len(nodes('AMFIPass'))!=1:
+        raise ValueError('WindowServer signing dependency preflight failed: reviewed Sequoia-compatible AMFIPass 1.4.1 must be loaded with an active service. Boot flags and app Metal tests alone are insufficient. No security setting changed.')
+
+CRASH_DIR=Path('/Library/Logs/DiagnosticReports')
+
+def watch_crashes(report):
+    # Snapshot before releasing the panel. Reports already on disk are history.
+    report['desktop_crash_baseline']=sorted(p.name for p in CRASH_DIR.glob('WindowServer*.ips'))
+
+def check_crashes(report,save):
+    if report.get('desktop_armed') is not True:return
+    baseline=set(report['desktop_crash_baseline'])
+    for path in sorted(CRASH_DIR.glob('WindowServer*.ips')):
+        if path.name in baseline:continue
+        try:
+            # IPS has a metadata JSON object followed by the crash JSON object.
+            with path.open() as f:raw=f.read(8*1024*1024+1)
+            if len(raw)>8*1024*1024:raise ValueError('WindowServer crash report exceeds inspection limit')
+            _,end=json.JSONDecoder().raw_decode(raw)
+            crash=json.loads(raw[end:])
+        except (FileNotFoundError,json.JSONDecodeError):continue  # report still being written
+        if crash.get('procName')!='WindowServer' or crash.get('bootSessionUUID')!=report.get('boot_session_uuid'):continue
+        report['desktop_crash_report']=path.name;save()
+        raise ValueError('WindowServer crashed during the one-shot display test; stop and collect '+path.name)
+
 def nodes(name):
     raw=subprocess.check_output(['/usr/sbin/ioreg','-alr','-c',name],timeout=15)
     return plistlib.loads(raw) if raw.strip() else []
@@ -109,6 +144,7 @@ def begin(package,state,folder,progress=None):
     # GPU initialization remains forbidden until the validated held FB appears.
     try:
         wait_for_framebuffer(progress=progress)
+        require_library_policy()
         nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
         if 'phxfb-boot' in nv:raise ValueError('attached framebuffer did not consume its one-shot')
     except (OSError,ValueError,subprocess.SubprocessError):
@@ -118,6 +154,7 @@ def begin(package,state,folder,progress=None):
     return True
 
 def arm(report,save,allow,atomic):
+    require_library_policy()
     validated_accelerator();unopened_held_framebuffer()
     report['desktop_phase']='registering-panel';save()
     sysctl('debug.nvaccelfb',1);time.sleep(1)
@@ -132,6 +169,7 @@ def arm(report,save,allow,atomic):
     sysctl('debug.nvaccel_iop_vsync',1)
     unopened_held_framebuffer()
     report['desktop_phase']='releasing-panel';save()
+    watch_crashes(report)
     atomic(allow,DESKTOP)
     sysctl('debug.phxfb_hold',0)
     if sysctl('debug.phxfb_hold')!=0:raise ValueError('framebuffer hold did not release')
@@ -142,6 +180,7 @@ def verify_present(report,save,timeout=120):
     # WindowServer framebuffer client, then retain counters as evidence.
     start=sysctl('debug.nvaccel_iop_ok');deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
+        check_crashes(report,save)
         current=sysctl('debug.nvaccel_iop_ok');failed=sysctl('debug.nvaccel_iop_fail')
         f=framebuffer()
         client=f and any(n.get('IOObjectClass')=='IOFramebufferUserClient' for n in walk([f]))

@@ -103,6 +103,7 @@ def main():
         return
     verify_existing_native(package if running else old)
     if running:
+        display.require_library_policy()
         display.validated_accelerator()
         status=json.loads(Path('/Users/Shared/nullarc-hp-native-status.json').read_text())
         validate_current_apps(status,display.boot_uuid())

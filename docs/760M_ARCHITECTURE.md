@@ -281,6 +281,17 @@ only when the custom framebuffer actually owns the panel. This preserves the
 existing reference-machine display path. Private method/offset compatibility,
 WindowServer shader execution and visible panel output still require HP testing.
 
+The first actual display boot passed attachment/native checks but failed at
+WindowServer's platform-process library validation, before loading NVMTLDriver.
+App Metal tests do not exercise that boundary. The supervisor and arming installer
+now require the reviewed Sequoia-compatible AMFIPass 1.4.1 and an active service;
+neither version presence nor service attachment is a claim that every signature
+check was relaxed. Actual WindowServer loading/presents remain separate runtime
+requirements. No AMFI boot-argument editing is performed. Crash-report monitoring
+is armed before panel release and checked during console waiting and presentation,
+so a fresh same-boot WindowServer crash requests fallback without waiting the full
+login deadline. Existing app-only startup does not inspect display crash reports.
+
 Source checks used Apple IOGraphics-599's IOFramebuffer::start/header and Linux
 v6.14 `dcn10_optc.c`/DCN 3.1.4 register definitions. The framebuffer base does not
 open its provider in those Apple sources; this matters because PhxBringup must

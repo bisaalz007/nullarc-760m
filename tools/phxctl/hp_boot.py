@@ -36,9 +36,10 @@ def publish(status,report):
     public['recorded_at']=datetime.now(timezone.utc).isoformat()
     atomic(status,json.dumps(public,indent=2)+'\n')
 
-def console_user(timeout=300):
+def console_user(timeout=300,check=None):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
+        if check:check()
         uid=os.stat('/dev/console').st_uid
         if uid>0:
             user=pwd.getpwuid(uid)
@@ -56,7 +57,7 @@ def user_prefix(user,work):
 
 def verify_console_metal(package,report,save):
     report['verification_phase']='awaiting-console-session';save()
-    user=console_user()
+    user=console_user(check=lambda:desktop.check_crashes(report,save)) if report.get('desktop_armed') else console_user()
     work=Path(tempfile.mkdtemp(prefix='nullarc-user-metal-',dir='/Users/Shared'))
     for p in (work,work/'cache',work/'aircache'):
         if p!=work:p.mkdir()
@@ -69,10 +70,12 @@ def verify_console_metal(package,report,save):
     report['metal_stages'].append(publication);save()
     def record(attempt):publication['attempts'].append(attempt);save()
     r=wait_for_metal(probe,environment,record,prefix=prefix)
+    desktop.check_crashes(report,save)
     publication.update(returncode=0,stdout=r.stdout,stderr=r.stderr);save()
     submitted=False
     try:
         for stage,args in [('metal-compute-readback',[]),('metal-render-readback',['render'])]:
+            desktop.check_crashes(report,save)
             submitted=True
             entry={'stage':stage,'returncode':None};report['metal_stages'].append(entry);save()
             r=subprocess.run(prefix+[str(probe),'--hp']+args,capture_output=True,text=True,timeout=90,env=environment)
