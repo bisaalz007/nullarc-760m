@@ -190,7 +190,7 @@ def assemble(a):
                     'translator_commit':(translator / 'SOURCE_COMMIT').read_text().strip(),
                     'minimum_macos':a.min_macos, 'native_targets':native_targets,
                     'experimental_hp_bootstrap':True,'bootstrap_requires_local_admin':True,
-                    'validation':'HP native/Metal/apps verified; actual display boot failed platform library validation; signing dependency update pending runtime verification'}
+                    'validation':'HP native/Metal/apps verified; actual display boot failed platform library validation; signing dependency now active, WindowServer retest pending'}
         write(p, metadata); verify(p)
         p.rename(dest)
     print(f'Assembled {dest}; HP diagnostic boot, explicit experimental bootstrap')

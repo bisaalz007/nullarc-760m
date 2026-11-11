@@ -115,7 +115,12 @@
   "authorized_update": {
     "staged_on_usb": true,
     "backup": "/Volumes/EFI/EFI/OC/.nullarc-amfipass-backup-jasuq34y",
-    "loaded_active_verified": false,
-    "boot_arguments_changed": false
+    "loaded_active_verified": true,
+    "boot_arguments_changed": false,
+    "active_boot": "6DCA08D0-867B-438C-8727-E37F406D9C21",
+    "loaded_uuid": "7DF1CDFC-7EFE-3D82-A3A2-7DACE8B1D097",
+    "service_version": "REL-141-2024-06-28",
+    "gpu_initialization_attempted": false,
+    "desktop_armed": false
   }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Backed-up next-boot update for the captured empty Metal catalogue failure.
+"""Backed-up service update for reviewed Metal-publication/display failures.
 
 Default stages only; --resume-metal runs test shaders on existing healthy queues.
 Never retries initialization or changes EFI/kexts/NVRAM.
@@ -59,7 +59,27 @@ def validate_before_gpu(supervisor,folder,boot,accel_uuid):
     if request.get('format')!=1 or request.get('accelerator_uuid')!=accel_uuid or request.get('armed_from_boot')==boot:
         raise ValueError('protected display request differs')
 
-def recover(package,daemon,state,parent,before_gpu=False):
+def validate_display_fallback(supervisor,evidence,folder,boot,accel_uuid):
+    """Only the reviewed post-arm GUI failure, after a completed fallback reboot."""
+    if (not supervisor.get('boot_session_uuid') or supervisor['boot_session_uuid']==boot or
+        supervisor.get('desktop_armed') is not True or
+        supervisor.get('firmware_fallback_reboot_requested') is not True or
+        supervisor.get('native_initialization_verified') is not True or
+        supervisor.get('metal_verified') is not False or
+        supervisor.get('error')!='no active console-user GUI session before deadline; native GPU retained, app access restricted'):
+        raise ValueError('failure is not the reviewed WindowServer GUI/fallback case')
+    stages=evidence.get('stages',[])
+    if (not stages or stages[-1].get('stage')!='accelerator-claim' or stages[-1].get('returncode')!=0 or
+        not all(evidence.get(k) is True for k in ('executed','native_compute_verified','native_render_verified','accelerator_claimed','metal_deferred')) or
+        evidence.get('metal_verified') is not False):
+        raise ValueError('previous display boot did not prove healthy native execution')
+    request=json.loads((folder/'windowserver-next-boot.json').read_text())
+    if (request.get('format')!=1 or request.get('accelerator_uuid')!=accel_uuid or
+        not request.get('armed_from_boot') or request.get('armed_from_boot') in (boot,supervisor['boot_session_uuid'])):
+        raise ValueError('protected consumed display request differs')
+
+def recover(package,daemon,state,parent,before_gpu=False,after_display_fallback=False):
+    if before_gpu and after_display_fallback:raise ValueError('choose one reviewed recovery case')
     verify(package)
     original=daemon.read_bytes();config=plistlib.loads(original);args=config.get('ProgramArguments',[])
     if config.get('Label')!='local.nullarc.hp-native' or len(args)!=5 or args[:2]!=['/usr/bin/python3','-B'] or args[3]!='--package':
@@ -76,11 +96,24 @@ def recover(package,daemon,state,parent,before_gpu=False):
     if not folders:raise ValueError('no protected boot report')
     latest=max(folders,key=lambda p:p.stat().st_mtime)
     supervisor=json.loads((latest/'boot-result.json').read_text()) if (latest/'boot-result.json').exists() else None
-    if before_gpu:
+    if before_gpu or after_display_fallback:
         sys.path.insert(0,str(package/'gpu/phxctl'))
         from hp_bringup import macho_uuid
         boot=subprocess.check_output(['/usr/sbin/sysctl','-n','kern.bootsessionuuid'],text=True).strip()
-        validate_before_gpu(supervisor or {},latest,boot,macho_uuid(package/'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel'))
+        accel_uuid=macho_uuid(package/'Library/Extensions/PhxAccel.kext/Contents/MacOS/PhxAccel')
+        if before_gpu:validate_before_gpu(supervisor or {},latest,boot,accel_uuid)
+        else:
+            import hp_windowserver as display
+            display.require_library_policy()
+            if display.nodes('PhxAMDFB') or display.nodes('NMXAccel'):raise ValueError('fallback recovery requires an idle firmware-framebuffer boot')
+            bringup=display.nodes('PhxBringup')
+            if len(bringup)!=1 or bringup[0].get('phx-profile')!='hp-760m' or bringup[0].get('phx-stage')!='profile-diagnostic-only':
+                raise ValueError('fresh diagnostic-only HP boot required; no queue retry permitted')
+            nv=plistlib.loads(subprocess.check_output(['/usr/sbin/nvram','-xp'],timeout=5))
+            if 'phxfb-boot' in nv or (state/display.REQUEST).exists():raise ValueError('unexpected display request; review before recovery')
+            evidence=json.loads((latest/'execution/result.json').read_text())
+            validate_display_fallback(supervisor or {},evidence,latest,boot,accel_uuid)
+            if evidence.get('source_package')!=str(old):raise ValueError('boot report belongs to another package')
     else:
         evidence=json.loads((latest/'execution/result.json').read_text())
         validate_failure(evidence,supervisor)
@@ -115,10 +148,12 @@ def recover(package,daemon,state,parent,before_gpu=False):
 
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--package',type=Path,required=True)
-    ap.add_argument('--resume-metal',action='store_true',help='after staging, verify Metal on existing healthy queues without reinitialization');a=ap.parse_args()
+    ap.add_argument('--resume-metal',action='store_true',help='after staging, verify Metal on existing healthy queues without reinitialization')
+    ap.add_argument('--after-display-fallback',action='store_true',help='stage only after the reviewed display failure and an idle firmware-fallback reboot');a=ap.parse_args()
+    if a.resume_metal and a.after_display_fallback:ap.error('fallback staging and existing-queue verification are different recovery cases')
     if os.geteuid()!=0:ap.error('local administrator authentication required')
     try:
-        destination=recover(a.package.resolve(),Path('/Library/LaunchDaemons/local.nullarc.hp-native.plist'),Path('/var/db/nullarc-760m'),Path('/Library/Application Support/NullArc760M'))
+        destination=recover(a.package.resolve(),Path('/Library/LaunchDaemons/local.nullarc.hp-native.plist'),Path('/var/db/nullarc-760m'),Path('/Library/Application Support/NullArc760M'),after_display_fallback=a.after_display_fallback)
         if a.resume_metal:
             subprocess.run([sys.executable,'-B',str(destination/'gpu/phxctl/hp_boot.py'),'--package',str(destination),'--verify-existing'],check=True,timeout=600)
     except (OSError,ValueError,subprocess.SubprocessError) as e:ap.exit(1,str(e)+'\n')

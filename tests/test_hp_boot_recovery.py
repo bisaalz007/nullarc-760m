@@ -15,6 +15,43 @@ SPEC=importlib.util.spec_from_file_location('recover_hp_boot',ROOT/'install/reco
 r=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(r)
 
 class RecoveryTests(unittest.TestCase):
+    def display_failure(self):
+        return {'boot_session_uuid':'failed','desktop_armed':True,'firmware_fallback_reboot_requested':True,
+                'native_initialization_verified':True,'metal_verified':False,
+                'error':'no active console-user GUI session before deadline; native GPU retained, app access restricted'}
+
+    def display_evidence(self):
+        return dict(executed=True,native_compute_verified=True,native_render_verified=True,
+                    accelerator_claimed=True,metal_deferred=True,metal_verified=False,
+                    stages=[{'stage':'accelerator-claim','returncode':0}],source_package=str(self.old))
+
+    def test_display_fallback_requires_new_boot_and_successful_previous_native_tests(self):
+        folder=self.state/'boot-fixture'
+        (folder/'windowserver-next-boot.json').write_text(json.dumps({'format':1,'accelerator_uuid':'expected','armed_from_boot':'origin'}))
+        supervisor=self.display_failure();evidence=self.display_evidence()
+        r.validate_display_fallback(supervisor,evidence,folder,'current','expected')
+        with self.assertRaises(ValueError):r.validate_display_fallback(supervisor,evidence,folder,'failed','expected')
+        with self.assertRaises(ValueError):r.validate_display_fallback(supervisor,evidence,folder,'current','other')
+        evidence['native_render_verified']=False
+        with self.assertRaises(ValueError):r.validate_display_fallback(supervisor,evidence,folder,'current','expected')
+
+    def test_idle_fallback_stages_only_without_gpu_commands(self):
+        folder=self.state/'boot-fixture'
+        (folder/'boot-result.json').write_text(json.dumps(self.display_failure()))
+        (folder/'execution/result.json').write_text(json.dumps(self.display_evidence()))
+        (folder/'windowserver-next-boot.json').write_text(json.dumps({'format':1,'accelerator_uuid':'expected','armed_from_boot':'origin'}))
+        display=SimpleNamespace(require_library_policy=lambda:None,REQUEST='windowserver-next-boot.json',
+            nodes=lambda name:[{'phx-profile':'hp-760m','phx-stage':'profile-diagnostic-only'}] if name=='PhxBringup' else [])
+        with self.stat,patch.object(r.os,'chown'),patch.dict(sys.modules,{'hp_bringup':SimpleNamespace(macho_uuid=lambda p:'expected'),'hp_windowserver':display}),patch.object(r.subprocess,'check_output',side_effect=['current',plistlib.dumps({})]),patch.object(r.subprocess,'run') as run:
+            r.recover(self.new,self.daemon,self.state,self.parent,after_display_fallback=True)
+        run.assert_not_called();self.assertFalse((self.state/'disabled').exists())
+
+    def test_fallback_refuses_an_active_accelerator_before_marker_changes(self):
+        display=SimpleNamespace(require_library_policy=lambda:None,nodes=lambda name:[{}])
+        with patch.dict(sys.modules,{'hp_bringup':SimpleNamespace(macho_uuid=lambda p:'expected'),'hp_windowserver':display}),patch.object(r.subprocess,'check_output',return_value='current'),self.assertRaisesRegex(ValueError,'idle'):
+            r.recover(self.new,self.daemon,self.state,self.parent,after_display_fallback=True)
+        self.assertEqual(self.daemon.read_bytes(),self.original);self.assertTrue((self.state/'disabled').exists())
+
     def test_pre_gpu_display_failure_requires_no_execution_and_this_boot(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp);request={'format':1,'accelerator_uuid':'expected','armed_from_boot':'previous'}

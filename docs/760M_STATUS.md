@@ -927,3 +927,20 @@ or native rebuild was needed. Targeted control tests pass (54 tests); they verif
 failure handling and ordering, not GPU execution. Next: inspect the dependency-only
 boot, then stage the new guards before considering another explicitly armed display
 experiment. Full WindowServer acceleration, reset and suspend remain unverified.
+
+### Sequoia-compatible signing dependency is now active
+
+Dependency-only boot 6DCA08D0-867B-438C-8727-E37F406D9C21 loads AMFIPass 1.4.1,
+UUID 7DF1CDFC-7EFE-3D82-A3A2-7DACE8B1D097, and publishes one AMFIPass service with
+VersionInfo REL-141-2024-06-28. Boot args remain `-v keepsyms=1 alcid=12 xhcinudge=1`.
+Automatic initialization, app access and display arming remain false. This proves
+startup of the updated dependency, not successful WindowServer library loading.
+
+A separate reviewed recovery mode can back up/stage the corrected supervisor only
+after this actual display/GUI-timeout fallback: different current boot, idle exact
+HP diagnostic state, no accelerator/custom framebuffer or display request, active
+1.4.1, protected prior successful native results/consumed matching request, unchanged
+11 native component groups. It does not initialize GPU queues or arm the display.
+Ten recovery tests pass, including same-boot rejection and active-accelerator refusal;
+total targeted control tests are now 57. Next: stage the guard package and run this
+fresh boot's first app/native checks before considering another one-shot display boot.

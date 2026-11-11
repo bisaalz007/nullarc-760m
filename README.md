@@ -74,9 +74,10 @@ and passed native tests, but WindowServer crashed: library validation rejected t
 ad-hoc Metal plugin in the platform process. The one-shot fallback restored the
 firmware framebuffer; display activation is disabled. AMFIPass 1.3.1 was loaded
 but had no active service and declares Darwin 22 as its maximum; the HP is Darwin
-24. A backed-up, explicitly authorized update to OCLP's AMFIPass 1.4.1 is staged on
-the USB, with boot arguments unchanged. Its loaded/active state and WindowServer
-compatibility still require runtime testing. The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
+24. A backed-up, explicitly authorized update to OCLP's AMFIPass 1.4.1 now loads
+and publishes its active service after a dependency-only reboot, with boot arguments
+unchanged. Actual WindowServer compatibility still requires runtime testing.
+The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
 
 The new Sequoia `install.sh --windowserver` path first stages the display module

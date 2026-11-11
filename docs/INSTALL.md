@@ -128,6 +128,15 @@ pending/disabled markers or retry initialization after a failure without first
 reviewing its protected report. App-mode support remains independently verified
 on the previous build; the updated display module requires its own runtime test.
 
+The narrowly scoped `recover_hp_boot.py --package <verified-package>
+--after-display-fallback` can stage a backed-up service update after the reviewed
+post-arm GUI timeout. It requires a different, idle diagnostic-only boot, no
+accelerator/custom framebuffer/request, the active reviewed signing dependency,
+the protected successful native results and consumed request from the failed boot,
+and identical native components. It initializes nothing and does not arm display;
+the local administrator must separately start the reviewed app test. It refuses
+same-boot queue retries and other failure signatures.
+
 ## HP: check and install diagnostics
 
 Mount the correct EFI using your existing disk-management workflow. Substitute
