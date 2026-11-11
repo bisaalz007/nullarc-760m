@@ -10,7 +10,7 @@ build/package/offline translation test does not establish GPU execution.
 
 - macOS Tahoe, Xcode/CLT with SDK 26+, Python 3, Clang, Cargo/Rust >=1.87 and Ninja.
 - MacKernelSDK path; Vulkan-Headers checkout; configured Mesa at the documented
-  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0010.
+  pinned commit with Cobalt64 0001..0009 and Phoenix 0001..0011.
 - Clean NullMoth source checkout at `76df0f6af5c64c2af9a22090da8b3fe14616023e`
   (v2.4.1). Only its LGPL `translator/` is compiled/archived.
 - Compatible LLVM/Zstd AIR-reader runtime bundle, including

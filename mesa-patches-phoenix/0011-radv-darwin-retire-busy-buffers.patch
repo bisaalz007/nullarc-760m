@@ -1,0 +1,206 @@
+From 9d23318a501fcff5faa46954c60bb495aa172dce Mon Sep 17 00:00:00 2001
+From: imnotsayingthatlol <norrisethan65@icloud.com>
+Date: Tue, 10 Nov 2026 18:57:41 -0500
+Subject: [PATCH] Wait for GPU retirement before releasing busy Darwin BOs
+
+---
+ src/amd/common/darwin/ac_darwin_kext.c     | 66 +++++++++++++++++++++-
+ src/amd/common/darwin/test/acd_kext_test.c | 41 ++++++++++++++
+ 2 files changed, 106 insertions(+), 1 deletion(-)
+
+diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_darwin_kext.c
+index 08e6ac0..9229c5f 100644
+--- a/src/amd/common/darwin/ac_darwin_kext.c
++++ b/src/amd/common/darwin/ac_darwin_kext.c
+@@ -8,9 +8,11 @@
+ #include "ac_darwin_kext.h"
+
+ #include <errno.h>
++#include <stdatomic.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <syslog.h>
+ #include <time.h>
+
+ /* ---- the mirrored structs must be layout-identical to their drm twins (D2) ---- */
+@@ -72,6 +74,9 @@ _Static_assert(N48N_GEM_DOMAIN_GTT == AMDGPU_GEM_DOMAIN_GTT && N48N_GEM_DOMAIN_V
+ struct acd_kext {
+    struct acd_kext_ops ops;
+    void *ctx;
++   atomic_bool retirement_failed;
++   atomic_bool retirement_logged;
++   atomic_uint create_errors, import_errors, map_errors;
+ };
+
+ /* G6: the service class of the N48N open. A pointer to one of the two string literals below (never to the caller's buffer). */
+@@ -108,6 +113,11 @@ acd_kext_create(const struct acd_kext_ops *ops, void *ctx)
+          ops->close(ctx);
+       return NULL;
+    }
++   atomic_init(&k->retirement_failed, false);
++   atomic_init(&k->retirement_logged, false);
++   atomic_init(&k->create_errors, 0);
++   atomic_init(&k->import_errors, 0);
++   atomic_init(&k->map_errors, 0);
+    k->ops = *ops;
+    k->ctx = ctx;
+    return k;
+@@ -208,14 +218,64 @@ static int
+ kcall(struct acd_kext *k, uint32_t sel, const uint64_t *sin, uint32_t nsin, const void *stin,
+       size_t stinsz, uint64_t *sout, uint32_t *nsout, void *stout, size_t *stoutsz)
+ {
++   if ((sel == ACD_SEL_SUBMIT || sel == ACD_SEL_BO_CREATE || sel == ACD_SEL_BO_IMPORT_HOST) &&
++       atomic_load(&k->retirement_failed))
++      return -ECANCELED;
+    int kr = k->ops.call(k->ctx, sel, sin, nsin, stin, stinsz, sout, nsout, stout, stoutsz);
+    const int r = acd_kr_to_errno(sel, kr);
+    if (trace_enabled())
+       fprintf(stderr, "radv-darwin: trace sel %u nsin %u stin %zu -> IOReturn 0x%08x errno %d\n", sel, nsin, stinsz,
+               (unsigned)kr, r);
++   if (r) {
++      atomic_uint *count = NULL;
++      const char *operation = NULL;
++      if (sel == ACD_SEL_BO_CREATE) {
++         count = &k->create_errors;
++         operation = "BO_CREATE";
++      } else if (sel == ACD_SEL_BO_IMPORT_HOST) {
++         count = &k->import_errors;
++         operation = "BO_IMPORT_HOST";
++      } else if (sel == ACD_SEL_GEM_VA && ((const struct n48n_gem_va *)stin)->operation == N48N_VA_OP_MAP) {
++         count = &k->map_errors;
++         operation = "GEM_VA_MAP";
++      }
++      if (count && atomic_fetch_add(count, 1) < 8)
++         syslog(LOG_NOTICE, "radv-darwin: %s failed (IOReturn 0x%08x, errno %d)", operation, (unsigned)kr, -r);
++   }
+    return r;
+ }
+
++/* A busy release leaves the kernel BO and GPU VA intact. RADV releases its
++ * userspace reservation when destruction returns, so wait for this client's
++ * submitted work before retrying. Never wait indefinitely in a compositor. */
++static int
++release_call(struct acd_kext *k, uint32_t sel, const uint64_t *sin, uint32_t nsin,
++             const void *stin, size_t stinsz)
++{
++   int result = kcall(k, sel, sin, nsin, stin, stinsz, NULL, NULL, NULL, NULL);
++   if (result != -EBUSY)
++      return result;
++
++   const uint64_t deadline = acd_kext_now_ns(k) + 50000000ull;
++   do {
++      bool busy;
++      result = acd_kext_wait_deadline(k, N48N_SEQ_LAST, deadline, &busy);
++      if (result)
++         break;
++      if (busy) {
++         result = -ETIME;
++         break;
++      }
++      result = kcall(k, sel, sin, nsin, stin, stinsz, NULL, NULL, NULL, NULL);
++   } while (result == -EBUSY && !acd_wait_expired(deadline, acd_kext_now_ns(k)));
++
++   if (!result && !atomic_exchange(&k->retirement_logged, true))
++      syslog(LOG_NOTICE, "radv-darwin: reclaimed an in-flight BO after its queue retired");
++   if (result && sel == ACD_SEL_BO_FREE && !atomic_exchange(&k->retirement_failed, true))
++      syslog(LOG_ERR, "radv-darwin: BO retirement failed (%d); stopping new allocations and submissions", result);
++   return result;
++}
++
+ /* ---- pure helpers ---- */
+
+ uint32_t
+@@ -323,7 +383,7 @@ acd_kext_bo_free(struct acd_kext *k, uint32_t handle)
+ {
+    const uint64_t sin[1] = {handle};
+    acd_sfence();
+-   return kcall(k, ACD_SEL_BO_FREE, sin, 1, NULL, 0, NULL, NULL, NULL, NULL);
++   return release_call(k, ACD_SEL_BO_FREE, sin, 1, NULL, 0);
+ }
+
+ int
+@@ -375,6 +435,10 @@ acd_kext_gem_va(struct acd_kext *k, const struct drm_amdgpu_gem_va *va)
+    /* vm_timeline_*, num_syncobj_handles and the input-fence pointer stay 0: Mesa
+     * consumes them (MAP is synchronous). */
+    acd_sfence();
++   if (va->operation == AMDGPU_VA_OP_UNMAP)
++      return release_call(k, ACD_SEL_GEM_VA, NULL, 0, &w, sizeof(w));
++   if (atomic_load(&k->retirement_failed))
++      return -ECANCELED;
+    return kcall(k, ACD_SEL_GEM_VA, NULL, 0, &w, sizeof(w), NULL, NULL, NULL, NULL);
+ }
+
+diff --git a/src/amd/common/darwin/test/acd_kext_test.c b/src/amd/common/darwin/test/acd_kext_test.c
+index bf85224..1411581 100644
+--- a/src/amd/common/darwin/test/acd_kext_test.c
++++ b/src/amd/common/darwin/test/acd_kext_test.c
+@@ -43,6 +43,7 @@ struct fake {
+    uint64_t last_wait_rel;
+    unsigned wait_calls;
+    int first_refuse;
++   unsigned busy_releases;
+ };
+
+ static int
+@@ -65,6 +66,12 @@ fake_call(void *ctx, uint32_t sel, const uint64_t *sin, uint32_t nsin, const voi
+    }
+    if (f->next_kr)
+       return f->next_kr;
++   if (f->busy_releases &&
++       (sel == ACD_SEL_BO_FREE ||
++        (sel == ACD_SEL_GEM_VA && ((const struct n48n_gem_va *)stin)->operation == N48N_VA_OP_UNMAP))) {
++      f->busy_releases--;
++      return (int)ACD_KR_BUSY;
++   }
+    switch (sel) {
+    case ACD_SEL_SUBMIT:
+       sout[0] = ++f->seq;
+@@ -111,6 +118,39 @@ mk(struct fake *f)
+    return acd_kext_create(&ops, f);
+ }
+
++static void
++test_busy_release(void)
++{
++   struct fake f;
++   struct acd_kext *k = mk(&f);
++   f.busy_releases = 1;
++   CHECK(acd_kext_bo_free(k, 9) == 0);
++   CHECK(f.ncalls == 3 && f.calls[1].sel == ACD_SEL_WAIT_SEQ && f.calls[1].sin[0] == N48N_SEQ_LAST);
++   CHECK(f.calls[2].sel == ACD_SEL_BO_FREE && f.calls[2].sin[0] == 9);
++   acd_kext_destroy(k);
++
++   k = mk(&f);
++   f.busy_releases = 1;
++   struct drm_amdgpu_gem_va va = {.handle = 9, .operation = AMDGPU_VA_OP_UNMAP,
++                                 .va_address = 65536, .map_size = 4096};
++   CHECK(acd_kext_gem_va(k, &va) == 0);
++   CHECK(f.ncalls == 3 && f.calls[1].sel == ACD_SEL_WAIT_SEQ && f.calls[2].sel == ACD_SEL_GEM_VA);
++   acd_kext_destroy(k);
++
++   k = mk(&f);
++   f.busy_releases = 1;
++   f.busy_polls = 1;
++   CHECK(acd_kext_bo_free(k, 9) == -ETIME);
++   CHECK(f.ncalls == 2 && f.last_wait_rel == 50000000ull);
++   va.operation = AMDGPU_VA_OP_MAP;
++   CHECK(acd_kext_gem_va(k, &va) == -ECANCELED && f.ncalls == 2);
++   struct n48n_gem_create_in create = {.bo_size = 4096};
++   struct acd_bo_created allocated;
++   CHECK(acd_kext_bo_create(k, &create, &allocated) == -ECANCELED && f.ncalls == 2);
++   CHECK(acd_kext_bo_free(k, 9) == 0 && f.ncalls == 3);
++   acd_kext_destroy(k);
++}
++
+ static void
+ test_errno_map(void)
+ {
+@@ -476,6 +516,7 @@ main(void)
+    test_import_host();
+    test_scanx_call();
+    test_service_class();
++   test_busy_release();
+    printf("acd_kext_test: %d checks, %d failures\n", checks, failures);
+    return failures != 0;
+ }

@@ -129,14 +129,19 @@ class DisplayTests(unittest.TestCase):
             d.verify_present({},lambda:None)
 
     def test_failed_display_boot_reboots_only_if_custom_framebuffer_owns_panel(self):
+        sample='debug.nvaccel_iop_copy_us_max: 21000\ndebug.nvaccel_iop_gap2: 25\n'
         for nodes,expected in (([],0),([{}],1)):
-            with patch.object(d,'nodes',return_value=nodes),patch.object(d,'sysctl',return_value=0),patch.object(d.subprocess,'run') as run:
-                d.fallback({},lambda:None);self.assertEqual(run.call_count,expected)
-                if expected:self.assertEqual(run.call_args.args[0],['/sbin/shutdown','-r','now'])
+            with patch.object(d,'nodes',return_value=nodes),patch.object(d,'sysctl',return_value=0),patch.object(d.subprocess,'run') as run,patch.object(d.subprocess,'check_output',return_value=sample):
+                report={}
+                d.fallback(report,lambda:None);self.assertEqual(run.call_count,expected)
+                if expected:
+                    self.assertEqual(run.call_args.args[0],['/sbin/shutdown','-r','now'])
+                    self.assertEqual(report['desktop_failure_timing'],{'nvaccel_iop_copy_us_max':21000,'nvaccel_iop_gap2':25})
 
     def test_counter_read_failure_cannot_prevent_firmware_fallback(self):
-        with patch.object(d,'nodes',return_value=[{}]),patch.object(d,'sysctl',side_effect=ValueError('counter unavailable')),patch.object(d.subprocess,'run') as run:
+        with patch.object(d,'nodes',return_value=[{}]),patch.object(d,'sysctl',side_effect=ValueError('counter unavailable')),patch.object(d.subprocess,'run') as run,patch.object(d.subprocess,'check_output',side_effect=d.subprocess.TimeoutExpired('sysctl',2)):
             report={};d.fallback(report,lambda:None)
         run.assert_called_once();self.assertEqual(len(report['desktop_failure_counters']),4)
+        self.assertIn('read_error',report['desktop_failure_timing'])
 
 if __name__=='__main__':unittest.main()

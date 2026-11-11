@@ -1,0 +1,35 @@
+{
+  "hardware": "HP Envy x360 16-ad0013dx, AMD Radeon 760M",
+  "macos": "15.8.2 (24H232)",
+  "source_commit": "d9e4fc5",
+  "radv_uuid_in_windowserver": "A59F0416-4FC9-327F-BCEE-CE8BF1BD4B31",
+  "observed_login_ui": {
+    "cursor_disappeared_over_textbox": true,
+    "time_and_text_missing": true,
+    "visibly_choppy": true
+  },
+  "runtime": {
+    "native_initialization_verified": true,
+    "metal_compute_and_render_readbacks_passed": true,
+    "framebuffer_fetch_enabled_in_windowserver": true,
+    "windowserver_processes_observed": 2,
+    "stable_gui_session_verified": false,
+    "present_transactions_before_fallback": 314,
+    "failed_present_transactions": 0,
+    "unwritten_present_transactions": 0,
+    "skipped_present_transactions": 0,
+    "console_session_returned_to_loginwindow_during_validation": true,
+    "windowserver_crash_report_observed_by_supervisor": false,
+    "firmware_fallback_confirmed": true,
+    "automatic_initialization_disabled_after_fallback": true
+  },
+  "windowserver_log": {
+    "invalid_drm_layout_messages": 0,
+    "image_allocation_failure_messages": 8,
+    "host_import_failure_messages": 8,
+    "allocation_throttle_messages": 8,
+    "first_failed_image_allocation_bytes": 32768,
+    "tracked_mib_at_first_throttle": 112,
+    "allocation_throttle_ms": 250
+  }
+}

@@ -147,7 +147,7 @@ sh src/phxbringup/build.sh /path/to/MacKernelSDK
 sh src/phxaccel/build.sh /path/to/MacKernelSDK
 ```
 
-Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0010 to Mesa
+Apply Cobalt64 0001..0009, then this repository's Phoenix 0001..0011 to Mesa
 `f5cb8ee032adabef599ae892ec4e42d796b84da9`. Each generator is an alternative to its corresponding patch, not an additional patch. Build per `mesa-patches-phoenix/README.txt`, then:
 
 ```sh
@@ -1131,5 +1131,35 @@ installed build and candidate held 80 concurrent 1024x1024 BGRA8 textures
 The x86_64 macOS 15.0 plugin, RADV and probe build, `make test`, SPIR-V validation
 of the sparse shader, and packaged AIR translation and ACO compilation with 8-CU
 and 12-CU mocks passed. The live tests used the existing native queues with the
-firmware framebuffer. The candidate was not installed; WindowServer's original
-OOM and the login/display path still require a guarded target retest.
+firmware framebuffer. That run preceded installation and the WindowServer test
+below.
+
+### Texture44 WindowServer retest and Darwin buffer retirement
+
+The one-shot retest loaded the exact texture44 RADV in WindowServer and enabled
+framebuffer fetch. Installed GUI Metal compute and render readbacks passed.
+The panel recorded 314 presents and zero failed copy transactions, but the
+login screen stuttered and lacked text. The cursor disappeared when it changed
+over the text box. WindowServer reinitialized under a second PID. The protected
+supervisor report recorded the console session returning to UID 0 during Metal
+validation and requested the firmware fallback, which completed. The report
+did not record a matching WindowServer crash report. See
+`hardware/dumps/hp_envy_760m/sequoia-texture44-windowserver.json`.
+
+The retest logged failed 32 KiB image allocations, host imports, and 250 ms
+allocation throttles at about 112 MiB of tracked usage. It did not log the
+previous invalid DRM pitch error. The Vulkan OOM result does not identify
+whether native allocation or GPU mapping failed.
+
+The transport also had a concrete teardown defect. A busy kernel unmap/free
+leaves its BO and GPU VA mapped, while RADV drops the userspace reservation.
+Phoenix patch 0011 retries those busy releases after the client's GPU work
+retires, with a 50 ms limit. If BO retirement fails after the wait, the
+connection stops accepting new allocations and submissions. It logs native
+allocation, import and mapping errors separately. The Darwin transport regression
+fails 10 checks against the old code and passes all 144 with the fix. The fallback
+supervisor now saves existing frame-copy durations and refresh-gap counters
+before reboot. The host suite (including all 18 display guard tests), Sequoia
+RADV build, and packaged Metal translation and ACO tests on both mocked profiles
+passed. The rebuilt RADV and supervisor are local candidates. Whether busy
+releases caused this specific login failure still requires native evidence.

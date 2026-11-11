@@ -210,5 +210,21 @@ def fallback(report,save):
             try:counters[name]=sysctl('debug.'+name)
             except (OSError,ValueError,subprocess.SubprocessError) as e:counters[name]={'read_error':str(e)}
         report['desktop_failure_counters']=counters
+        # Collect pacing in one bounded read so diagnostics cannot stall fallback.
+        names=('nvaccel_iop_copy_us','nvaccel_iop_copy_us_max','nvaccel_iop_copy_us_sum',
+               'nvaccel_iop_src_surf','nvaccel_iop_src_res','nvaccel_iop_blank',
+               'nvaccel_iop_gap1','nvaccel_iop_gap2','nvaccel_iop_gap3','nvaccel_iop_gap4',
+               'phxbos_flush_bytes')
+        try:
+            raw=subprocess.check_output(['/usr/sbin/sysctl',*('debug.'+name for name in names)],
+                                        text=True,timeout=2)
+            timing={}
+            for line in raw.splitlines():
+                key,sep,value=line.partition(':')
+                if sep and key.startswith('debug.') and key[6:] in names:
+                    timing[key[6:]]=int(value.strip())
+            report['desktop_failure_timing']=timing
+        except (OSError,ValueError,subprocess.SubprocessError) as e:
+            report['desktop_failure_timing']={'read_error':str(e)}
         report['firmware_fallback_reboot_requested']=True;save()
         subprocess.run(['/sbin/shutdown','-r','now'],check=True,timeout=10)

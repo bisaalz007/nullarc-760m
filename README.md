@@ -84,8 +84,8 @@ actual Metal plugin without GPU commands. The next actual display boot loaded
 NVMTL inside WindowServer and created its AMD Metal device. The user saw a partial
 login UI with missing cursor/text; native and GUI Metal compute/render tests passed,
 but the supervisor requested fallback when the console user changed. No successful
-presentation-counter check or complete desktop is verified. Logs identify invalid
-linear texture pitches, allocation failures and disabled framebuffer fetch.
+presentation-counter check or complete desktop is verified. That boot logged
+invalid linear texture pitches, allocation failures and disabled framebuffer fetch.
 See the [partial-display report](hardware/dumps/hp_envy_760m/sequoia-display42-partial-ui.json).
 The [module test report](hardware/dumps/hp_envy_760m/sequoia-display40-metal-execution.json)
 records those actual GPU readbacks.
@@ -96,9 +96,11 @@ pitches), and an aligned public buffer texture still aliases its buffer. Native
 RADV now reports a 1 MiB allocation and its release; previously both read as zero.
 The candidate held 80 textures (320 MiB) and matched all 4096 pixels in each of
 three framebuffer-fetch cases. Fetch is enabled for WindowServer on the exact HP
-PCI profile in this build. These tests used the firmware framebuffer; the
-candidate has not yet run inside WindowServer. See the
-[texture44 report](hardware/dumps/hp_envy_760m/sequoia-texture44-offscreen.json).
+PCI profile in this build. A subsequent WindowServer boot loaded the candidate
+and recorded 314 presents, but the login screen still lost text and the cursor,
+stuttered, and fell back to the firmware framebuffer. Texture allocations
+continued to fail. See the [offscreen report](hardware/dumps/hp_envy_760m/sequoia-texture44-offscreen.json)
+and the [WindowServer retest](hardware/dumps/hp_envy_760m/sequoia-texture44-windowserver.json).
 
 The new Sequoia `install.sh --windowserver` path first stages the display module
 for an **app-only validation reboot**. Only after that module's loaded UUID,
@@ -172,7 +174,7 @@ or accelerated display success is claimed by this build.
 See [development status](docs/760M_STATUS.md), [source dependency map](docs/760M_ARCHITECTURE.md),
 and [build, package, offline translation tests and diagnostic installation](docs/BUILD_STACK.md).
 Validate the supplied profile with `python3 tools/phx_profile.py --check`.
-Mesa uses Phoenix patches 0001..0010; generator scripts are alternatives to applying
+Mesa uses Phoenix patches 0001..0011; generator scripts are alternatives to applying
 the corresponding patches, not additional steps.
 
 ## Status
