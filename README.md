@@ -220,7 +220,7 @@ Validate the supplied profile with `python3 tools/phx_profile.py --check`.
 Mesa uses Phoenix patches 0001..0013; generator scripts are alternatives to applying
 the corresponding patches, not additional steps.
 
-## Status
+## Status (FROM ORIGINAL NULLARC PROJECT, NOT THIS ONE)
 
 Measured on the reference machine — Firebat U6C, Ryzen 7 H 255, Radeon 780M, 2560×1600 120 Hz eDP, macOS Tahoe 26.6.2 —
 in October 2026:
